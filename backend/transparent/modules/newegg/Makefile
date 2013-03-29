@@ -18,7 +18,7 @@ JFLAGS=
 #
 
 .java.class:
-		${JC} ${JFLAGS} $*.java
+		${JC} ${JFLAGS} -cp json-smart-1.1.1.jar $*.java
 
 #
 # GNU Make: targets that don't build files

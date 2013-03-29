@@ -2,9 +2,11 @@
 # Unix/Linux makefile for COS 333 project
 #
 
-.SUFFIXES: .java .class
 SRCS = \
-	core/Core.java
+	transparent/core/Module.java \
+	transparent/core/Sandbox.java \
+	transparent/core/NoSandbox.java \
+	transparent/core/Core.java
 
 #
 # Compile and link options
@@ -18,8 +20,8 @@ MODULES=newegg
 # Compile command
 #
 
-.java.class:
-		${JC} ${JFLAGS} $*.java
+%.class : %.java
+		${JC} ${JFLAGS} $<
 
 #
 # GNU Make: targets that don't build files
@@ -36,10 +38,10 @@ default: all
 all: core modules
 
 modules:
-		${MAKE} -C modules/${MODULES} all
+		${MAKE} -C transparent/modules/${MODULES} all
 
 core: ${SRCS:.java=.class}
 
 clean:
-		${RM} -f core/*.class; ${MAKE} -C modules/${MODULES} clean
+		${RM} -f core/*.class; ${MAKE} -C transparent/modules/${MODULES} clean
 
