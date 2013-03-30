@@ -4,6 +4,6 @@
 *.war
 *.ear
 
-# Eclipse project files #
-.classpath
-.project
+# Binary output $
+backend/bin/
+

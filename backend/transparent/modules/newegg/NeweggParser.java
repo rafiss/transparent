@@ -1,12 +1,19 @@
-package transparent.modules.newegg;
-
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.AbstractSet;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 import net.minidev.json.JSONArray;
+import net.minidev.json.JSONObject;
 import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 
@@ -23,6 +30,30 @@ public class NeweggParser
 	
 	private static final String ROOT_URL =
 			"http://www.ows.newegg.com/Stores.egg/Menus";
+	private static final String ROOT_KEY = "StoreDepa";
+	private static final String ROOT_VALUE = "ComputerHardware";
+	private static final String STORE_ID = "StoreID";
+	
+	private static final String STORE_URL =
+			"http://www.ows.newegg.com/Stores.egg/Categories/";
+	private static final String STORE_KEY = "Description";
+	private static final String CATEGORY_ID = "CategoryID";
+	private static final String NODE_ID = "NodeId";
+
+	private static final String CATEGORY_URL =
+			"http://www.ows.newegg.com/Stores.egg/Navigation/";
+	
+	private static final HashSet<Object> STORE_DESCRIPTIONS =
+			new HashSet<Object>(Arrays.asList(
+					"CD \\/ DVD Burners & Media",		"Computer Cases",
+					"CPUs \\/ Processors",				"Fans & Heatsinks",
+					"Flash Memory & Readers",			"Hard Drives",
+					"Keyboards & Mice",					"Memory",
+					"Monitors",							"Motherboards",
+					"Networking",						"Power Protection",
+					"Power Supplies",					"Printers \\/ Scanners & Supplies",
+					"Soundcards, Speakers & Headsets",	"Video Cards & Video Devices"
+			));
 	
 	private static final JSONParser parser =
 			new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
@@ -51,11 +82,72 @@ public class NeweggParser
 		return response.toByteArray();
 	}
 	
-	public static void parseProductList()
+	private static HashMap<Object, JSONObject> findKeyValues(
+			Object key, Set<Object> values, Object json)
 	{
-		byte[] root;
+		HashMap<Object, JSONObject> map = new HashMap<Object, JSONObject>();
+		if (json instanceof JSONArray) {
+			/* look for the key-value pair in this array */
+			JSONArray array = (JSONArray) json;
+			for (int i = 0; i < array.size(); i++)
+				map.putAll(findKeyValues(key, values, array.get(i)));
+			
+		} else if (json instanceof JSONObject) {
+			/* look for the key-value pair in this map */
+			JSONObject jsonMap = (JSONObject) json;
+			if (jsonMap.containsKey(key) && values.contains(jsonMap.get(key)))
+				map.put(jsonMap.get(key), jsonMap);
+			
+			/* it could be in its children */
+			for (Object child : jsonMap.values())
+				map.putAll(findKeyValues(key, values, child));
+		} else {
+			return map;
+		}
+		
+		return map;
+	}
+	
+	private static JSONObject findKeyValue(Object key, Object value, Object json)
+	{
+		HashMap<Object, JSONObject> result =
+				findKeyValues(key, Collections.singleton(value), json);
+		if (result == null || result.size() == 0)
+			return null;
+		return result.values().iterator().next();
+	}
+	
+	private static void parseCategory(String url)
+	{
+		byte[] data;
 		try {
-			root = request(ROOT_URL);
+			data = request(url);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseCategory ERROR:"
+					+ " Error requesting URL '" + url + "'.");
+			return;
+		}
+		
+		Object parsed;
+		try {
+			parsed = parser.parse(data);
+		} catch (ParseException e) {
+			System.err.println("NeweggParser.parseCategory ERROR:"
+					+ " Error parsing JSON.");
+			return;
+		}
+
+		System.err.println(parsed);
+		System.err.flush();
+		
+		System.exit(0);
+	}
+	
+	private static void parseProductList()
+	{
+		byte[] data;
+		try {
+			data = request(ROOT_URL);
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
 					+ " Error requesting URL '" + ROOT_URL + "'.");
@@ -64,51 +156,55 @@ public class NeweggParser
 		
 		Object parsed;
 		try {
-			parsed = parser.parse(root);
+			parsed = parser.parse(data);
 		} catch (ParseException e) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
 					+ " Error parsing JSON.");
 			return;
 		}
 
-		if (!(parsed instanceof JSONArray)) {
+		JSONObject map = findKeyValue(ROOT_KEY, ROOT_VALUE, parsed);
+		if (map == null || !map.containsKey(STORE_ID)) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
-					+ " Incorrect parsed object type.");
+					+ " Could not determine 'ComputerHardware' store ID.");
+			return;
+		}
+
+		String storeId = map.get(STORE_ID).toString();
+		String url = STORE_URL + storeId;
+		try {
+			data = request(url);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseProductList ERROR:"
+					+ " Error requesting URL '" + url + "'.");
 			return;
 		}
 		
-		JSONArray array = (JSONArray) parsed;
-		if (array.size() == 0) {
+		try {
+			parsed = parser.parse(data);
+		} catch (ParseException e) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
-					+ " Root array size is zero.");
+					+ " Error parsing JSON.");
 			return;
 		}
 		
-		if (!(array.get(0) instanceof JSONObject)) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
-					+ " Expected JSONObject.");
-			return;
+		HashMap<Object, JSONObject> result =
+				findKeyValues(STORE_KEY, STORE_DESCRIPTIONS, parsed);
+		for (JSONObject category : result.values()) {
+			parseCategory(CATEGORY_URL + storeId + '/'
+					+ category.get(CATEGORY_ID) + '/' + category.get(NODE_ID));
 		}
-		
-		JSONObject map = (JSONObject) array.get(0);
-		
 	}
 	
 	public static void main(String[] args)
 	{
-		System.err.write('0');
-		System.err.flush();
 		try {
 			/* wait for the type of request */
 			switch (in.readUnsignedByte()) {
 			case PRODUCT_LIST_REQUEST:
-				System.err.write('1');
-				System.err.flush();
 				parseProductList();
 				break;
 			case PRODUCT_INFO_REQUEST:
-				System.err.write('2');
-				System.err.flush();
 				//parseProductInfo(); TODO: implement this
 				break;
 			default:

@@ -25,6 +25,7 @@ public class Core
 	
 	private static void downloadPage(DataOutputStream dest, String url, boolean blocked)
 	{
+		/* TODO: limit the amount of data we download */
 		try {
 			InputStream stream = new URL(url).openStream();
 		
@@ -92,28 +93,34 @@ public class Core
 					System.err.println("Core.getProductList ERROR:"
 							+ " Unknown module response type.");
 				}
-				
-				int next = process.getErrorStream().read();
-				while (next != -1) {
-					System.err.write(next);
-					next = process.getErrorStream().read();
-				}
+
+				while (process.getErrorStream().available() > 0)
+					System.err.write(process.getErrorStream().read());
 			}
 		} catch (IOException e) {
 			/* we cannot communicate with the module, so just kill it */
-			/* TODO: we need some kind of logging mechanism that keeps track of module errors */
 			System.err.println("Core.getProductList ERROR:"
 					+ " Cannot communicate with module.");
-			process.destroy();
 		}
+
+		/* get standard error (TODO: limit the amount of data we read) */
+		/* TODO: we need some kind of logging mechanism that keeps track of module errors */
+		try {
+			if (process.getErrorStream().available() > 0) {
+				System.err.println("Core.getProductList: Module printed to standard error.");
+				while (process.getErrorStream().available() > 0)
+					System.err.write(process.getErrorStream().read());
+			}
+		} catch (IOException e) { }
+		process.destroy();
 	}
 	
 	public static void main(String[] args)
 	{
 		/* for now, just start the Newegg parser */
 		Module newegg = new Module(
-				"java -cp .:transparent/modules/newegg/json-smart-1.1.1.jar"
-						+ " transparent.modules.newegg.NeweggParser", false, true);
+				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
+						+ " NeweggParser", false, true);
 		getProductList(newegg);
 	}
 }
