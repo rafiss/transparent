@@ -10,6 +10,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import net.minidev.json.JSONArray;
@@ -21,8 +23,9 @@ public class NeweggParser
 {
 	private static final byte PRODUCT_LIST_REQUEST = 0;
 	private static final byte PRODUCT_INFO_REQUEST = 1;
-	private static final byte MODULE_URL_REQUEST = 0;
-	private static final byte MODULE_RESPONSE = 1;
+	private static final byte MODULE_RESPONSE = 0;
+	private static final byte MODULE_HTTP_GET_REQUEST = 1;
+	private static final byte MODULE_HTTP_POST_REQUEST = 2;
 
 	private static final int BUFFER_SIZE = 4096;
 	
@@ -36,23 +39,100 @@ public class NeweggParser
 	
 	private static final String STORE_URL =
 			"http://www.ows.newegg.com/Stores.egg/Categories/";
-	private static final String STORE_KEY = "Description";
+	private static final String DESCRIPTION_KEY = "Description";
 	private static final String CATEGORY_ID = "CategoryID";
 	private static final String NODE_ID = "NodeId";
 
 	private static final String CATEGORY_URL =
 			"http://www.ows.newegg.com/Stores.egg/Navigation/";
+
+	private static final String SUBCATEGORY_URL =
+			"http://www.ows.newegg.com/Search.egg/Advanced";
 	
 	private static final HashSet<Object> STORE_DESCRIPTIONS =
 			new HashSet<Object>(Arrays.asList(
-					"CD \\/ DVD Burners & Media",		"Computer Cases",
-					"CPUs \\/ Processors",				"Fans & Heatsinks",
-					"Flash Memory & Readers",			"Hard Drives",
+					"CD / DVD Burners & Media",			"Computer Accessories",
+					"Computer Cases",					"CPUs / Processors",
+					"Fans & Heatsinks",					"Hard Drives",
 					"Keyboards & Mice",					"Memory",
 					"Monitors",							"Motherboards",
-					"Networking",						"Power Protection",
-					"Power Supplies",					"Printers \\/ Scanners & Supplies",
-					"Soundcards, Speakers & Headsets",	"Video Cards & Video Devices"
+					"Networking",						"Power Supplies",
+					"Printers / Scanners & Supplies",	"Soundcards, Speakers & Headsets",
+					"Video Cards & Video Devices"
+			));
+
+	private static final HashSet<Object> SUBCATEGORY_DESCRIPTIONS =
+			new HashSet<Object>(Arrays.asList(
+					/* for "CD / DVD Burners & Media" */
+					"Blu-Ray Burners",					"Blu-Ray Drives",
+					"CD / DVD Burners",					"CD / DVD Drives",
+					"Duplicators",						"External CD / DVD / Blu-Ray Drives",
+					"CD / DVD / Blu-ray Media",
+
+					/* for "Computer Accessories" */
+					"Cables",							"Adapters & Gender Changers",
+					"Add-On Cards",						"Cable Management",
+					"Card Readers",						"Case Accessories",
+					"Controller Panels",				"CPU Accessories",
+					"Mouse Pads & Accessories",			"Power Strips",
+					"SSD/ HDD Accessory",
+
+					/* for "Computer Cases" */
+					"Computer Cases",					"Server Chassis",
+
+					/* for "CPUs / Processors" */
+					"Processors - Desktops",			"Processors - Servers",
+					"Processors - Mobile",
+
+					/* for "Fans & Heatsinks" */
+					"Case Fans",						"CPU Fans & Heatsinks",
+					"Hard Drive Cooling",				"Memory & Chipset Cooling",
+					"Thermal Compound / Grease",		"VGA Cooling",
+					"Water / Liquid Cooling",
+
+					/* for "Hard Drives" */
+					"Internal Hard Drives",				"SSD",
+					"Laptop Hard Drives",				"Mac Hard Drives",
+					"External Hard Drives",				"Controllers / RAID Cards",
+
+					/* for "Keyboards & Mice" */
+					"Keyboards",						"Mice",
+
+					/* for "Memory" */
+					"Desktop Memory",					"Flash Memory",
+					"Laptop Memory",					"Mac Memory",
+					"Server Memory",					"System Specific Memory",
+					"USB Flash Drives",
+
+					/* for "Monitors" */
+					"LCD Monitors",						"Large Format Display",
+					"Touchscreen Monitors",				"Monitor Accessories",
+
+					/* for "Motherboards" */
+					"AMD Motherboards",					"Intel Motherboards",
+					"Motherboard / CPU / VGA Combo",	"Motherboard Accessories",
+					"Server Motherboards",
+
+					/* for "Networking" */
+					"Wireless Networking",				"Wired Networking",
+					"VoIP",								"Firewalls/Security Appliances",
+					"Security & Surveillance",			"Modems",
+					"Powerline Networking",
+
+					/* for "Power Supplies" */
+					"Power Supplies",					"Server Power Supplies",
+
+					/* for "Printers / Scanners & Supplies" */
+					"Laser Printers",					"Inkjet Printers",
+					"Document Scanners",				"Flatbed Scanners",
+					"Fax Machines & Copiers",
+
+					/* for "Soundcards, Speakers & Headsets" */
+					"Headsets & Accessories",			"Microphones",
+					"Sound Cards",						"Speakers",
+
+					/* for "Video Cards & Video Devices" */
+					"Desktop Graphics Cards",			"Professional Graphics Cards"
 			));
 	
 	private static final JSONParser parser =
@@ -63,13 +143,8 @@ public class NeweggParser
 	private static final DataInputStream in =
 			new DataInputStream(System.in);
 	
-	private static byte[] request(String url) throws IOException
+	private static byte[] httpResponse() throws IOException
 	{
-		out.writeByte(MODULE_URL_REQUEST);
-		out.writeShort(url.length());
-		out.write(url.getBytes(ASCII));
-		out.flush();
-
 		int length = in.readUnsignedShort();
 		ByteArrayOutputStream response = new ByteArrayOutputStream(BUFFER_SIZE);
 		while (length != 0) {
@@ -80,6 +155,28 @@ public class NeweggParser
 		}
 		
 		return response.toByteArray();
+	}
+	
+	private static byte[] httpGetRequest(String url) throws IOException
+	{
+		out.writeByte(MODULE_HTTP_GET_REQUEST);
+		out.writeShort(url.length());
+		out.write(url.getBytes(ASCII));
+		out.flush();
+
+		return httpResponse();
+	}
+	
+	private static byte[] httpPostRequest(String url, String post) throws IOException
+	{
+		out.writeByte(MODULE_HTTP_POST_REQUEST);
+		out.writeShort(url.length());
+		out.write(url.getBytes(ASCII));
+		out.writeInt(post.length());
+		out.writeBytes(post);
+		out.flush();
+
+		return httpResponse();
 	}
 	
 	private static HashMap<Object, JSONObject> findKeyValues(
@@ -117,15 +214,18 @@ public class NeweggParser
 		return result.values().iterator().next();
 	}
 	
-	private static void parseCategory(String url)
+	private static HashSet<Subcategory> parseCategory(
+			Object storeId, Object categoryId, Object nodeId)
 	{
 		byte[] data;
+		String url = CATEGORY_URL + storeId + '/'
+				+ categoryId + '/' + nodeId;
 		try {
-			data = request(url);
+			data = httpGetRequest(url);
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseCategory ERROR:"
 					+ " Error requesting URL '" + url + "'.");
-			return;
+			return null;
 		}
 		
 		Object parsed;
@@ -134,20 +234,51 @@ public class NeweggParser
 		} catch (ParseException e) {
 			System.err.println("NeweggParser.parseCategory ERROR:"
 					+ " Error parsing JSON.");
-			return;
+			return null;
 		}
 
-		System.err.println(parsed);
+		HashMap<Object, JSONObject> result =
+				findKeyValues(DESCRIPTION_KEY, SUBCATEGORY_DESCRIPTIONS, parsed);
+		HashSet<Subcategory> subcategories = new HashSet<Subcategory>();
+		for (JSONObject map : result.values()) {
+			Subcategory subcategory = new Subcategory(
+					storeId, categoryId, map.get(CATEGORY_ID), map.get(NODE_ID));
+			subcategories.add(subcategory);
+		}
+		return subcategories;
+	}
+	
+	private static void parseSubcategory(Subcategory subcategory)
+	{
+		int pageNumber = 1;
+		String post = "data = {"
+				+ "\"SubCategoryId\":" + subcategory.getSubcategoryId() + ","
+				+ "\"NValue\":\"\","
+				+ "\"StoreDepaId\":" + subcategory.getStoreId() + ","
+				+ "\"NodeId\":" + subcategory.getNodeId() + ","
+				+ "\"BrandId\":-1,"
+				+ "\"PageNumber\":" + pageNumber + ","
+				+ "\"CategoryId\":" + subcategory.getCategoryId() + "}";
+
+		byte[] data;
+		try {
+			data = httpPostRequest(SUBCATEGORY_URL, post);
+			System.err.write(data);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseProductList ERROR:"
+					+ " Error requesting URL '" + ROOT_URL + "'.");
+			return;
+		}
 		System.err.flush();
-		
 		System.exit(0);
 	}
 	
-	private static void parseProductList()
+	private static void getProductList()
 	{
+		/* first get the list of stores from the root JSON document */
 		byte[] data;
 		try {
-			data = request(ROOT_URL);
+			data = httpGetRequest(ROOT_URL);
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
 					+ " Error requesting URL '" + ROOT_URL + "'.");
@@ -163,6 +294,7 @@ public class NeweggParser
 			return;
 		}
 
+		/* find the computer hardware store ID */
 		JSONObject map = findKeyValue(ROOT_KEY, ROOT_VALUE, parsed);
 		if (map == null || !map.containsKey(STORE_ID)) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
@@ -170,10 +302,11 @@ public class NeweggParser
 			return;
 		}
 
-		String storeId = map.get(STORE_ID).toString();
+		/* get the list of categories in that store */
+		Object storeId = map.get(STORE_ID);
 		String url = STORE_URL + storeId;
 		try {
-			data = request(url);
+			data = httpGetRequest(url);
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductList ERROR:"
 					+ " Error requesting URL '" + url + "'.");
@@ -188,11 +321,18 @@ public class NeweggParser
 			return;
 		}
 		
+		/* for each category, get a list of subcategories */
 		HashMap<Object, JSONObject> result =
-				findKeyValues(STORE_KEY, STORE_DESCRIPTIONS, parsed);
+				findKeyValues(DESCRIPTION_KEY, STORE_DESCRIPTIONS, parsed);
+		HashSet<Subcategory> subcategories = new HashSet<Subcategory>();
 		for (JSONObject category : result.values()) {
-			parseCategory(CATEGORY_URL + storeId + '/'
-					+ category.get(CATEGORY_ID) + '/' + category.get(NODE_ID));
+			subcategories.addAll(parseCategory(
+					storeId, category.get(CATEGORY_ID), category.get(NODE_ID)));
+		}
+		
+		/* for each subcategory, get a list of products */
+		for (Subcategory subcategory : subcategories) {
+			parseSubcategory(subcategory);
 		}
 	}
 	
@@ -202,7 +342,7 @@ public class NeweggParser
 			/* wait for the type of request */
 			switch (in.readUnsignedByte()) {
 			case PRODUCT_LIST_REQUEST:
-				parseProductList();
+				getProductList();
 				break;
 			case PRODUCT_INFO_REQUEST:
 				//parseProductInfo(); TODO: implement this
@@ -214,5 +354,53 @@ public class NeweggParser
 					+ " Error communicating with core.");
 			return;
 		}
+	}
+}
+
+class Subcategory {
+	private Object storeId;
+	private Object categoryId;
+	private Object subcategoryId;
+	private Object nodeId;
+	
+	public Subcategory(Object storeId, Object categoryId,
+			Object subcategoryId, Object nodeId)
+	{
+		this.storeId = storeId;
+		this.categoryId = categoryId;
+		this.subcategoryId = subcategoryId;
+		this.nodeId = nodeId;
+	}
+	
+	public Object getStoreId() {
+		return this.storeId;
+	}
+	
+	public Object getCategoryId() {
+		return this.categoryId;
+	}
+	
+	public Object getSubcategoryId() {
+		return this.subcategoryId;
+	}
+	
+	public Object getNodeId() {
+		return this.nodeId;
+	}
+	
+	@Override
+	public int hashCode() {
+		return subcategoryId.hashCode();
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (o == null) return false;
+		else if (o == this) return true;
+		else if (!o.getClass().equals(this.getClass()))
+			return false;
+		
+		Subcategory other = (Subcategory) o;
+		return categoryId.equals(other.categoryId);
 	}
 }
