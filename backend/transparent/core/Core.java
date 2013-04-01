@@ -21,15 +21,26 @@ public class Core
 	private static final byte MODULE_HTTP_POST_REQUEST = 2;
 	
 	private static final int BUFFER_SIZE = 4096;
+	private static final int SLEEP_DURATION = 400;
+	private static final int MAX_USHORT = 65535;
+	private static final long REQUEST_PERIOD = 1000000000;
 	
 	private static final Sandbox sandbox = new NoSandbox();
+	private static final Database database = null; /* TODO: we need an implementation */
 	
 	private static final Charset ASCII = Charset.forName("US-ASCII");
+	private static final Charset UTF8 = Charset.forName("UTF-8");
 	
-	private static void downloadPage(
+	private static void downloadPage(String contentType,
 			InputStream stream, DataOutputStream dest, boolean blocked)
 					throws IOException
 	{
+		/* first pass in the content type field from the HTTP header */
+		if (contentType.length() > MAX_USHORT)
+			throw new IOException("Content type header field too long.");
+		dest.writeShort(contentType.length());
+		dest.writeBytes(contentType);
+		
 		/* TODO: limit the amount of data we download */
 		if (blocked) {
 			/* download the page in blocks, sending each to the module */
@@ -59,21 +70,34 @@ public class Core
 	}
 	
 	private static void httpGetRequest(
-			String url, DataOutputStream dest, boolean blocked)
+			String url, DataOutputStream dest, boolean blocked, long prevRequest)
 	{
 		try {
-			downloadPage(new URL(url).openStream(), dest, blocked);
+			long towait = prevRequest + REQUEST_PERIOD - System.nanoTime();
+			if (towait > 0) {
+				try {
+					Thread.sleep(towait / 1000000);
+				} catch (InterruptedException e) { }
+			}
+			URLConnection http = new URL(url).openConnection();
+			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
 		} catch (IOException e) {
 			System.err.println("Core.downloadPage ERROR:"
 					+ " Could not download from URL '" + url + "'.");
-			return;
 		}
 	}
 	
-	private static void httpPostRequest(
-			String url, byte[] post, DataOutputStream dest, boolean blocked)
+	private static void httpPostRequest(String url, byte[] post,
+			DataOutputStream dest, boolean blocked, long prevRequest)
 	{
 		try {
+			long towait = prevRequest + REQUEST_PERIOD - System.nanoTime();
+			if (towait > 0) {
+				try {
+					Thread.sleep(towait / 1000);
+				} catch (InterruptedException e) { }
+			}
+
 			URLConnection connection = new URL(url).openConnection();
 			if (!(connection instanceof HttpURLConnection)) {
 				System.err.println("Core.httpPostRequest ERROR:"
@@ -92,7 +116,7 @@ public class Core
 			http.getOutputStream().flush();
 			http.getOutputStream().close();
 			
-			downloadPage(http.getInputStream(), dest, blocked);
+			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
 		} catch (Exception e) {
 			System.err.println("Core.httpPostRequest ERROR:"
 					+ " Could not download from URL '" + url + "'.");
@@ -101,19 +125,55 @@ public class Core
 		}
 	}
 	
-	public static void getProductList(Module module)
+	private static void getProductListResponse(
+			Module module, DataInputStream in) throws IOException
+	{
+		int count = in.readInt();
+		for (int i = 0; i < count; i++) {
+			int length = in.readUnsignedShort();
+			byte[] data = new byte[length];
+			in.readFully(data);
+			database.addProductId(module, new String(data, UTF8));
+		}
+	}
+	
+	private static void getProductList(Module module)
 	{
 		/* TODO: the module should be time-limited */
 		Process process = sandbox.run(module);
 		DataOutputStream out = new DataOutputStream(process.getOutputStream());
 		DataInputStream in = new DataInputStream(process.getInputStream());
+
+		/* TODO: limit the amount of data we read */
+		/* TODO: we need some kind of logging mechanism that keeps track of module errors */
+		StreamPipe pipe = new StreamPipe(process.getErrorStream(), System.err);
+		Thread piper = new Thread(pipe);
+		piper.start();
 		
+		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(PRODUCT_LIST_REQUEST);
 			out.flush();
 		
 			boolean error = false;
 			while (!error) {
+				/* wait until input becomes available */
+				boolean exited = false;
+				while (in.available() == 0) {
+					try {
+						Thread.sleep(SLEEP_DURATION);
+						process.exitValue();
+						exited = true;
+						break;
+					} catch (InterruptedException e) {
+						/* TODO: this method should be wrapped in a thread anyway */
+					} catch (IllegalThreadStateException e) { }
+				}
+				
+				if (exited)
+					break;
+
+				/* read input from the module */
 				switch (in.readUnsignedByte()) {
 				case MODULE_HTTP_GET_REQUEST:
 					if (module.isRemote()) {
@@ -125,7 +185,8 @@ public class Core
 						byte[] data = new byte[length];
 						in.readFully(data);
 						String url = new String(data, ASCII);
-						httpGetRequest(url, out, module.blockedDownload());
+						httpGetRequest(url, out, module.blockedDownload(), prevRequest);
+						prevRequest = System.nanoTime();
 					}
 					break;
 
@@ -145,11 +206,13 @@ public class Core
 						data = new byte[length];
 						in.readFully(data);
 						
-						httpPostRequest(url, data, out, module.blockedDownload());
+						httpPostRequest(url, data, out, module.blockedDownload(), prevRequest);
+						prevRequest = System.nanoTime();
 					}
 					break;
 
 				case MODULE_RESPONSE:
+					getProductListResponse(module, in);
 					break;
 
 				default:
@@ -164,25 +227,21 @@ public class Core
 					+ " Cannot communicate with module.");
 		}
 
-		/* get standard error (TODO: limit the amount of data we read) */
-		/* TODO: we need some kind of logging mechanism that keeps track of module errors */
+		/* destroy the process and all related threads */
+		pipe.setAlive(false);
+		piper.interrupt();
 		try {
-			if (process.getErrorStream().available() > 0) {
-				System.err.println("Core.getProductList: Module printed to standard error.");
-				while (process.getErrorStream().available() > 0)
-					System.err.write(process.getErrorStream().read());
-			}
-		} catch (IOException e) { }
+			piper.join();
+		} catch (InterruptedException e) { }
 		process.destroy();
 	}
 	
 	public static void main(String[] args)
-	{		
+	{
 		/* for now, just start the Newegg parser */
 		Module newegg = new Module(
 				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
-						+ " NeweggParser", false, true);
+						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser", false, true);
 		getProductList(newegg);
 	}
 }
-
