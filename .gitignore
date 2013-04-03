@@ -7,3 +7,6 @@
 # Binary output $
 backend/bin/
 
+# IntelliJ files
+*.iml
+.idea/

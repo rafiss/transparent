@@ -1,16 +1,18 @@
 package transparent.core;
 
+import transparent.core.database.Database;
+import transparent.core.database.MariaDBDriver;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.InputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-
-import transparent.core.Module;
+import java.nio.charset.Charset;
+import java.sql.SQLException;
 
 public class Core
 {
@@ -26,7 +28,7 @@ public class Core
 	private static final long REQUEST_PERIOD = 1000000000;
 	
 	private static final Sandbox sandbox = new NoSandbox();
-	private static final Database database = null; /* TODO: we need an implementation */
+	private static Database database;
 	
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -126,7 +128,7 @@ public class Core
 	}
 	
 	private static void getProductListResponse(
-			Module module, DataInputStream in) throws IOException
+			Module module, DataInputStream in) throws IOException, SQLException
 	{
 		int count = in.readInt();
 		for (int i = 0; i < count; i++) {
@@ -225,7 +227,11 @@ public class Core
 			/* we cannot communicate with the module, so just kill it */
 			System.err.println("Core.getProductList ERROR:"
 					+ " Cannot communicate with module.");
-		}
+		} catch (SQLException e) {
+            /* we cannot communicate with the database */
+            System.err.println("Core.getProductList ERROR:"
+                                       + " Cannot commit data to database.");
+        }
 
 		/* destroy the process and all related threads */
 		pipe.setAlive(false);
@@ -238,10 +244,18 @@ public class Core
 	
 	public static void main(String[] args)
 	{
+        try {
+            database = new MariaDBDriver();
+        } catch (Exception e) {
+            System.err.println("Core.main ERROR: " + "Cannot connect to database: " + e.getMessage());
+            System.exit(-1);
+        }
+
 		/* for now, just start the Newegg parser */
 		Module newegg = new Module(
 				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
-						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser", false, true);
+						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
+                "Newegg", "NeweggParser", false, true);
 		getProductList(newegg);
 	}
 }
