@@ -8,6 +8,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.jsoup.Jsoup;
@@ -50,6 +52,10 @@ public class NeweggParser
 	private static final String SUBCATEGORY_URL =
 			"http://m.newegg.com/ProductList?";
 	private static final String ITEM_NUMBER = "itemNumber=";
+
+	private static final String PRODUCT_URL =
+			"http://www.ows.newegg.com/Products.egg/";
+	private static final String PRODUCT_URL_SUFFIX = "/Specification";
 
 	private static final HashSet<Object> STORE_DESCRIPTIONS =
 			new HashSet<Object>(Arrays.asList(
@@ -177,11 +183,54 @@ public class NeweggParser
 	private static void respond(ArrayList<String> productIds) throws IOException
 	{
 		out.writeByte(MODULE_RESPONSE);
-		out.writeInt(productIds.size());
+		out.writeShort(productIds.size());
 		for (String productId : productIds) {
 			byte[] data = productId.getBytes(UTF8);
 			out.writeShort(data.length);
 			out.write(data);
+		}
+	}
+
+	private static void respond(Map<String, String> keyValues) throws IOException
+	{
+		out.writeByte(MODULE_RESPONSE);
+		out.writeShort(keyValues.size());
+		for (Entry<String, String> pair : keyValues.entrySet()) {
+			byte[] key = pair.getKey().getBytes(UTF8);
+			out.writeShort(key.length);
+			out.write(key);
+			
+			byte[] value = pair.getValue().getBytes(UTF8);
+			out.writeShort(value.length);
+			out.write(value);
+		}
+	}
+
+	private static void findKeyValues(
+			HashMap<String, String> keyValues, Object json)
+	{
+		if (json instanceof JSONArray) {
+			/* look for the key-value pair in this array */
+			JSONArray array = (JSONArray) json;
+			for (int i = 0; i < array.size(); i++)
+				findKeyValues(keyValues, json);
+
+		} else if (json instanceof JSONObject) {
+			/* look for the key-value pair in this map */
+			JSONObject jsonMap = (JSONObject) json;
+			if (jsonMap.containsKey("Key") && jsonMap.containsKey("Value")) {
+				Object key = jsonMap.get("Key");
+				Object value = jsonMap.get("Value");
+				if (!(key instanceof String) || !(value instanceof String)) {
+					System.err.println("NeweggParser.findKeyValues ERROR:"
+							+ " Expected String key-value pair.");
+				} else
+					keyValues.put((String) key, (String) value);
+			}
+
+			/* it could be in its children */
+			for (Object child : jsonMap.values())
+				findKeyValues(keyValues, child);
 		}
 	}
 
@@ -304,7 +353,7 @@ public class NeweggParser
 		try {
 			data = httpGetRequest(ROOT_URL);
 		} catch (IOException e) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
+			System.err.println("NeweggParser.getProductList ERROR:"
 					+ " Error requesting URL '" + ROOT_URL + "'.");
 			return;
 		}
@@ -313,7 +362,7 @@ public class NeweggParser
 		try {
 			parsed = parser.parse(data);
 		} catch (ParseException e) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
+			System.err.println("NeweggParser.getProductList ERROR:"
 					+ " Error parsing JSON.");
 			return;
 		}
@@ -321,7 +370,7 @@ public class NeweggParser
 		/* find the computer hardware store ID */
 		JSONObject map = findKeyValue(ROOT_KEY, ROOT_VALUE, parsed);
 		if (map == null || !map.containsKey(STORE_ID)) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
+			System.err.println("NeweggParser.getProductList ERROR:"
 					+ " Could not determine 'ComputerHardware' store ID.");
 			return;
 		}
@@ -332,7 +381,7 @@ public class NeweggParser
 		try {
 			data = httpGetRequest(url);
 		} catch (IOException e) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
+			System.err.println("NeweggParser.getProductList ERROR:"
 					+ " Error requesting URL '" + url + "'.");
 			return;
 		}
@@ -340,7 +389,7 @@ public class NeweggParser
 		try {
 			parsed = parser.parse(data);
 		} catch (ParseException e) {
-			System.err.println("NeweggParser.parseProductList ERROR:"
+			System.err.println("NeweggParser.getProductList ERROR:"
 					+ " Error parsing JSON.");
 			return;
 		}
@@ -360,6 +409,40 @@ public class NeweggParser
 		}
 	}
 
+	private static void parseProductInfo(String productId)
+	{
+		byte[] data;
+		String url = PRODUCT_URL + productId + PRODUCT_URL_SUFFIX;
+		
+		try {
+			data = httpGetRequest(url);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Error requesting URL '" + url + "'.");
+			return;
+		}
+
+		Object parsed;
+		try {
+			parsed = parser.parse(data);
+		} catch (ParseException e) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Error parsing JSON.");
+			return;
+		}
+
+		HashMap<String, String> keyValues = new HashMap<String, String>();
+		findKeyValues(keyValues, parsed);
+
+		try {
+			respond(keyValues);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Error responding with product information.");
+			return;
+		}
+	}
+
 	public static void main(String[] args)
 	{
 		try {
@@ -369,7 +452,10 @@ public class NeweggParser
 				getProductList();
 				break;
 			case PRODUCT_INFO_REQUEST:
-				//parseProductInfo(); TODO: implement this
+				int length = in.readUnsignedShort();
+				byte[] data = new byte[length];
+				in.readFully(data);
+				parseProductInfo(new String(data, UTF8));
 				break;
 			default:
 			}

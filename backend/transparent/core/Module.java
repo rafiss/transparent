@@ -1,5 +1,7 @@
 package transparent.core;
 
+import java.io.PrintStream;
+
 public class Module
 {
 	/* contains the full command to execute the module, or the remote URL */
@@ -17,14 +19,19 @@ public class Module
 	/* specifies whether website should be downloaded in blocks or all at once */
 	private final boolean useBlockedDownload;
 
-	public Module(String path, String sourceName, String moduleName, boolean isRemote,
-                  boolean blockedDownload)
+	/* the output log associated with this module */
+	private final PrintStream log;
+
+	public Module(String path, String sourceName,
+			String moduleName, PrintStream log,
+			boolean isRemote, boolean blockedDownload)
 	{
 		this.path = path;
 		this.sourceName = sourceName;
         this.moduleName = moduleName;
         this.remote = isRemote;
 		this.useBlockedDownload = blockedDownload;
+		this.log = log;
 	}
 	
 	public String getPath() {
@@ -45,5 +52,17 @@ public class Module
 	
 	public boolean blockedDownload() {
 		return useBlockedDownload;
+	}
+	
+	public void logInfo(String className,
+			String methodName, String message)
+	{
+		log.println(className + '.' + methodName + ": " + message);
+	}
+	
+	public void logError(String className,
+			String methodName, String message)
+	{
+		log.println(className + '.' + methodName + " ERROR: " + message);
 	}
 }
