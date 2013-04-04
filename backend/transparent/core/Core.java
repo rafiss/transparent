@@ -230,7 +230,7 @@ public class Core
 		} catch (SQLException e) {
             /* we cannot communicate with the database */
             System.err.println("Core.getProductList ERROR:"
-                                       + " Cannot commit data to database.");
+                                       + " Cannot commit data to database: " + e.getMessage());
         }
 
 		/* destroy the process and all related threads */

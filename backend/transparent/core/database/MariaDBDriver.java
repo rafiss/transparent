@@ -38,9 +38,9 @@ public class MariaDBDriver implements Database {
     public void addProductId(Module module, String productId) throws SQLException {
         Statement statement = connection.createStatement();
         statement.execute("INSERT INTO " + TABLE_NAME + " VALUES (" +
-                            module.getSourceName() + "," +
-                            module.getModuleName() + "," +
-                            productId + ")");
+                          "'" + module.getSourceName() + "'," +
+                          "'" + module.getModuleName() + "'," +
+                          "'" + productId + "')");
         statement.close();
     }
 
