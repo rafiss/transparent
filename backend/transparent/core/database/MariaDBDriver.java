@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Iterator;
 import java.util.Properties;
 
 public class MariaDBDriver implements Database {
@@ -34,7 +35,6 @@ public class MariaDBDriver implements Database {
         System.err.println("Successfully connected to database...");
     }
 
-    @Override
     public void addProductId(Module module, String productId) throws SQLException {
         Statement statement = connection.createStatement();
         statement.execute("INSERT INTO " + TABLE_NAME + " VALUES (" +
@@ -44,8 +44,37 @@ public class MariaDBDriver implements Database {
         statement.close();
     }
 
-    @Override
     public void closeConnection() throws SQLException {
-        connection.close();
+        
     }
+
+	@Override
+	public boolean addProductIds(Module module, String[] productIds) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public Iterator<String> getProductIds(Module module) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public boolean addProductInfo(Module module, String productId,
+			String[] keys, String[] values) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public void close() {
+		try {
+			connection.close();
+		} catch (SQLException e) {
+			System.err.println("MariaDBDriver.close ERROR:"
+					+ " Exception thrown (" + e.getMessage() + ").");
+		}
+		
+	}
 }

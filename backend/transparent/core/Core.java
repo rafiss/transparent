@@ -39,18 +39,19 @@ public class Core
 	
 	public static void main(String[] args)
 	{
-        try {
+        /*try {
             database = new MariaDBDriver();
         } catch (Exception e) {
             System.err.println("Core.main ERROR: " + "Cannot connect to database: " + e.getMessage());
             System.exit(-1);
-        }
+        }*/
 
 		/* for now, just start the Newegg parser */
 		Module newegg = new Module(
 				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
 						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
                 "Newegg", "NeweggParser", System.err, false, true);
-		getProductInfo(newegg, "N82E16820148448");
+		getProductList(newegg);
+		//getProductInfo(newegg, "N82E16820148448");
 	}
 }

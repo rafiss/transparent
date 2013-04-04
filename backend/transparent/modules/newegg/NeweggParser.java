@@ -213,7 +213,7 @@ public class NeweggParser
 			/* look for the key-value pair in this array */
 			JSONArray array = (JSONArray) json;
 			for (int i = 0; i < array.size(); i++)
-				findKeyValues(keyValues, json);
+				findKeyValues(keyValues, array.get(i));
 
 		} else if (json instanceof JSONObject) {
 			/* look for the key-value pair in this map */
@@ -441,6 +441,7 @@ public class NeweggParser
 					+ " Error responding with product information.");
 			return;
 		}
+		try {Thread.sleep(10000);} catch(Exception e) { }
 	}
 
 	public static void main(String[] args)

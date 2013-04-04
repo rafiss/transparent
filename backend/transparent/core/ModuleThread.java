@@ -91,6 +91,7 @@ public class ModuleThread implements Runnable, Interruptable
 			String url, DataOutputStream dest, boolean blocked, long prevRequest)
 	{
 		try {
+			System.err.println("HTTP GET " + url);
 			long towait = prevRequest + REQUEST_PERIOD - System.nanoTime();
 			if (towait > 0) {
 				try {
@@ -159,11 +160,13 @@ public class ModuleThread implements Runnable, Interruptable
 			byte[] data = new byte[length];
 			in.readFully(data);
 			productIds[i] = new String(data, UTF8);
+			
+			System.err.println(productIds[i]);
 		}
-		if (!database.addProductIds(module, productIds)) {
+		/*if (!database.addProductIds(module, productIds)) {
 			module.logError("ModuleThread", "getProductListResponse",
 					"Error occurred while adding product IDs.");
-		}
+		}*/
 	}
 	
 	private void getProductInfoResponse(Module module,
@@ -188,11 +191,13 @@ public class ModuleThread implements Runnable, Interruptable
 			data = new byte[length];
 			in.readFully(data);
 			values[i] = new String(data, UTF8);
+			
+			System.err.println(keys[i] + " : " + values[i]);
 		}
-		if (!database.addProductInfo(module, productId, keys, values)) {
+		/*if (!database.addProductInfo(module, productId, keys, values)) { TODO: uncomment this
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
-		}
+		}*/
 	}
 	
 	private void cleanup(Process process, StreamPipe pipe, Thread piper)
