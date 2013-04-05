@@ -6,7 +6,14 @@ SRCS = \
 	transparent/core/Module.java \
 	transparent/core/Sandbox.java \
 	transparent/core/NoSandbox.java \
-	transparent/core/Core.java
+	transparent/core/Core.java \
+	transparent/core/Interruptable.java \
+	transparent/core/InterruptableInputStream.java \
+	transparent/core/InterruptedStreamException.java \
+	transparent/core/ModuleThread.java \
+	transparent/core/StreamPipe.java \
+	transparent/core/database/Database.java \
+	transparent/core/database/MariaDBDriver.java
 
 #
 # Compile and link options

@@ -12,6 +12,7 @@ public class Core
 	
 	private static void getProductList(Module module)
 	{
+		/* TODO: the module should be time-limited */
 		ModuleThread wrapper = new ModuleThread(module, sandbox, database);
 		wrapper.setRequestType(PRODUCT_LIST_REQUEST);
 		Thread thread = new Thread(wrapper);
@@ -25,6 +26,7 @@ public class Core
 	
 	private static void getProductInfo(Module module, String productId)
 	{
+		/* TODO: the module should be time-limited */
 		ModuleThread wrapper = new ModuleThread(module, sandbox, database);
 		wrapper.setRequestType(PRODUCT_INFO_REQUEST);
 		wrapper.setRequestedProductId(productId);
@@ -51,7 +53,7 @@ public class Core
 				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
 						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
                 "Newegg", "NeweggParser", System.err, false, true);
-		getProductList(newegg);
-		//getProductInfo(newegg, "N82E16820148448");
+		//getProductList(newegg);
+		getProductInfo(newegg, "N82E16819113280");
 	}
 }

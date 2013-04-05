@@ -17,11 +17,17 @@ public class ModuleThread implements Runnable, Interruptable
 	private static final byte MODULE_RESPONSE = 0;
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 	private static final byte MODULE_HTTP_POST_REQUEST = 2;
+	
+	private static final int DOWNLOAD_OK = 0;
+	private static final int DOWNLOAD_ABORTED = 1;
 
-	private static final int BUFFER_SIZE = 4096;
+	private static final int BUFFER_SIZE = 4096; /* in bytes */
+	private static final int MAX_DOWNLOAD_SIZE = 10485760; /* 10 MB */
 	private static final int MAX_USHORT = 65535;
 	private static final int MAX_BATCH_SIZE = 10000;
 	private static final int MAX_COLUMN_COUNT = 64;
+	private static final int INPUT_SLEEP_DURATION = 200;
+	private static final int ERROR_SLEEP_DURATION = 400;
 	private static final long REQUEST_PERIOD = 1000000000; /* in nanoseconds */
 
 	private static final Charset ASCII = Charset.forName("US-ASCII");
@@ -59,7 +65,7 @@ public class ModuleThread implements Runnable, Interruptable
 		dest.writeShort(contentType.length());
 		dest.writeBytes(contentType);
 		
-		/* TODO: limit the amount of data we download */
+		int total = 0;
 		if (blocked) {
 			/* download the page in blocks, sending each to the module */
 			byte[] buf = new byte[BUFFER_SIZE];
@@ -67,6 +73,9 @@ public class ModuleThread implements Runnable, Interruptable
 				int read = stream.read(buf);
 				if (read == -1) break;
 				else if (read > 0) {
+					total += read;
+					if (total > MAX_DOWNLOAD_SIZE)
+						break;
 					dest.writeShort(read);
 					dest.write(buf, 0, read);
 				}
@@ -76,13 +85,20 @@ public class ModuleThread implements Runnable, Interruptable
 			/* download the entire page, and send the whole thing */
 			ByteArrayOutputStream page = new ByteArrayOutputStream(BUFFER_SIZE);
 			int read = stream.read();
-			while (read != -1) {
+			total = read;
+			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
 				page.write(read);
 				read = stream.read();
+				total += read;
 			}
 			dest.writeInt(page.size());
 			page.writeTo(dest);
 		}
+
+		if (total < MAX_DOWNLOAD_SIZE)
+			dest.writeByte(DOWNLOAD_OK);
+		else dest.writeByte(DOWNLOAD_ABORTED);
+		
 		dest.flush();
 		stream.close();
 	}
@@ -91,7 +107,6 @@ public class ModuleThread implements Runnable, Interruptable
 			String url, DataOutputStream dest, boolean blocked, long prevRequest)
 	{
 		try {
-			System.err.println("HTTP GET " + url);
 			long towait = prevRequest + REQUEST_PERIOD - System.nanoTime();
 			if (towait > 0) {
 				try {
@@ -113,14 +128,14 @@ public class ModuleThread implements Runnable, Interruptable
 			long towait = prevRequest + REQUEST_PERIOD - System.nanoTime();
 			if (towait > 0) {
 				try {
-					Thread.sleep(towait / 1000);
+					Thread.sleep(towait / 1000000);
 				} catch (InterruptedException e) { }
 			}
-
+			
 			URLConnection connection = new URL(url).openConnection();
 			if (!(connection instanceof HttpURLConnection)) {
-				System.err.println("Core.httpPostRequest ERROR:"
-						+ " Unrecognized network protocol.");
+				module.logError("ModuleThread", "httpPostRequest",
+						"Unrecognized network protocol.");
 				return;
 			}
 			
@@ -137,9 +152,9 @@ public class ModuleThread implements Runnable, Interruptable
 			
 			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
 		} catch (Exception e) {
-			System.err.println("Core.httpPostRequest ERROR:"
-					+ " Could not download from URL '" + url + "'.");
-			e.printStackTrace();
+			module.logError("ModuleThread", "httpPostRequest",
+					"Could not download from URL '" + url
+					+ "'. Exception: " + e.getMessage());
 			return;
 		}
 	}
@@ -160,13 +175,11 @@ public class ModuleThread implements Runnable, Interruptable
 			byte[] data = new byte[length];
 			in.readFully(data);
 			productIds[i] = new String(data, UTF8);
-			
-			System.err.println(productIds[i]);
 		}
-		/*if (!database.addProductIds(module, productIds)) {
+		if (!database.addProductIds(module, productIds)) {
 			module.logError("ModuleThread", "getProductListResponse",
 					"Error occurred while adding product IDs.");
-		}*/
+		}
 	}
 	
 	private void getProductInfoResponse(Module module,
@@ -191,18 +204,16 @@ public class ModuleThread implements Runnable, Interruptable
 			data = new byte[length];
 			in.readFully(data);
 			values[i] = new String(data, UTF8);
-			
-			System.err.println(keys[i] + " : " + values[i]);
 		}
-		/*if (!database.addProductInfo(module, productId, keys, values)) { TODO: uncomment this
+		if (!database.addProductInfo(module, productId, keys, values)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
-		}*/
+		}
 	}
 	
 	private void cleanup(Process process, StreamPipe pipe, Thread piper)
 	{
-		pipe.setAlive(false);
+		pipe.stop();
 		piper.interrupt();
 		try {
 			piper.join();
@@ -223,8 +234,9 @@ public class ModuleThread implements Runnable, Interruptable
 	{
 		try {
 			process.exitValue();
-			module.logInfo("ModuleThread", "interrupted",
-					"Local process of module exited, interrupting thread...");
+			if (!alive)
+				module.logInfo("ModuleThread", "interrupted",
+						"Local process of module exited, interrupting thread...");
 			stop();
 		} catch (IllegalThreadStateException e) { }
 		return !alive;
@@ -243,15 +255,15 @@ public class ModuleThread implements Runnable, Interruptable
 			}
 		}
 		
-		/* TODO: the module should be time-limited */
 		process = sandbox.run(module);
 		DataOutputStream out = new DataOutputStream(process.getOutputStream());
-		DataInputStream in = new DataInputStream(
-				new InterruptableInputStream(process.getInputStream(), this));
+		DataInputStream in = new DataInputStream(new InterruptableInputStream(
+				process.getInputStream(), this, INPUT_SLEEP_DURATION));
 
 		/* TODO: limit the amount of data we read */
-		/* TODO: we need some kind of logging mechanism that keeps track of module errors */
-		StreamPipe pipe = new StreamPipe(process.getErrorStream(), System.err);
+		InterruptableInputStream error = new InterruptableInputStream(
+				process.getErrorStream(), this, ERROR_SLEEP_DURATION);
+		StreamPipe pipe = new StreamPipe(error, module.getLogStream());
 		Thread piper = new Thread(pipe);
 		piper.start();
 		

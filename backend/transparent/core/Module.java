@@ -54,6 +54,10 @@ public class Module
 		return useBlockedDownload;
 	}
 	
+	public PrintStream getLogStream() {
+		return log;
+	}
+	
 	public void logInfo(String className,
 			String methodName, String message)
 	{

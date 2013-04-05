@@ -30,6 +30,7 @@ public class NeweggParser
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 
 	private static final int BUFFER_SIZE = 4096;
+	private static final int DOWNLOAD_OK = 0;
 
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -165,6 +166,13 @@ public class NeweggParser
 			in.readFully(data);
 			response.write(data);
 			length = in.readUnsignedShort();
+		}
+		
+		int errorCode = in.readUnsignedByte();
+		if (errorCode != DOWNLOAD_OK) {
+			System.err.println("NeweggParser.httpResponse ERROR:"
+					+ " Error occurred during download.");
+			return null;
 		}
 
 		return response.toByteArray();
@@ -441,7 +449,6 @@ public class NeweggParser
 					+ " Error responding with product information.");
 			return;
 		}
-		try {Thread.sleep(10000);} catch(Exception e) { }
 	}
 
 	public static void main(String[] args)

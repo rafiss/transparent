@@ -5,31 +5,29 @@ import java.io.InputStream;
 
 public class InterruptableInputStream extends InputStream
 {
-	private static final int SLEEP_DURATION = 200;
-	
 	private InputStream in;
 	private Interruptable interruptable;
+	private int sleepDuration;
 	
-	public InterruptableInputStream(InputStream in, Interruptable interruptable) {
+	public InterruptableInputStream(InputStream in,
+			Interruptable interruptable, int sleepDuration)
+	{
 		this.in = in;
 		this.interruptable = interruptable;
+		this.sleepDuration = sleepDuration;
 	}
 	
 	@Override
 	public int read() throws IOException
 	{
-		if (interruptable.interrupted())
-			throw new InterruptedStreamException("Stream was interrupted"
-					+ " by the underlying Interruptable.");
-
 		while (in.available() == 0) {
 			try {
-				Thread.sleep(SLEEP_DURATION);
+				Thread.sleep(sleepDuration);
 			} catch (InterruptedException e) {
 				throw new InterruptedStreamException(e);
 			}
 			
-			if (interruptable.interrupted())
+			if (in.available() == 0 && interruptable.interrupted())
 				throw new InterruptedStreamException("Stream was interrupted"
 						+ " by the underlying Interruptable.");
 		}
