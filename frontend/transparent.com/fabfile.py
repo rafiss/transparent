@@ -7,5 +7,5 @@ def ec2():
 
 def deploy():
     run('cd transparent && git pull')
-    run('cp -r transparent/frontend/transparent.com /var/www/html')
-    run('cd /var/www/html/transparent.com && python2 manage.py syncdb && python2 manage.py collectstatic')
+    run('cp -r transparent/frontend/transparent.com/* /var/www/transparent.com/')
+    run('cd /var/www/transparent.com && python2 manage.py syncdb && python2 manage.py collectstatic')
