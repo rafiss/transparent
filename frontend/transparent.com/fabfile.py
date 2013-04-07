@@ -8,4 +8,14 @@ def ec2():
 def deploy():
     run('cd transparent && git pull')
     run('cp -r transparent/frontend/transparent.com/* /var/www/transparent.com/')
-    run('cd /var/www/transparent.com && python2 manage.py syncdb && python2 manage.py collectstatic')
+
+def deploy_db():
+    run('cd transparent && git pull')
+    run('cp -r transparent/frontend/transparent.com/* /var/www/transparent.com/')
+    run('cd /var/www/transparent.com && python2 manage.py syncdb')
+
+def deploy_static():
+    run('cd transparent && git pull')
+    run('cp -r transparent/frontend/transparent.com/* /var/www/transparent.com/')
+    run('cd /var/www/transparent.com && python2 manage.py collectstatic')
+
