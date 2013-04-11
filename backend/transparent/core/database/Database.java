@@ -11,12 +11,17 @@ import transparent.core.Module;
  */
 public interface Database
 {
-	public boolean addProductIds(Module module, String[] productIds);
+	public boolean addProductIds(Module module, String[] moduleProductIds);
 	
 	public Iterator<String> getProductIds(Module module);
 	
-	public boolean addProductInfo(Module module,
-			String productId, String[] keys, String[] values);
+	public boolean addProductInfo(Module module, String moduleProductId,
+			long productId, String[] keys, String[] values);
+
+	public long getMetadataLong(String key);
+	public boolean setMetadata(String key, long value);
+
+	/* TODO: add api for querying (what should it return?) */
 
     public void close();
 }
