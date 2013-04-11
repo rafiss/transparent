@@ -3,7 +3,7 @@ DROP DATABASE IF EXISTS transparent;
 CREATE DATABASE transparent;
 USE transparent;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'ajay'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
 
 CREATE TABLE IF NOT EXISTS Entity (
     entity_id INT AUTO_INCREMENT,
@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS Entity (
 
 CREATE TABLE IF NOT EXISTS PropertyType (
     property_type_id INT AUTO_INCREMENT,
-    property_name VARCHAR(512) UNIQUE,  -- A limitation of UNIQUE keys
-    is_trait ENUM('yes', 'no'),
+    property_name VARCHAR(512),  -- A limitation of UNIQUE keys -- TODO(asaparov): I removed UNIQUE because mysql was complaining about the key size being too big.
+    is_trait BOOL, -- TODO(asaparov): I changed this to a boolean type for better performance
     PRIMARY KEY (property_type_id)
 );
 

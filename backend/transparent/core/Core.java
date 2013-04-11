@@ -2,6 +2,9 @@ package transparent.core;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
+
+import java.util.Iterator;
+
 public class Core
 {
 	public static final byte PRODUCT_LIST_REQUEST = 0;
@@ -54,6 +57,9 @@ public class Core
 						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
                 "Newegg", "NeweggParser", System.err, false, true);
 		getProductList(newegg);
-		getProductInfo(newegg, "N82E16819113280");
+		Iterator<String> moduleProductIds = database.getProductIds(newegg);
+		while (moduleProductIds.hasNext()) {
+			getProductInfo(newegg, moduleProductIds.next());
+		}
 	}
 }

@@ -203,7 +203,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                                                 Statement.RETURN_GENERATED_KEYS);
         statement.setNull(1, Types.INTEGER);
         statement.setString(2, name);
-        statement.setString(3, isTrait ? "yes" : "no");
+        statement.setBoolean(3, isTrait);
         statement.executeUpdate();
 
         ResultSet generatedKeys = statement.getGeneratedKeys();
