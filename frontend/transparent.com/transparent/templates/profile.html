@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Selected Modules{% endblock %}
+
+{% block content %}
+
+    {% if user.is_authenticated %}
+        <h1>These are the modules you selected</h1>
+
+        <ul>
+            {% for mod in modules.all %}
+                <li>{{ mod.name }}</li>
+            {% endfor %}
+        </ul>
+        <p><a href="/logout/">Logout</a></p>
+    {% else %}
+        <h1>Please create an account or login</h1>
+
+        <p><a href="/register/">Register</a></p>
+        <p><a href="/login/">Login</a></p>
+    {% endif %}
+{% endblock %}
