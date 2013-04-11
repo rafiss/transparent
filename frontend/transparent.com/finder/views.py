@@ -12,9 +12,8 @@ def index(request):
     return render(request, "index.html", {})
 
 def profile(request):
-    return HttpResponse(request.user.userprofile)
-    #modules = request.user.userprofile.modules
-    #return render(request, "profile.html", {'modules' : modules})
+    modules = request.user.userprofile.modules
+    return render(request, "profile.html", {'modules' : modules})
 
 def register(request):
     if request.method == 'POST':
