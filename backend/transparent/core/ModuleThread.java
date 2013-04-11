@@ -1,5 +1,7 @@
 package transparent.core;
 
+import transparent.core.database.Database;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -9,8 +11,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
-
-import transparent.core.database.Database;
 
 public class ModuleThread implements Runnable, Interruptable
 {
@@ -205,7 +205,8 @@ public class ModuleThread implements Runnable, Interruptable
 			in.readFully(data);
 			values[i] = new String(data, UTF8);
 		}
-		if (!database.addProductInfo(module, productId, keys, values)) {
+        // TODO: Add actual productId
+		if (!database.addProductInfo(module, productId, 0, keys, values)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
 		}
