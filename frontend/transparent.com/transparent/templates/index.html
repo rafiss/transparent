@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}The Home Page{% endblock %}
+
+{% block content %}
+
+    {% if user.is_authenticated %}
+        <h1>Welcome!</h1>
+
+        <p>There isn't much to see here, but you can log out.</p>
+        <p><a href="/logout/">Logout</a></p>
+    {% else %}
+        <h1>Please create an account or login</h1>
+
+        <p><a href="/register/">Register</a></p>
+        <p><a href="/login/">Login</a></p>
+    {% endif %}
+{% endblock %}
