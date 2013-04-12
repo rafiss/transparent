@@ -1,6 +1,7 @@
 package transparent.core.database;
 
 import transparent.core.Module;
+import transparent.core.ProductID;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.Map.Entry;
 
 public class MariaDBDriver implements transparent.core.database.Database {
 
@@ -22,7 +24,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     private static final String MODULE_NAME_KEY = "module_name";
     private static final String MODULE_SOURCE_KEY = "module_source";
-    private static final String PRODUCT_ID_KEY = "product_id";
 
     private static final String ENTITY_TABLE = "Entity";
     private static final String PROPERTY_TYPE_TABLE = "PropertyType";
@@ -50,7 +51,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public boolean addProductIds(Module module, String[] moduleProductIds) {
+    public boolean addProductIds(Module module, String... moduleProductIds) {
         // TODO: Batch SQL statements
 
         try {
@@ -84,7 +85,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public Iterator<String> getProductIds(Module module) {
+    public Iterator<ProductID> getProductIds(Module module) {
         Statement statement = null;
         try {
             statement = connection.createStatement();
@@ -109,20 +110,19 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public boolean addProductInfo(Module module, String moduleProductId, long productId,
-                                  String[] keys, String[] values) {
-        assert (keys.length == values.length);
-
+    @SafeVarargs
+	public final boolean addProductInfo(Module module,
+			ProductID moduleProductId,
+			Entry<String, String>... keyValues)
+    {
         try {
-            // TODO: Add this to the Measurement table without casting?
-            insertNewAttribute(moduleProductId, PRODUCT_ID_KEY, String.valueOf(productId));
-
-            for (int i = 0; i < keys.length; i++) {
-                insertNewAttribute(moduleProductId, keys[i], values[i]);
+            for (Entry<String, String> pair: keyValues) {
+                insertNewAttribute(moduleProductId.getModuleId(),
+                		pair.getKey(), pair.getValue());
             }
         } catch (SQLException e) {
-            System.err.println("MariaDBDriver.addProductInfo ERROR:"
-                                       + " Exception thrown (" + e.getMessage() + ").");
+            module.logError("MariaDBDriver", "addProductInfo",
+            		"Exception thrown (" + e.getMessage() + ").");
             return false;
         }
 
@@ -130,13 +130,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public long getMetadataLong(String key) {
+    public String getMetadata(String key) {
         // TODO: Finish this
-        return 0;
+        return null;
     }
 
     @Override
-    public boolean setMetadata(String key, long value) {
+    public boolean setMetadata(String key, String value) {
         // TODO: Finish this
         return false;
     }
@@ -273,7 +273,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 }
 
-class ResultSetIterator implements Iterator<String> {
+class ResultSetIterator implements Iterator<ProductID> {
 
     private final ResultSet resultSet;
 
@@ -293,7 +293,7 @@ class ResultSetIterator implements Iterator<String> {
     }
 
     @Override
-    public String next() {
+    public ProductID next() {
         try {
             if (resultSet.next()) {
                 return resultSet.getString(0);

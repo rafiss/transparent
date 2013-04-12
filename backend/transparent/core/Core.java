@@ -57,9 +57,5 @@ public class Core
 						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
                 "Newegg", "NeweggParser", System.err, false, true);
 		getProductList(newegg);
-		Iterator<String> moduleProductIds = database.getProductIds(newegg);
-		while (moduleProductIds.hasNext()) {
-			getProductInfo(newegg, moduleProductIds.next());
-		}
 	}
 }

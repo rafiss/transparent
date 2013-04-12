@@ -12,6 +12,7 @@ SRCS = \
 	transparent/core/InterruptedStreamException.java \
 	transparent/core/ModuleThread.java \
 	transparent/core/StreamPipe.java \
+	transparent/core/ProductID.java \
 	transparent/core/database/Database.java \
 	transparent/core/database/MariaDBDriver.java
 
