@@ -1,6 +1,7 @@
 package transparent.core.database;
 
 import java.util.Iterator;
+import java.util.Map.Entry;
 
 import transparent.core.Module;
 
@@ -11,15 +12,15 @@ import transparent.core.Module;
  */
 public interface Database
 {
-	public boolean addProductIds(Module module, String[] moduleProductIds);
+	public boolean addProductIds(Module module, String... moduleProductIds);
 	
-	public Iterator<String> getProductIds(Module module);
+	public Iterator<Entry<String, Object>> getProductIds(Module module);
 	
-	public boolean addProductInfo(Module module, String moduleProductId,
-			long productId, String[] keys, String[] values);
+	public boolean addProductInfo(Module module, Entry<String, Object> moduleProductId,
+			Entry<String, String>... keyValues);
 
-	public long getMetadataLong(String key);
-	public boolean setMetadata(String key, long value);
+	public String getMetadata(String key);
+	public boolean setMetadata(String key, String value);
 
 	/* TODO: add api for querying (what should it return?) */
 

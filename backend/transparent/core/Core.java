@@ -1,9 +1,9 @@
 package transparent.core;
 
+import java.util.Iterator;
+
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
-
-import java.util.Iterator;
 
 public class Core
 {
