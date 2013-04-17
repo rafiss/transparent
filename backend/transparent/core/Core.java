@@ -27,7 +27,7 @@ public class Core
 		} catch (InterruptedException e) { }
 	}
 	
-	private static void getProductInfo(Module module, String productId)
+	private static void getProductInfo(Module module, ProductID productId)
 	{
 		/* TODO: the module should be time-limited */
 		ModuleThread wrapper = new ModuleThread(module, sandbox, database);

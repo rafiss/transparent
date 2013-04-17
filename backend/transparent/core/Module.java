@@ -18,12 +18,15 @@ public class Module
 	
 	/* specifies whether website should be downloaded in blocks or all at once */
 	private final boolean useBlockedDownload;
+	
+	/* unique integer identifier for the module */
+	private final long id;
 
 	/* the output log associated with this module */
 	private final PrintStream log;
 
 	public Module(String path, String sourceName,
-			String moduleName, PrintStream log,
+			String moduleName, long id, PrintStream log,
 			boolean isRemote, boolean blockedDownload)
 	{
 		this.path = path;
@@ -31,7 +34,12 @@ public class Module
         this.moduleName = moduleName;
         this.remote = isRemote;
 		this.useBlockedDownload = blockedDownload;
+		this.id = id;
 		this.log = log;
+	}
+	
+	public long getId() {
+		return id;
 	}
 	
 	public String getPath() {

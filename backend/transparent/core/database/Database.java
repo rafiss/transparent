@@ -13,8 +13,13 @@ import transparent.core.ProductID;
  */
 public interface Database
 {
+	/**
+	 * Adds the list of module product IDs to the database associated
+	 * with the given module. If any of the product IDs already exist
+	 * for that module, then they are not added.
+	 */
 	public boolean addProductIds(Module module, String... moduleProductIds);
-	
+
 	public Iterator<ProductID> getProductIds(Module module);
 
 	@SuppressWarnings("unchecked") /* needed to suppress varargs warning */

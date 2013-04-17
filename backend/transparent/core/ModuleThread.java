@@ -11,12 +11,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Map.Entry;
 
 public class ModuleThread implements Runnable, Interruptable
 {
 	private static final byte MODULE_RESPONSE = 0;
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 	private static final byte MODULE_HTTP_POST_REQUEST = 2;
+	private static final byte MODULE_SET_USER_AGENT = 3;
 	
 	private static final int DOWNLOAD_OK = 0;
 	private static final int DOWNLOAD_ABORTED = 1;
@@ -33,13 +36,17 @@ public class ModuleThread implements Runnable, Interruptable
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
 	
+	private static final String DEFAULT_USER_AGENT =
+			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
+	
 	private final Module module;
 	private final Sandbox sandbox;
 	private final Database database;
 	private byte requestType;
 	private boolean alive;
 	private Process process;
-	private String requestedProductId;
+	private ProductID requestedProductId;
+	private String userAgent;
 	
 	public ModuleThread(Module module, Sandbox sandbox,
 			Database database)
@@ -49,6 +56,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.database = database;
 		this.requestType = 0;
 		this.alive = true;
+		this.userAgent = DEFAULT_USER_AGENT;
 	}
 	
 	private void stop() {
@@ -114,6 +122,7 @@ public class ModuleThread implements Runnable, Interruptable
 				} catch (InterruptedException e) { }
 			}
 			URLConnection http = new URL(url).openConnection();
+			http.setRequestProperty("User-Agent", userAgent);
 			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
 		} catch (IOException e) {
 			module.logError("ModuleThread", "httpGetRequest",
@@ -140,6 +149,7 @@ public class ModuleThread implements Runnable, Interruptable
 			}
 			
 			HttpURLConnection http = (HttpURLConnection) connection;
+			http.setRequestProperty("User-Agent", userAgent);
 			http.setDoInput(true);
 			http.setDoOutput(true);
 			http.setUseCaches(false);
@@ -183,7 +193,7 @@ public class ModuleThread implements Runnable, Interruptable
 	}
 	
 	private void getProductInfoResponse(Module module,
-			String productId, DataInputStream in) throws IOException
+			ProductID productId, DataInputStream in) throws IOException
 	{
 		int count = in.readUnsignedShort();
 		if (count < 0 || count > MAX_COLUMN_COUNT) {
@@ -192,21 +202,23 @@ public class ModuleThread implements Runnable, Interruptable
 			return;
 		}
 
-		String[] keys = new String[count];
-		String[] values = new String[count];
+		@SuppressWarnings("unchecked")
+		Entry<String, String>[] keyValues = new Entry[count];
 		for (int i = 0; i < count; i++) {
 			int length = in.readUnsignedShort();
 			byte[] data = new byte[length];
 			in.readFully(data);
-			keys[i] = new String(data, UTF8);
+			String key = new String(data, UTF8);
 
 			length = in.readUnsignedShort();
 			data = new byte[length];
 			in.readFully(data);
-			values[i] = new String(data, UTF8);
+			String value = new String(data, UTF8);
+			
+			keyValues[i] = new SimpleEntry<String, String>(key, value);
 		}
-        // TODO: Add actual productId
-		if (!database.addProductInfo(module, productId, 0, keys, values)) {
+
+		if (!database.addProductInfo(module, productId, keyValues)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
 		}
@@ -226,7 +238,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.requestType = requestType;
 	}
 	
-	public void setRequestedProductId(String productId) {
+	public void setRequestedProductId(ProductID productId) {
 		this.requestedProductId = productId;
 	}
 
@@ -272,14 +284,28 @@ public class ModuleThread implements Runnable, Interruptable
 		try {
 			out.writeByte(requestType);
 			if (requestType == Core.PRODUCT_INFO_REQUEST) {
-				out.writeShort(requestedProductId.length());
-				out.write(requestedProductId.getBytes(UTF8));
+				String moduleProductId = requestedProductId.getModuleProductId();
+				out.writeShort(moduleProductId.length());
+				out.write(moduleProductId.getBytes(UTF8));
 			}
 			out.flush();
 		
 			while (alive) {
 				/* read input from the module */
 				switch (in.readUnsignedByte()) {
+				case MODULE_SET_USER_AGENT:
+					if (module.isRemote()) {
+						module.logError("ModuleThread", "run",
+								"Remote modules cannot make HTTP requests.");
+						stop();
+					} else {
+						int length = in.readUnsignedShort();
+						byte[] data = new byte[length];
+						in.readFully(data);
+						this.userAgent = new String(data, UTF8);
+					}
+					break;
+					
 				case MODULE_HTTP_GET_REQUEST:
 					if (module.isRemote()) {
 						module.logError("ModuleThread", "run",

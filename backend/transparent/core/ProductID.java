@@ -2,32 +2,17 @@ package transparent.core;
 
 public class ProductID
 {
-	private long databaseId;
-	private String moduleId;
+	private final String moduleProductId;
 	
 	public ProductID() {
-		this.databaseId = -1;
-		this.moduleId = null;
+		this.moduleProductId = null;
 	}
 	
 	public ProductID(String moduleId) {
-		this.databaseId = -1;
-		this.moduleId = moduleId;
+		this.moduleProductId = moduleId;
 	}
 	
-	public long getDatabaseId() {
-		return databaseId;
-	}
-	
-	public String getModuleId() {
-		return moduleId;
-	}
-	
-	public void setDatabaseId(long id) {
-		databaseId = id;
-	}
-	
-	public void setModuleId(String id) {
-		moduleId = id;
+	public String getModuleProductId() {
+		return moduleProductId;
 	}
 }
