@@ -4,13 +4,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -29,6 +24,10 @@ public class AmazonParser
 
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
+	
+	private static final String SORT_BY_PRICE = "&sort=price";
+	private static final String LOW_PRICE = "&low-price=";
+	private static final String PAGE_NUMBER = "&page=";
 
 	private static final String[] CATEGORY_URLS = new String[] {
 		"http://www.amazon.com/gp/search/ref=sr_nr_n_0?rh=n%3A572238",
@@ -60,7 +59,7 @@ public class AmazonParser
 		
 		int errorCode = in.readUnsignedByte();
 		if (errorCode != DOWNLOAD_OK) {
-			System.err.println("NeweggParser.httpResponse ERROR:"
+			System.err.println("AmazonParser.httpResponse ERROR:"
 					+ " Error occurred during download.");
 			return null;
 		}
@@ -103,104 +102,84 @@ public class AmazonParser
 			out.write(value);
 		}
 	}
+	
+	private static void parseCategory(String url)
+	{
+		byte[] data;
+		String lowPrice = null;
+		ArrayList<String> productIds = new ArrayList<String>();
+		for (int page = 1; page <= 400; page++)
+		{
+			/* construct the request URL */
+			String request = url + PAGE_NUMBER + page
+					+ SORT_BY_PRICE;
+			if (lowPrice != null)
+				request += LOW_PRICE + lowPrice;
+			
+			try {
+				data = httpGetRequest(request);
+			} catch (IOException e) {
+				System.err.println("AmazonParser.parseCategory ERROR:"
+						+ " Error requesting URL '" + request + "'.");
+				return;
+			}
+			
+			/* get the current result position and total result count */
+			Document document = Jsoup.parse(new String(data, UTF8));
+			Elements elements = document.select("#resultCount");
+			if (elements.size() != 1) {
+				System.err.println("AmazonParser.parseCategory ERROR:"
+						+ " Error parsing result count.");
+				return;
+			}
+			
+			String[] results = elements.get(0).text().split(" ");
+			int currResult = Integer.parseInt(results[3].replace(",", ""));
+			int resultCount = Integer.parseInt(results[5].replace(",", ""));
+	
+			/* parse the Amazon product IDs */
+			elements = document.select(".prod");
+			for (Element element : elements) {
+				productIds.add(element.attr("name"));
+			}
+			
+			/* send the product IDs to the core */
+			try {
+				respond(productIds);
+			} catch (IOException e) {
+				System.err.println("AmazonParser.parseCategory ERROR:"
+						+ " Error responding with product ID list.");
+				return;
+			}
+			
+			/* check to see if we are done parsing this category */
+			if (currResult == resultCount)
+				return;
+			else if (page == 400) {
+				/* parse the price of the last product */
+				String price;
+				Elements priceElement = elements.last().select(".price");
+				if (priceElement.size() == 0)
+					price = elements.last().select(".newp").text();
+				else price = priceElement.text();
+				
+				lowPrice = price;
+				page = 0;
+			}
+			productIds.clear();
+		}
+	}
 
 	private static void getProductList()
 	{
 		/* first get the list of stores from the root JSON document */
-		byte[] data;
 		for (String url : CATEGORY_URLS) {
-			try {
-				data = httpGetRequest(url);
-			} catch (IOException e) {
-				System.err.println("NeweggParser.getProductList ERROR:"
-						+ " Error requesting URL '" + url + "'.");
-				return;
-			}
-		}
-
-		Object parsed;
-		try {
-			parsed = parser.parse(data);
-		} catch (ParseException e) {
-			System.err.println("NeweggParser.getProductList ERROR:"
-					+ " Error parsing JSON.");
-			return;
-		}
-
-		/* find the computer hardware store ID */
-		JSONObject map = findKeyValue(ROOT_KEY, ROOT_VALUE, parsed);
-		if (map == null || !map.containsKey(STORE_ID)) {
-			System.err.println("NeweggParser.getProductList ERROR:"
-					+ " Could not determine 'ComputerHardware' store ID.");
-			return;
-		}
-
-		/* get the list of categories in that store */
-		Object storeId = map.get(STORE_ID);
-		String url = STORE_URL + storeId;
-		try {
-			data = httpGetRequest(url);
-		} catch (IOException e) {
-			System.err.println("NeweggParser.getProductList ERROR:"
-					+ " Error requesting URL '" + url + "'.");
-			return;
-		}
-
-		try {
-			parsed = parser.parse(data);
-		} catch (ParseException e) {
-			System.err.println("NeweggParser.getProductList ERROR:"
-					+ " Error parsing JSON.");
-			return;
-		}
-
-		/* for each category, get a list of subcategories */
-		HashMap<Object, JSONObject> result =
-				findKeyValues(DESCRIPTION_KEY, STORE_DESCRIPTIONS, parsed);
-		HashSet<Subcategory> subcategories = new HashSet<Subcategory>();
-		for (JSONObject category : result.values()) {
-			subcategories.addAll(parseCategory(
-					storeId, category.get(CATEGORY_ID), category.get(NODE_ID)));
-		}
-
-		/* for each subcategory, get a list of products */
-		for (Subcategory subcategory : subcategories) {
-			parseSubcategory(subcategory);
+			parseCategory(url);
 		}
 	}
 
 	private static void parseProductInfo(String productId)
 	{
-		byte[] data;
-		String url = PRODUCT_URL + productId + PRODUCT_URL_SUFFIX;
-		
-		try {
-			data = httpGetRequest(url);
-		} catch (IOException e) {
-			System.err.println("NeweggParser.parseProductInfo ERROR:"
-					+ " Error requesting URL '" + url + "'.");
-			return;
-		}
-
-		Object parsed;
-		try {
-			parsed = parser.parse(data);
-		} catch (ParseException e) {
-			System.err.println("NeweggParser.parseProductInfo ERROR:"
-					+ " Error parsing JSON.");
-			return;
-		}
-
-		HashMap<String, String> keyValues = new HashMap<String, String>();
-		findKeyValues(keyValues, parsed);
-
-		try {
-			respond(keyValues);
-		} catch (IOException e) {
-			System.err.println("NeweggParser.parseProductInfo ERROR:"
-					+ " Error responding with product information.");
-			return;
-		}
 	}
 
 	public static void main(String[] args)
@@ -221,57 +200,9 @@ public class AmazonParser
 			}
 
 		} catch (IOException e) {
-			System.err.println("NeweggParser.main ERROR:"
+			System.err.println("AmazonParser.main ERROR:"
 					+ " Error communicating with core.");
 			return;
 		}
-	}
-}
-
-class Subcategory {
-	private Object storeId;
-	private Object categoryId;
-	private Object subcategoryId;
-	private Object nodeId;
-
-	public Subcategory(Object storeId, Object categoryId,
-			Object subcategoryId, Object nodeId)
-	{
-		this.storeId = storeId;
-		this.categoryId = categoryId;
-		this.subcategoryId = subcategoryId;
-		this.nodeId = nodeId;
-	}
-
-	public Object getStoreId() {
-		return this.storeId;
-	}
-
-	public Object getCategoryId() {
-		return this.categoryId;
-	}
-
-	public Object getSubcategoryId() {
-		return this.subcategoryId;
-	}
-
-	public Object getNodeId() {
-		return this.nodeId;
-	}
-
-	@Override
-	public int hashCode() {
-		return subcategoryId.hashCode();
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (o == null) return false;
-		else if (o == this) return true;
-		else if (!o.getClass().equals(this.getClass()))
-			return false;
-
-		Subcategory other = (Subcategory) o;
-		return categoryId.equals(other.categoryId);
 	}
 }

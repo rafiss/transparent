@@ -52,10 +52,14 @@ public class Core
         }
 
 		/* for now, just start the Newegg parser */
-		Module newegg = new Module(
+		/*Module newegg = new Module(
 				"java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar"
 						+ ":transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser",
-                "Newegg", "NeweggParser", System.err, false, true);
-		getProductList(newegg);
+                "Newegg", "NeweggParser", 0, System.err, false, true);*/
+        Module amazon = new Module(
+				"java -cp transparent/modules/amazon/:"
+						+ ":transparent/modules/amazon/jsoup-1.7.2.jar AmazonParser",
+                "Amazon", "AmazonParser", 1, System.err, false, true);
+		getProductList(amazon);
 	}
 }
