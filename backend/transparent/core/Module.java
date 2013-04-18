@@ -250,7 +250,8 @@ public class Module
 				useBlockedDownload ? "1" : "0"));
 	}
 	
-	private static String toUnsignedString(long value) {
+	private static String toUnsignedString(long value)
+	{
         if (value >= 0) return String.valueOf(value);
         return BigInteger.valueOf(value).add(B64).toString();
 	}

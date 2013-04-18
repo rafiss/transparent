@@ -275,6 +275,11 @@ public class Core
 			return;
 		}
 		
+		if (!loadQueue()) {
+			System.err.println("Core.main WARNING: Unable to load task queue."
+					+ " Creating empty queue...");
+		}
+		
     	ArrayList<String> strings = new ArrayList<String>();
         try {
         	Reader r = new InputStreamReader(
@@ -317,15 +322,12 @@ public class Core
         	if (m.getModuleName().equals("Newegg"))
         		newegg = m;
         }
-        for (int i = 0; i < strings.size(); i++)
+        /*for (int i = 0; i < strings.size(); i++)
         	database.addProductIds(newegg, strings.get(i));
         
         int i = 2;
         if (i == 2)
-        	return;
-        
-        loadModules();
-        loadQueue();
+        	return;*/
 
         /* dispatch all tasks in the queue */
 		for (Task task : queuedJobs)
