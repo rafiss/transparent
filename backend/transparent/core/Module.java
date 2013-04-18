@@ -193,11 +193,11 @@ public class Module
 			return new Module(id, path, name, source, log, remote, blocked);
 
 		} catch (RuntimeException e) {
-			System.err.println("Core.loadModules ERROR: "
+			System.err.println("Module.load ERROR: "
 					+ "Error loading module id.");
 			return null;
 		} catch (IOException e) {
-			System.err.println("Core.loadModules ERROR: "
+			System.err.println("Module.load ERROR: "
 					+ "Unable to initialize output log. "
 					+ "(name = " + name + ", id = " + id + ")");
 			return null;
