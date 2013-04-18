@@ -12,6 +12,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.Iterator;
 import java.util.Map.Entry;
 
 public class ModuleThread implements Runnable, Interruptable
@@ -45,7 +46,7 @@ public class ModuleThread implements Runnable, Interruptable
 	private byte requestType;
 	private boolean alive;
 	private Process process;
-	private ProductID requestedProductId;
+	private Iterator<ProductID> requestedProductIds;
 	private String userAgent;
 	
 	public ModuleThread(Module module, Sandbox sandbox,
@@ -84,6 +85,7 @@ public class ModuleThread implements Runnable, Interruptable
 					total += read;
 					if (total > MAX_DOWNLOAD_SIZE)
 						break;
+					module.logDownloadProgress(total);
 					dest.writeShort(read);
 					dest.write(buf, 0, read);
 				}
@@ -95,6 +97,8 @@ public class ModuleThread implements Runnable, Interruptable
 			int read = stream.read();
 			total = read;
 			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
+				if (total > 0)
+					module.logDownloadProgress(total);
 				page.write(read);
 				read = stream.read();
 				total += read;
@@ -103,9 +107,13 @@ public class ModuleThread implements Runnable, Interruptable
 			page.writeTo(dest);
 		}
 
-		if (total < MAX_DOWNLOAD_SIZE)
+		if (total < MAX_DOWNLOAD_SIZE) {
 			dest.writeByte(DOWNLOAD_OK);
-		else dest.writeByte(DOWNLOAD_ABORTED);
+			module.logDownloadCompleted(total);
+		} else {
+			dest.writeByte(DOWNLOAD_ABORTED);
+			module.logDownloadAborted();
+		}
 		
 		dest.flush();
 		stream.close();
@@ -121,6 +129,8 @@ public class ModuleThread implements Runnable, Interruptable
 					Thread.sleep(towait / 1000000);
 				} catch (InterruptedException e) { }
 			}
+			
+			module.logHttpGetRequest(url);
 			URLConnection http = new URL(url).openConnection();
 			http.setRequestProperty("User-Agent", userAgent);
 			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
@@ -140,7 +150,8 @@ public class ModuleThread implements Runnable, Interruptable
 					Thread.sleep(towait / 1000000);
 				} catch (InterruptedException e) { }
 			}
-			
+
+			module.logHttpPostRequest(url, post);
 			URLConnection connection = new URL(url).openConnection();
 			if (!(connection instanceof HttpURLConnection)) {
 				module.logError("ModuleThread", "httpPostRequest",
@@ -238,8 +249,8 @@ public class ModuleThread implements Runnable, Interruptable
 		this.requestType = requestType;
 	}
 	
-	public void setRequestedProductId(ProductID productId) {
-		this.requestedProductId = productId;
+	public void setRequestedProductIds(Iterator<ProductID> productIds) {
+		this.requestedProductIds = productIds;
 	}
 
 	@Override
@@ -262,8 +273,8 @@ public class ModuleThread implements Runnable, Interruptable
 			if (requestType != Core.PRODUCT_INFO_REQUEST) {
 				module.logError("ModuleThread", "run", "requestType not set.");
 				return;
-			} else if (requestedProductId == null) {
-				module.logError("ModuleThread", "run", "requestedProductId not set.");
+			} else if (requestedProductIds == null) {
+				module.logError("ModuleThread", "run", "requestedProductIds not set.");
 				return;
 			}
 		}
@@ -283,14 +294,24 @@ public class ModuleThread implements Runnable, Interruptable
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(requestType);
-			if (requestType == Core.PRODUCT_INFO_REQUEST) {
-				String moduleProductId = requestedProductId.getModuleProductId();
-				out.writeShort(moduleProductId.length());
-				out.write(moduleProductId.getBytes(UTF8));
-			}
-			out.flush();
 		
-			while (alive) {
+			while (alive)
+			{
+				/* indicate the product ID we are requesting */
+				ProductID requestedProductId = null;
+				if (requestType == Core.PRODUCT_INFO_REQUEST) {
+					if (requestedProductIds.hasNext()) {
+						requestedProductId = requestedProductIds.next();
+						String moduleProductId = requestedProductId.getModuleProductId();
+						out.writeShort(moduleProductId.length());
+						out.write(moduleProductId.getBytes(UTF8));
+					} else {
+						out.writeShort(0);
+						break;
+					}
+				}
+				out.flush();
+				
 				/* read input from the module */
 				switch (in.readUnsignedByte()) {
 				case MODULE_SET_USER_AGENT:
@@ -303,6 +324,7 @@ public class ModuleThread implements Runnable, Interruptable
 						byte[] data = new byte[length];
 						in.readFully(data);
 						this.userAgent = new String(data, UTF8);
+						module.logUserAgentChange(this.userAgent);
 					}
 					break;
 					

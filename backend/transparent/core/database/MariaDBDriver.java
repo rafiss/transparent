@@ -12,7 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -63,16 +63,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
                 // Insert moduleProductId as Entity
                 long generatedEntityKey = insertIntoEntity(moduleProductId).get(0);
-
-                // Insert MODULE_ID as PropertyType
-                long generatedPropertyTypeKey = insertIntoPropertyType(MODULE_ID).get(0);
-
-                // Associate EntityIDs with PropertyTypeId in Property
-                long generatedPropertyKey = insertIntoProperty(generatedEntityKey,
-                                                               generatedPropertyTypeKey).get(0);
-
-                // Update Trait table with module's ID
-                insertIntoTrait(generatedPropertyKey, String.valueOf(module.getId()));
+                insertNewAttribute(generatedEntityKey, MODULE_ID, String.valueOf(module.getId()));
             }
             connection.commit();
         } catch (SQLException e) {
@@ -538,13 +529,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    @SuppressWarnings("Unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public static void main(String[] args) throws SQLException, IOException, ClassNotFoundException {
         // Test client
 
         Database database = new MariaDBDriver();
 
-        Module testModule = new Module(null, "source", "module", 1, null, false, false);
+        // TODO: i changed the constructor for module
+        Module testModule = null; //new Module(null, "source", "module", 1, null, false, false);
 
         database.addProductIds(testModule, "product1", "product2");
         database.addProductIds(testModule, "product1", "product2");
@@ -558,13 +550,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
             ProductID productID = productIDIterator.next();
             System.out.println(productID.getModuleProductId() + " " + productID.getRowId());
 
-            AbstractMap.SimpleEntry entry = new AbstractMap.SimpleEntry("foo", "bar");
+            SimpleEntry<String, String> entry = new SimpleEntry("foo", "bar");
             database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("baz", "grep");
+            entry = new SimpleEntry("baz", "grep");
             database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("something", "else");
+            entry = new SimpleEntry("something", "else");
             database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("something", "else2");
+            entry = new SimpleEntry("something", "else2");
             database.addProductInfo(testModule, productID, entry);
 
         }

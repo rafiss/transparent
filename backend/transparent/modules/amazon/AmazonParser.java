@@ -192,9 +192,12 @@ public class AmazonParser
 				break;
 			case PRODUCT_INFO_REQUEST:
 				int length = in.readUnsignedShort();
-				byte[] data = new byte[length];
-				in.readFully(data);
-				parseProductInfo(new String(data, UTF8));
+				while (length  > 0) {
+					byte[] data = new byte[length];
+					in.readFully(data);
+					parseProductInfo(new String(data, UTF8));
+					length = in.readUnsignedShort();
+				}
 				break;
 			default:
 			}

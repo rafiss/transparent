@@ -31,6 +31,8 @@ public interface Database
 	public boolean setMetadata(String key, String value);
 
 	/* TODO: add api for querying (what should it return?) */
+	
+	/* TODO: add api for deleting (both metadata and non-metadata) */
 
     public void close();
 }
