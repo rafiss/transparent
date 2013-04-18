@@ -184,7 +184,7 @@ public class Module
 		long id = -1;
 		String name = "<unknown>";
 		try {
-			id = Long.parseLong(database.getMetadata("module." + index + ".id"));
+			id = new BigInteger(database.getMetadata("module." + index + ".id")).longValue();
 
 			String path = database.getMetadata("module." + index + ".path");
 			name = database.getMetadata("module." + index + ".name");
