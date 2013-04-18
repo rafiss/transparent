@@ -51,9 +51,18 @@ public class Module
 		this.log = log;
 	}
 	
+	/**
+	 * WARNING: do not convert this directly to a string, as Java will
+	 * interpret it as a signed value. Use {@link Module#getIdString()}
+	 * instead.
+	 */
 	public long getId() {
 		return id;
 	}
+	
+    public String getIdString() {
+    	return toUnsignedString(id);
+    }
 	
 	public String getPath() {
 		return path;
@@ -92,7 +101,7 @@ public class Module
 	{
 		log.println(className + '.' + methodName + ": " + message);
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id) + " (name: '"
+			System.out.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') information:");
 			System.out.println("\t" + className + '.' + methodName + ": " + message);
 			System.out.flush();
@@ -104,7 +113,7 @@ public class Module
 	{
 		log.println(className + '.' + methodName + " ERROR: " + message);
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id) + " (name: '"
+			System.out.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
 			System.out.println("\t" + className + '.' + methodName + " ERROR: " + message);
 			System.out.flush();
@@ -114,7 +123,7 @@ public class Module
 	public void logUserAgentChange(String newUserAgent)
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') changed user agent to: " + newUserAgent);
 			System.out.flush();
@@ -124,7 +133,7 @@ public class Module
 	public void logHttpGetRequest(String url)
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP GET: " + url);
 			System.out.flush();
@@ -134,7 +143,7 @@ public class Module
 	public void logHttpPostRequest(String url, byte[] post)
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP POST:");
 			System.out.println("\tURL: " + url);
@@ -152,7 +161,7 @@ public class Module
 	public void logDownloadProgress(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') downloading: " + downloaded + " bytes");
 			System.out.flush();
@@ -162,7 +171,7 @@ public class Module
 	public void logDownloadCompleted(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') completed download: " + downloaded + " bytes");
 			System.out.flush();
@@ -172,7 +181,7 @@ public class Module
 	public void logDownloadAborted()
 	{
 		if (logActivity) {
-			System.out.println("Module " + toUnsignedString(id)
+			System.out.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') aborted download due to download size limit.");
 			System.out.flush();
@@ -223,15 +232,10 @@ public class Module
 		}
 	}
 	
-    public static String toUnsignedString(long num) {
-        if (num >= 0) return String.valueOf(num);
-        return BigInteger.valueOf(num).add(B64).toString();
-    }
-	
 	public boolean save(Database database, int index)
 	{
 		return (database.setMetadata(
-				"module." + index + ".id", toUnsignedString(id))
+				"module." + index + ".id", getIdString())
 		 && database.setMetadata(
 					"module." + index + "path", path)
 		 && database.setMetadata(
@@ -244,5 +248,10 @@ public class Module
 		 && database.setMetadata(
 				"module." + index + ".blocked",
 				useBlockedDownload ? "1" : "0"));
+	}
+	
+	private static String toUnsignedString(long value) {
+        if (value >= 0) return String.valueOf(value);
+        return BigInteger.valueOf(value).add(B64).toString();
 	}
 }

@@ -83,6 +83,7 @@ public class Core
 	
 	private static boolean loadModules()
 	{
+		System.out.println("Loading modules...");
 		String moduleCount = database.getMetadata(MODULE_COUNT);
 		if (moduleCount == null) {
 			System.err.println("Core.loadModules ERROR: No modules stored."
@@ -99,6 +100,7 @@ public class Core
 			return false;
 		}
 		
+		System.out.println("Found " + count + " modules.");
 		for (int i = 0; i < count; i++) {
 			Module module = Module.load(database, i);
 			if (module == null) {
@@ -107,6 +109,8 @@ public class Core
 				return false;
 			}
 			
+			System.out.println("Loaded module '" + module.getModuleName()
+					+ "' (id: " + module.getIdString() + ")");
 			modules.put(module.getId(), module);
 		}
 		
@@ -186,7 +190,7 @@ public class Core
 		for (Task task : tasks) {
 			String module = "<null>";
 			if (task.getModule() != null)
-				module = task.getModule().getId() + " ("
+				module = task.getModule().getIdString() + " ("
 						+ task.getModule().getModuleName() + ")";
 			
 			System.out.println("Task type: " + task.getType().toString()
@@ -225,7 +229,7 @@ public class Core
     		printTasks(jobs);
     	} else if (command.equals("modules")) {
     		for (Module module : modules.values()) {
-    			System.out.println("Module id: " + module.getId()
+    			System.out.println("Module id: " + module.getIdString()
     					+ ", name: " + module.getModuleName()
     					+ ", source: " + module.getSourceName()
     					+ ", remote: " + module.isRemote()
@@ -443,7 +447,7 @@ class Task implements Comparable<Task>, Callable<Object>
 		
 		String reschedulesString = reschedules ? "1" : "0";
 		String dummyString = dummy ? "1" : "0";
-		return typeString + "." + module.getId() + "." + time
+		return typeString + "." + module.getIdString() + "." + time
 				+ "." + reschedulesString + "." + dummyString;
 	}
 

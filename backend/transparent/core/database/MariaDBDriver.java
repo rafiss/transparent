@@ -63,7 +63,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
                 // Insert moduleProductId as Entity
                 long generatedEntityKey = insertIntoEntity(moduleProductId).get(0);
-                insertNewAttribute(generatedEntityKey, MODULE_ID, String.valueOf(module.getId()));
+                insertNewAttribute(generatedEntityKey, MODULE_ID, module.getIdString());
             }
             connection.commit();
         } catch (SQLException e) {
@@ -92,7 +92,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                                                                         "EntityID",
                                                                         columns));
             statement.setString(1, MODULE_ID);
-            statement.setString(2, String.valueOf(module.getId()));
+            statement.setString(2, module.getIdString());
             return new ResultSetIterator(statement.executeQuery());
         } catch (SQLException e) {
             System.err.println("MariaDBDriver.getProductIds ERROR:"
@@ -280,7 +280,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             statement = connection.prepareStatement(buildSelectTemplate(MODEL_NAME, "*", null,
                                                                         columns));
             statement.setString(1, MODULE_ID);
-            statement.setString(2, String.valueOf(module.getId()));
+            statement.setString(2, module.getIdString());
             statement.setString(3, moduleProductId);
             return statement.executeQuery();
         } catch (SQLException e) {
