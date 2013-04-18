@@ -12,24 +12,25 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.Properties;
 
 public class MariaDBDriver implements transparent.core.database.Database {
 
     private static final String CFG_FILE = "transparent/core/database/transparent.cfg";
 
-    private static final String MODULE_NAME_KEY = "module_name";
-    private static final String MODULE_SOURCE_KEY = "module_source";
+    private static final String MODULE_ID = "module_id";
 
+    private static final String METADATA_TABLE = "Metadata";
     private static final String ENTITY_TABLE = "Entity";
     private static final String PROPERTY_TYPE_TABLE = "PropertyType";
     private static final String PROPERTY_TABLE = "Property";
-    private static final String MEASUREMENT_TABLE = "Measurement";
     private static final String TRAIT_TABLE = "Trait";
+    private static final String MODEL_NAME = "vModel";
 
     private final Connection connection;
 
@@ -52,33 +53,39 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
-        // TODO: Batch SQL statements
-
         try {
+            connection.setAutoCommit(false);
+
             for (String moduleProductId : moduleProductIds) {
+                if (checkModuleProductExistence(moduleProductId, module).next()) {
+                    continue;
+                }
+
                 // Insert moduleProductId as Entity
                 long generatedEntityKey = insertIntoEntity(moduleProductId).get(0);
 
-                // Insert MODULE_NAME_KEY and MODULE_SOURCE_KEY as PropertyTypes
-                long generatedPropertyTypeKey1 = insertIntoPropertyType(MODULE_NAME_KEY,
-                                                                        true).get(0);
-                long generatedPropertyTypeKey2 = insertIntoPropertyType(MODULE_SOURCE_KEY,
-                                                                        true).get(0);
+                // Insert MODULE_ID as PropertyType
+                long generatedPropertyTypeKey = insertIntoPropertyType(MODULE_ID).get(0);
 
-                // Associate EntityIDs with PropertyTypeIds in Property
-                long generatedPropertyKey1 = insertIntoProperty(generatedEntityKey,
-                                                                generatedPropertyTypeKey1).get(0);
-                long generatedPropertyKey2 = insertIntoProperty(generatedEntityKey,
-                                                                generatedPropertyTypeKey2).get(0);
+                // Associate EntityIDs with PropertyTypeId in Property
+                long generatedPropertyKey = insertIntoProperty(generatedEntityKey,
+                                                               generatedPropertyTypeKey).get(0);
 
-                // Update Trait table with correct values
-                insertIntoTrait(generatedPropertyKey1, module.getModuleName());
-                insertIntoTrait(generatedPropertyKey2, module.getSourceName());
+                // Update Trait table with module's ID
+                insertIntoTrait(generatedPropertyKey, String.valueOf(module.getId()));
             }
+            connection.commit();
         } catch (SQLException e) {
             System.err.println("MariaDBDriver.addProductIds ERROR:"
                                        + " Exception thrown (" + e.getMessage() + ").");
             return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("MariaDBDriver.addProductIds ERROR:"
+                                           + " Exception thrown (" + e.getMessage() + ").");
+            }
         }
 
         return true;
@@ -86,13 +93,16 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     @Override
     public Iterator<ProductID> getProductIds(Module module) {
-        Statement statement = null;
+        PreparedStatement statement = null;
         try {
-            statement = connection.createStatement();
-            statement.execute("SELECT EntityID FROM vModel WHERE PropertyName='" + MODULE_NAME_KEY +
-                                      "' AND TraitValue='" + module.getModuleName() +
-                                      "' GROUP BY EntityID");
-            return new ResultSetIterator(statement.getResultSet());
+            String[] columns = new String[] { "PropertyName", "TraitValue" };
+            statement = connection.prepareStatement(buildSelectTemplate(MODEL_NAME,
+                                                                        "EntityID, EntityName",
+                                                                        "EntityID",
+                                                                        columns));
+            statement.setString(1, MODULE_ID);
+            statement.setString(2, String.valueOf(module.getId()));
+            return new ResultSetIterator(statement.executeQuery());
         } catch (SQLException e) {
             System.err.println("MariaDBDriver.getProductIds ERROR:"
                                        + " Exception thrown (" + e.getMessage() + ").");
@@ -111,18 +121,16 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     @Override
     @SafeVarargs
-	public final boolean addProductInfo(Module module,
-			ProductID moduleProductId,
-			Entry<String, String>... keyValues)
-    {
+    public final boolean addProductInfo(Module module,
+                                        ProductID productId,
+                                        Entry<String, String>... keyValues) {
         try {
-            for (Entry<String, String> pair: keyValues) {
-                insertNewAttribute(moduleProductId.getModuleId(),
-                		pair.getKey(), pair.getValue());
+            for (Entry<String, String> pair : keyValues) {
+                insertNewAttribute(productId.getRowId(), pair.getKey(), pair.getValue());
             }
         } catch (SQLException e) {
             module.logError("MariaDBDriver", "addProductInfo",
-            		"Exception thrown (" + e.getMessage() + ").");
+                            "Exception thrown (" + e.getMessage() + ").");
             return false;
         }
 
@@ -131,14 +139,75 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     @Override
     public String getMetadata(String key) {
-        // TODO: Finish this
-        return null;
+        PreparedStatement statement = null;
+
+        try {
+            String[] columns = new String[] { "meta_key" };
+            statement = connection.prepareStatement(buildSelectTemplate(METADATA_TABLE,
+                                                                        "meta_value", null,
+                                                                        columns));
+            statement.setString(1, key);
+
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                return resultSet.getString(1);
+            } else {
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return null;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
     }
 
     @Override
     public boolean setMetadata(String key, String value) {
-        // TODO: Finish this
-        return false;
+        PreparedStatement statement = null;
+        try {
+            connection.setAutoCommit(false);
+
+            if (getMetadata(key) != null) {
+                String whereField = "meta_key='" + key + "'";
+                String[] columns = new String[] { "meta_value" };
+                statement = connection.prepareStatement(buildUpdateTemplate(METADATA_TABLE,
+                                                                            whereField,
+                                                                            columns));
+                statement.setString(1, value);
+                statement.executeUpdate();
+            } else {
+                statement = connection.prepareStatement(buildInsertTemplate(METADATA_TABLE, 2));
+                statement.setString(1, key);
+                statement.setString(2, value);
+                statement.executeUpdate();
+            }
+
+            connection.commit();
+            return true;
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return false;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
     }
 
     @Override
@@ -151,12 +220,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    private String buildInsertTemplate(String tableName, long numFields, boolean setIgnore) {
+    private String buildInsertTemplate(String tableName, long numFields) {
         StringBuilder stringBuilder = new StringBuilder("INSERT ");
-
-        if (setIgnore) {
-            stringBuilder.append("IGNORE ");
-        }
 
         stringBuilder.append("INTO ");
         stringBuilder.append(tableName);
@@ -173,15 +238,163 @@ public class MariaDBDriver implements transparent.core.database.Database {
         return stringBuilder.toString();
     }
 
+    private String buildSelectTemplate(String tableName, String selectField, String groupBy,
+                                       String... whereFields) {
+        StringBuilder stringBuilder = new StringBuilder("SELECT ");
+
+        stringBuilder.append(selectField);
+        stringBuilder.append(" FROM ");
+        stringBuilder.append(tableName);
+        stringBuilder.append(" WHERE ");
+
+        for (int i = 0; i < whereFields.length; i++) {
+            stringBuilder.append(whereFields[i]);
+            stringBuilder.append("=?");
+            if (i != whereFields.length - 1) {
+                stringBuilder.append(" AND ");
+            }
+        }
+
+        if (groupBy != null) {
+            stringBuilder.append(" GROUP BY ");
+            stringBuilder.append(groupBy);
+        }
+        return stringBuilder.toString();
+    }
+
+    private String buildUpdateTemplate(String tableName, String whereField, String... columns) {
+        StringBuilder stringBuilder = new StringBuilder("UPDATE ");
+
+        stringBuilder.append(tableName);
+        stringBuilder.append(" SET ");
+
+        for (int i = 0; i < columns.length; i++) {
+            stringBuilder.append(columns[i]);
+            stringBuilder.append("=?");
+            if (i != columns.length - 1) {
+                stringBuilder.append(" AND ");
+            }
+        }
+
+        stringBuilder.append(" WHERE ");
+        stringBuilder.append(whereField);
+        return stringBuilder.toString();
+    }
+
+    private ResultSet checkModuleProductExistence(String moduleProductId, Module module) {
+        PreparedStatement statement = null;
+
+        try {
+            String[] columns = new String[] { "PropertyName", "TraitValue", "EntityName" };
+            statement = connection.prepareStatement(buildSelectTemplate(MODEL_NAME, "*", null,
+                                                                        columns));
+            statement.setString(1, MODULE_ID);
+            statement.setString(2, String.valueOf(module.getId()));
+            statement.setString(3, moduleProductId);
+            return statement.executeQuery();
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return null;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.checkModuleProductExistence ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
+    }
+
+    private ResultSet checkPropertyTypeExistence(String name) {
+        PreparedStatement statement = null;
+
+        try {
+            String[] columns = new String[] { "property_name" };
+            statement = connection.prepareStatement(buildSelectTemplate(PROPERTY_TYPE_TABLE,
+                                                                        "property_type_id", null,
+                                                                        columns));
+            statement.setString(1, name);
+            return statement.executeQuery();
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return null;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.checkPropertyTypeExistence ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
+    }
+
+    private ResultSet checkPropertyExistence(long entityId, long propertyTypeId) {
+        PreparedStatement statement = null;
+
+        try {
+            String[] columns = new String[] { "entity_id", "property_type_id" };
+            statement = connection.prepareStatement(buildSelectTemplate(PROPERTY_TABLE,
+                                                                        "property_id", null,
+                                                                        columns));
+            statement.setLong(1, entityId);
+            statement.setLong(2, propertyTypeId);
+            return statement.executeQuery();
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return null;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.checkPropertyExistence ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
+    }
+
+    private ResultSet checkTraitExistence(long propertyId) {
+        PreparedStatement statement = null;
+
+        try {
+            String[] columns = new String[] { "property_id" };
+            statement = connection.prepareStatement(buildSelectTemplate(TRAIT_TABLE,
+                                                                        "property_id", null,
+                                                                        columns));
+            statement.setLong(1, propertyId);
+            return statement.executeQuery();
+        } catch (SQLException e) {
+            System.err.println("MariaDBDriver.getMetadata ERROR:"
+                                       + " Exception thrown (" + e.getMessage() + ").");
+            return null;
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (SQLException e) {
+                    System.err.println("MariaDBDriver.checkTraitExistence ERROR:"
+                                               + " Exception thrown (" + e.getMessage() + ").");
+                }
+            }
+        }
+    }
+
     private List<Long> insertIntoEntity(String name) throws SQLException {
         PreparedStatement statement;
 
-        statement = connection.prepareStatement(buildInsertTemplate(ENTITY_TABLE, 2, false),
+        statement = connection.prepareStatement(buildInsertTemplate(ENTITY_TABLE, 2),
                                                 Statement.RETURN_GENERATED_KEYS);
         statement.setNull(1, Types.INTEGER);
         statement.setString(2, name);
         statement.executeUpdate();
-
 
         ResultSet generatedKeys = statement.getGeneratedKeys();
         List<Long> keys = new ArrayList<Long>();
@@ -196,80 +409,170 @@ public class MariaDBDriver implements transparent.core.database.Database {
         return keys;
     }
 
-    private List<Long> insertIntoPropertyType(String name, boolean isTrait) throws SQLException {
-        PreparedStatement statement;
+    private List<Long> insertIntoPropertyType(String name) throws SQLException {
+        PreparedStatement statement = null;
 
-        statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TYPE_TABLE, 3, true),
-                                                Statement.RETURN_GENERATED_KEYS);
-        statement.setNull(1, Types.INTEGER);
-        statement.setString(2, name);
-        statement.setBoolean(3, isTrait);
-        statement.executeUpdate();
+        try {
+            connection.setAutoCommit(false);
 
-        ResultSet generatedKeys = statement.getGeneratedKeys();
-        List<Long> keys = new ArrayList<Long>();
+            ResultSet results = checkPropertyTypeExistence(name);
+            List<Long> keys = new ArrayList<Long>();
 
-        while (generatedKeys.next()) {
-            keys.add(generatedKeys.getLong(1));
+            if (results.next()) {
+                keys.add(results.getLong(1));
+            } else {
+                statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TYPE_TABLE, 2),
+                                                        Statement.RETURN_GENERATED_KEYS);
+                statement.setNull(1, Types.INTEGER);
+                statement.setString(2, name);
+                statement.executeUpdate();
+
+                results = statement.getGeneratedKeys();
+            }
+
+            while (results.next()) {
+                keys.add(results.getLong(1));
+            }
+
+            results.close();
+
+            if (statement != null) {
+                statement.close();
+            }
+
+            return keys;
+        } finally {
+            connection.setAutoCommit(true);
         }
-
-        generatedKeys.close();
-        statement.close();
-
-        return keys;
     }
 
     private List<Long> insertIntoProperty(long entityId, long propertyTypeId) throws SQLException {
-        PreparedStatement statement;
+        PreparedStatement statement = null;
 
-        statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TABLE, 3, false),
-                                                Statement.RETURN_GENERATED_KEYS);
-        statement.setNull(1, Types.INTEGER);
-        statement.setLong(2, entityId);
-        statement.setLong(3, propertyTypeId);
-        statement.executeUpdate();
+        try {
+            connection.setAutoCommit(false);
 
-        ResultSet generatedKeys = statement.getGeneratedKeys();
-        List<Long> keys = new ArrayList<Long>();
+            ResultSet results = checkPropertyExistence(entityId, propertyTypeId);
+            List<Long> keys = new ArrayList<Long>();
 
-        while (generatedKeys.next()) {
-            keys.add(generatedKeys.getLong(1));
+            if (results.next()) {
+                keys.add(results.getLong(1));
+            } else {
+                statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TABLE, 3),
+                                                        Statement.RETURN_GENERATED_KEYS);
+                statement.setNull(1, Types.INTEGER);
+                statement.setLong(2, entityId);
+                statement.setLong(3, propertyTypeId);
+                statement.executeUpdate();
+
+                results = statement.getGeneratedKeys();
+            }
+
+            while (results.next()) {
+                keys.add(results.getLong(1));
+            }
+
+            results.close();
+
+            if (statement != null) {
+                statement.close();
+            }
+
+            return keys;
+        } finally {
+            connection.setAutoCommit(true);
         }
-
-        generatedKeys.close();
-        statement.close();
-
-        return keys;
     }
 
     private List<Long> insertIntoTrait(long propertyId, String value) throws SQLException {
         PreparedStatement statement;
 
-        statement = connection.prepareStatement(buildInsertTemplate(TRAIT_TABLE, 2, false),
-                                                Statement.RETURN_GENERATED_KEYS);
-        statement.setLong(1, propertyId);
-        statement.setString(2, value);
-        statement.executeUpdate();
+        try {
+            connection.setAutoCommit(false);
 
-        ResultSet generatedKeys = statement.getGeneratedKeys();
-        List<Long> keys = new ArrayList<Long>();
+            ResultSet results = checkTraitExistence(propertyId);
+            List<Long> keys = new ArrayList<Long>();
 
-        while (generatedKeys.next()) {
-            keys.add(generatedKeys.getLong(1));
+            if (results.next()) {
+                String whereField = "property_id='" + propertyId + "'";
+                String[] columns = new String[] { "value" };
+                statement = connection.prepareStatement(buildUpdateTemplate(TRAIT_TABLE,
+                                                                            whereField, columns),
+                                                        Statement.RETURN_GENERATED_KEYS);
+                statement.setString(1, value);
+                statement.executeUpdate();
+
+                keys.add(results.getLong(1));
+            } else {
+                statement = connection.prepareStatement(buildInsertTemplate(TRAIT_TABLE, 2),
+                                                        Statement.RETURN_GENERATED_KEYS);
+                statement.setLong(1, propertyId);
+                statement.setString(2, value);
+                statement.executeUpdate();
+
+                results = statement.getGeneratedKeys();
+            }
+
+            while (results.next()) {
+                keys.add(results.getLong(1));
+            }
+
+            results.close();
+            statement.close();
+            return keys;
+        } finally {
+            connection.setAutoCommit(true);
         }
-
-        generatedKeys.close();
-        statement.close();
-
-        return keys;
     }
 
-    private void insertNewAttribute(String moduleProductId, String key,
+    private void insertNewAttribute(long entityId, String key,
                                     String value) throws SQLException {
-        long entityId = insertIntoEntity(moduleProductId).get(0);
-        long propertyTypeId = insertIntoPropertyType(key, true).get(0);
-        long propertyId = insertIntoProperty(entityId, propertyTypeId).get(0);
-        insertIntoTrait(propertyId, value);
+        try {
+            connection.setAutoCommit(false);
+            long propertyTypeId = insertIntoPropertyType(key).get(0);
+            long propertyId = insertIntoProperty(entityId, propertyTypeId).get(0);
+            insertIntoTrait(propertyId, value);
+            connection.commit();
+        } finally {
+            connection.setAutoCommit(true);
+        }
+    }
+
+    @SuppressWarnings("Unchecked")
+    public static void main(String[] args) throws SQLException, IOException, ClassNotFoundException {
+        // Test client
+
+        Database database = new MariaDBDriver();
+
+        Module testModule = new Module(null, "source", "module", 1, null, false, false);
+
+        database.addProductIds(testModule, "product1", "product2");
+        database.addProductIds(testModule, "product1", "product2");
+        database.addProductIds(testModule, "product1", "product2");
+        database.addProductIds(testModule, "product1", "product2");
+
+
+        Iterator<ProductID> productIDIterator = database.getProductIds(testModule);
+
+        while (productIDIterator.hasNext()) {
+            ProductID productID = productIDIterator.next();
+            System.out.println(productID.getModuleProductId() + " " + productID.getRowId());
+
+            AbstractMap.SimpleEntry entry = new AbstractMap.SimpleEntry("foo", "bar");
+            database.addProductInfo(testModule, productID, entry);
+            entry = new AbstractMap.SimpleEntry("baz", "grep");
+            database.addProductInfo(testModule, productID, entry);
+            entry = new AbstractMap.SimpleEntry("something", "else");
+            database.addProductInfo(testModule, productID, entry);
+            database.addProductInfo(testModule, productID, entry);
+
+        }
+
+        database.setMetadata("key1", "value1");
+        System.out.println(database.getMetadata("key1"));
+        System.out.println(database.getMetadata("key2"));
+        database.setMetadata("key1", "value2");
+        System.out.println(database.getMetadata("key1"));
     }
 }
 
@@ -284,7 +587,7 @@ class ResultSetIterator implements Iterator<ProductID> {
     @Override
     public boolean hasNext() {
         try {
-            return !resultSet.isAfterLast();
+            return !resultSet.isLast();
         } catch (SQLException e) {
             System.err.println("ResultSetIterator.hasNext ERROR:"
                                        + " Exception thrown (" + e.getMessage() + ").");
@@ -296,7 +599,7 @@ class ResultSetIterator implements Iterator<ProductID> {
     public ProductID next() {
         try {
             if (resultSet.next()) {
-                return resultSet.getString(0);
+                return new ProductID(resultSet.getLong(1), resultSet.getString(2));
             } else {
                 return null;
             }

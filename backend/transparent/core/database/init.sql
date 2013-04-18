@@ -5,6 +5,11 @@ USE transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
 
+CREATE TABLE IF NOT EXISTS Metadata (
+    meta_key TEXT,
+    meta_value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS Entity (
     entity_id INT AUTO_INCREMENT,
     name TEXT,
@@ -35,6 +40,7 @@ CREATE TABLE IF NOT EXISTS Trait (
 CREATE OR REPLACE VIEW vModel AS
 SELECT
       e.entity_id AS EntityID
+    , e.name AS EntityName
     , x.property_name AS PropertyName
     , t.value AS TraitValue
 FROM Entity           AS e
