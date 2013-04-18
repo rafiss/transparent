@@ -564,6 +564,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             database.addProductInfo(testModule, productID, entry);
             entry = new AbstractMap.SimpleEntry("something", "else");
             database.addProductInfo(testModule, productID, entry);
+            entry = new AbstractMap.SimpleEntry("something", "else2");
             database.addProductInfo(testModule, productID, entry);
 
         }
