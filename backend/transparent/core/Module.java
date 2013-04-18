@@ -199,7 +199,8 @@ public class Module
 		} catch (IOException e) {
 			System.err.println("Module.load ERROR: "
 					+ "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + id + ")");
+					+ "(name = " + name + ", id = " + id
+					+ ", exception: " + e.getMessage() + ")");
 			return null;
 		}
 	}
