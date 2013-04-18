@@ -1,8 +1,10 @@
 package transparent.core;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.math.BigInteger;
 
 import transparent.core.database.Database;
 
@@ -31,6 +33,9 @@ public class Module
 	
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
+
+	/* needed to print unsigned 64-bit long values */
+	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
 
 	public Module(long id, String path,
 			String moduleName, String sourceName,
@@ -87,7 +92,7 @@ public class Module
 	{
 		log.println(className + '.' + methodName + ": " + message);
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '"
+			System.out.println("Module " + toUnsignedString(id) + " (name: '"
 					+ moduleName + "') information:");
 			System.out.println("\t" + className + '.' + methodName + ": " + message);
 			System.out.flush();
@@ -99,7 +104,7 @@ public class Module
 	{
 		log.println(className + '.' + methodName + " ERROR: " + message);
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '"
+			System.out.println("Module " + toUnsignedString(id) + " (name: '"
 					+ moduleName + "') reported error:");
 			System.out.println("\t" + className + '.' + methodName + " ERROR: " + message);
 			System.out.flush();
@@ -109,7 +114,8 @@ public class Module
 	public void logUserAgentChange(String newUserAgent)
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') changed user agent to: " + newUserAgent);
 			System.out.flush();
 		}
@@ -118,7 +124,8 @@ public class Module
 	public void logHttpGetRequest(String url)
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') requested HTTP GET: " + url);
 			System.out.flush();
 		}
@@ -127,7 +134,8 @@ public class Module
 	public void logHttpPostRequest(String url, byte[] post)
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') requested HTTP POST:");
 			System.out.println("\tURL: " + url);
 			System.out.print("\tPOST data: ");
@@ -144,7 +152,8 @@ public class Module
 	public void logDownloadProgress(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') downloading: " + downloaded + " bytes");
 			System.out.flush();
 		}
@@ -153,7 +162,8 @@ public class Module
 	public void logDownloadCompleted(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') completed download: " + downloaded + " bytes");
 			System.out.flush();
 		}
@@ -162,7 +172,8 @@ public class Module
 	public void logDownloadAborted()
 	{
 		if (logActivity) {
-			System.out.println("Module " + id + " (name: '" + moduleName
+			System.out.println("Module " + toUnsignedString(id)
+					+ " (name: '" + moduleName
 					+ "') aborted download due to download size limit.");
 			System.out.flush();
 		}
@@ -188,8 +199,14 @@ public class Module
 			if (remoteString.equals("0"))
 				remote = false;
 			
-			PrintStream log = new PrintStream(new FileOutputStream(
-					"log/" + name + "." + id + ".log", true));
+			PrintStream log;
+			String filename = "log/" + name + "." + id + ".log";
+			File logfile = new File(filename);
+			if (!logfile.exists()) {
+				log = new PrintStream(new FileOutputStream(filename));
+			} else {
+				log = new PrintStream(new FileOutputStream(filename, true));	
+			}
 			return new Module(id, path, name, source, log, remote, blocked);
 
 		} catch (RuntimeException e) {
@@ -199,16 +216,21 @@ public class Module
 		} catch (IOException e) {
 			System.err.println("Module.load ERROR: "
 					+ "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + id
+					+ "(name = " + name + ", id = " + toUnsignedString(id)
 					+ ", exception: " + e.getMessage() + ")");
 			return null;
 		}
 	}
 	
+    public static String toUnsignedString(long num) {
+        if (num >= 0) return String.valueOf(num);
+        return BigInteger.valueOf(num).add(B64).toString();
+    }
+	
 	public boolean save(Database database, int index)
 	{
 		return (database.setMetadata(
-				"module." + index + ".id", Long.toString(id))
+				"module." + index + ".id", toUnsignedString(id))
 		 && database.setMetadata(
 					"module." + index + "path", path)
 		 && database.setMetadata(

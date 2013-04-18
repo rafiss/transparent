@@ -45,18 +45,20 @@ public class ModuleThread implements Runnable, Interruptable
 	private final Database database;
 	private byte requestType;
 	private boolean alive;
+	private boolean dummy;
 	private Process process;
 	private Iterator<ProductID> requestedProductIds;
 	private String userAgent;
 	
 	public ModuleThread(Module module, Sandbox sandbox,
-			Database database)
+			Database database, boolean dummy)
 	{
 		this.sandbox = sandbox;
 		this.module = module;
 		this.database = database;
 		this.requestType = 0;
 		this.alive = true;
+		this.dummy = dummy;
 		this.userAgent = DEFAULT_USER_AGENT;
 	}
 	
@@ -197,6 +199,8 @@ public class ModuleThread implements Runnable, Interruptable
 			in.readFully(data);
 			productIds[i] = new String(data, UTF8);
 		}
+
+		if (dummy) return;
 		if (!database.addProductIds(module, productIds)) {
 			module.logError("ModuleThread", "getProductListResponse",
 					"Error occurred while adding product IDs.");
@@ -229,6 +233,7 @@ public class ModuleThread implements Runnable, Interruptable
 			keyValues[i] = new SimpleEntry<String, String>(key, value);
 		}
 
+		if (dummy) return;
 		if (!database.addProductInfo(module, productId, keyValues)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");

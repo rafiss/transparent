@@ -192,27 +192,29 @@ public class Core
 			System.out.println("Task type: " + task.getType().toString()
 					+ ", module: " + module
 					+ ", scheduled execution: " + new Date(task.getTime())
-					+ ", reschedules: " + task.reschedules());
+					+ ", is running: " + runningJobs.contains(task)
+					+ ", reschedules: " + task.reschedules()
+					+ ", dummy: " + task.isDummy());
 		}
 	}
 	
 	private static void parseCommand(String command)
 	{
-    	if (command.equals("list queued")) {
+    	if (command.equals("tasks queued")) {
     		ArrayList<Task> jobs = new ArrayList<Task>();
     		for (Task task : queuedJobs)
     			jobs.add(task);
     		
     		Collections.sort(jobs);
     		printTasks(jobs);
-    	} else if (command.equals("list running")) {
+    	} else if (command.equals("tasks running")) {
     		ArrayList<Task> jobs = new ArrayList<Task>();
     		for (Task task : runningJobs)
     			jobs.add(task);
     		
     		Collections.sort(jobs);
     		printTasks(jobs);
-    	} else if (command.equals("list tasks")) {
+    	} else if (command.equals("tasks")) {
     		ArrayList<Task> jobs = new ArrayList<Task>();
     		for (Task task : queuedJobs)
     			jobs.add(task);
@@ -221,7 +223,7 @@ public class Core
     		
     		Collections.sort(jobs);
     		printTasks(jobs);
-    	} else if (command.equals("list modules")) {
+    	} else if (command.equals("modules")) {
     		for (Module module : modules.values()) {
     			System.out.println("Module id: " + module.getId()
     					+ ", name: " + module.getModuleName()
@@ -353,14 +355,16 @@ class Task implements Comparable<Task>, Callable<Object>
 	private ScheduledFuture<Object> future;
 	private long time;
 	private boolean reschedules;
+	private boolean dummy;
 	
 	public Task(TaskType type, Module module,
-			long time, boolean reschedules)
+			long time, boolean reschedules, boolean dummy)
 	{
 		this.type = type;
 		this.module = module;
 		this.time = time;
 		this.reschedules = reschedules;
+		this.dummy = dummy;
 	}
 	
 	public TaskType getType() {
@@ -387,10 +391,14 @@ class Task implements Comparable<Task>, Callable<Object>
 		return this.reschedules;
 	}
 	
+	public boolean isDummy() {
+		return this.dummy;
+	}
+	
 	public static Task load(String data)
 	{
 		String[] tokens = data.split("\\.");
-		if (tokens.length != 4) {
+		if (tokens.length != 5) {
 			System.err.println("Task.load ERROR: Unable to parse string.");
 			return null;
 		}
@@ -409,9 +417,10 @@ class Task implements Comparable<Task>, Callable<Object>
 		
 		long id = Long.parseLong(tokens[1]);
 		long time = Long.parseLong(tokens[2]);
-		boolean reschedules = Boolean.parseBoolean(tokens[3]);
+		boolean reschedules = !tokens[3].equals("0");
+		boolean dummy = !tokens[4].equals("0");
 		
-		return new Task(type, Core.getModule(id), time, reschedules);
+		return new Task(type, Core.getModule(id), time, reschedules, dummy);
 	}
 	
 	public String save()
@@ -432,7 +441,10 @@ class Task implements Comparable<Task>, Callable<Object>
 			return null;
 		}
 		
-		return typeString + "." + module.getId() + "." + time;
+		String reschedulesString = reschedules ? "1" : "0";
+		String dummyString = dummy ? "1" : "0";
+		return typeString + "." + module.getId() + "." + time
+				+ "." + reschedulesString + "." + dummyString;
 	}
 
 	@Override
@@ -453,13 +465,13 @@ class Task implements Comparable<Task>, Callable<Object>
 		ModuleThread wrapper;
 		switch (type) {
 		case PRODUCT_LIST_PARSE:
-			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase());
+			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase(), dummy);
 			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
 			wrapper.run();
 			Core.stopTask(this);
 			return null;
 		case PRODUCT_INFO_PARSE:
-			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase());
+			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase(), dummy);
 			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
 			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
 			wrapper.run();
