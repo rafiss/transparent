@@ -212,12 +212,13 @@ public class Module
 		} catch (RuntimeException e) {
 			System.err.println("Module.load ERROR: "
 					+ "Error loading module id.");
+			System.err.println("\tException: " + e.getMessage());
 			return null;
 		} catch (IOException e) {
 			System.err.println("Module.load ERROR: "
 					+ "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + toUnsignedString(id)
-					+ ", exception: " + e.getMessage() + ")");
+					+ "(name = " + name + ", id = " + toUnsignedString(id) + ")");
+			System.err.println("\tException: " + e.getMessage());
 			return null;
 		}
 	}
