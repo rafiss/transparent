@@ -487,60 +487,20 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    private void insertIntoTrait(
-            Module module, long propertyId, String value) throws SQLException {
-        PreparedStatement statement;
-
-        try {
-            statement = connection.prepareStatement(buildReplaceTemplate(TRAIT_TABLE, 2));
-            statement.setLong(1, propertyId);
-            statement.setString(2, value);
-            statement.executeUpdate();
-            statement.close();
-            return;
-
-            //ResultSet results = checkTraitExistence(module, propertyId);
-//            List<Long> keys = new ArrayList<Long>();
-//
-//            if (results.next()) {
-//                String whereField = "property_id='" + propertyId + "'";
-//                String[] columns = new String[] { "value" };
-//                statement = connection.prepareStatement(buildUpdateTemplate(TRAIT_TABLE,
-//                                                                            whereField, columns),
-//                                                        Statement.RETURN_GENERATED_KEYS);
-//                statement.setString(1, value);
-//                statement.executeUpdate();
-//
-//                keys.add(results.getLong(1));
-//            } else {
-//                statement = connection.prepareStatement(buildInsertTemplate(TRAIT_TABLE, 2),
-//                                                        Statement.RETURN_GENERATED_KEYS);
-//                statement.setLong(1, propertyId);
-//                statement.setString(2, value);
-//                statement.executeUpdate();
-//
-//                results = statement.getGeneratedKeys();
-//            }
-//
-//            while (results.next()) {
-//                keys.add(results.getLong(1));
-//            }
-//
-//            results.close();
-//            statement.close();
-//            return keys;
-        } finally {
-        }
+    private void insertIntoTrait(long propertyId, String value) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(buildReplaceTemplate
+                                                                          (TRAIT_TABLE, 2));
+        statement.setLong(1, propertyId);
+        statement.setString(2, value);
+        statement.executeUpdate();
+        statement.close();
     }
 
     private void insertNewAttribute(Module module, long entityId,
                                     String key, String value) throws SQLException {
-        try {
-            long propertyTypeId = insertIntoPropertyType(module, key);
-            long propertyId = insertIntoProperty(module, entityId, propertyTypeId);
-            insertIntoTrait(module, propertyId, value);
-        } finally {
-        }
+        long propertyTypeId = insertIntoPropertyType(module, key);
+        long propertyId = insertIntoProperty(module, entityId, propertyTypeId);
+        insertIntoTrait(propertyId, value);
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -553,9 +513,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
         Module testModule = new Module(1, null, "moduleName", "sourceName", null, false, false);
 
         int numInserts = 1000;
-        Connection connection = database.getConnection();
-
-
         String[] products = new String[numInserts];
 
         for (int i = 0; i < numInserts; i++) {
@@ -585,7 +542,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
             database.addProductInfo(testModule, productID, entry);
 
         }
-
 
         database.setMetadata("key1", "value1");
         Core.println(database.getMetadata("key1"));
