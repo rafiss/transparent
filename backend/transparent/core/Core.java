@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +25,7 @@ import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Erase;
 import org.fusesource.jansi.AnsiConsole;
 import org.fusesource.jansi.Ansi.Color;
+import org.fusesource.jansi.AnsiString;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
@@ -59,6 +61,8 @@ public class Core
 	private static ReentrantLock consoleLock = new ReentrantLock();
 	private static boolean consoleStarted = false;
 	private static int nestedLock = 0;
+	
+	private static ArrayList<String> history = new ArrayList<String>();
 
 	/* needed to print unsigned 64-bit long values */
 	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
@@ -287,6 +291,10 @@ public class Core
 	        	int c = in.read();
 	        	while (c != '\n' && c != -1) {
 	        		input += (char) c;
+	        		/*AnsiString temp = new AnsiString(input);
+	        		for (int i = 0; i < temp.getEncoded().length(); i++)
+	        			Core.println("temp[" + i + "]: " + temp.charAt(i));
+	        		Core.flush();*/
 	        		AnsiConsole.out.print((char) c);
 	        		c = in.read();
 	        	}
@@ -295,6 +303,7 @@ public class Core
 	        		break;
 	        	String command = input;
 	        	input = "";
+	        	history.add(command);
 	        	parseCommand(command);
 	        }
 	        in.close();
@@ -455,7 +464,7 @@ public class Core
 					+ " Creating empty queue...");
 		}
 		
-		ArrayList<String> strings = new ArrayList<String>();
+		HashSet<String> strings = new HashSet<String>();
 		try {
 			Reader r = new InputStreamReader(
 					new BufferedInputStream(new FileInputStream("Entity.sql")));
