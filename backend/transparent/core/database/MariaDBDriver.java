@@ -55,7 +55,11 @@ public class MariaDBDriver implements transparent.core.database.Database {
         try {
             connection.setAutoCommit(false);
 
+            Core.printWarning("MariaDBDriver", "addProductIds", "Beginning transaction...");
+            Core.flush();
             for (String moduleProductId : moduleProductIds) {
+                Core.printWarning("MariaDBDriver", "addProductIds", "Processing " + moduleProductId);
+                Core.flush();
                 if (checkModuleProductExistence(moduleProductId, module)) {
                     continue;
                 }
