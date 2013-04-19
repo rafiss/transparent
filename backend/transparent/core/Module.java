@@ -3,6 +3,7 @@ package transparent.core;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.math.BigInteger;
 
@@ -207,42 +208,58 @@ public class Module
 	public static Module load(Database database, int index)
 	{
 		long id = -1;
+		String path, source;
+		boolean blocked = true;
+		boolean remote = true;
 		String name = "<unknown>";
 		try {
 			id = new BigInteger(database.getMetadata("module." + index + ".id")).longValue();
 
-			String path = database.getMetadata("module." + index + ".path");
+			path = database.getMetadata("module." + index + ".path");
 			name = database.getMetadata("module." + index + ".name");
-			String source = database.getMetadata("module." + index + ".source");
+			source = database.getMetadata("module." + index + ".source");
 			String blockedString = database.getMetadata("module." + index + ".blocked");
 			String remoteString = database.getMetadata("module." + index + ".remote");
 			
-			boolean blocked = true;
-			boolean remote = true;
 			if (blockedString.equals("0"))
 				blocked = false;
 			if (remoteString.equals("0"))
 				remote = false;
-			
-			PrintStream log;
-			String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
-			File logfile = new File(filename);
-			if (!logfile.exists()) {
-				log = new PrintStream(new FileOutputStream(filename));
-			} else {
-				log = new PrintStream(new FileOutputStream(filename, true));	
-			}
-			return new Module(id, path, name, source, log, remote, blocked);
-
 		} catch (RuntimeException e) {
 			Core.printError("Module", "load", "Error loading module id.", e.getMessage());
 			return null;
-		} catch (IOException e) {
-			Core.printError("Module", "load", "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + Core.toUnsignedString(id) + ")",
-					e.getMessage());
-			return null;
 		}
+
+		PrintStream log;
+		try {
+			File logdir = new File("log");
+			if (!logdir.exists() && !logdir.mkdir()) {
+				Core.printError("Module", "load", "Unable to create log directory."
+						+ " Logging is disabled for this module. (name = " + name
+						+ ", id = " + Core.toUnsignedString(id) + ")");
+				log = new PrintStream(new NullOutputStream());
+			} else if (!logdir.isDirectory()) {
+				Core.printError("Module", "load", "'log' is not a directory."
+						+ " Logging is disabled for this module. (name = " + name
+						+ ", id = " + Core.toUnsignedString(id) + ")");
+				log = new PrintStream(new NullOutputStream());
+			} else {
+				String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
+				File logfile = new File(filename);
+				if (!logfile.exists()) {
+					log = new PrintStream(new FileOutputStream(filename));
+				} else {
+					log = new PrintStream(new FileOutputStream(filename, true));
+				}
+			}
+		} catch (IOException e) {
+			Core.printError("Module", "load", "Unable to initialize output log."
+					+ " Logging is disabled for this module. (name = " + name
+					+ ", id = " + Core.toUnsignedString(id) + ")", e.getMessage());
+			log = new PrintStream(new NullOutputStream());
+		}
+
+		return new Module(id, path, name, source, log, remote, blocked);
 	}
 	
 	public boolean save(Database database, int index)
@@ -262,4 +279,9 @@ public class Module
 				"module." + index + ".blocked",
 				useBlockedDownload ? "1" : "0"));
 	}
+}
+
+class NullOutputStream extends OutputStream {
+	@Override
+	public void write(int b) throws IOException { }
 }
