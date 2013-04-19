@@ -348,8 +348,10 @@ public class Core
 			String methodName, String message)
 	{
 		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold().fg(Color.YELLOW));
-		AnsiConsole.out.print(className + '.' + methodName + " WARNING: ");
+		AnsiConsole.out.print(new Ansi().bold());
+		AnsiConsole.out.print(className + '.' + methodName);
+		AnsiConsole.out.print(new Ansi().fg(Color.YELLOW));
+		AnsiConsole.out.print(" WARNING: ");
 		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
 		AnsiConsole.out.println(message);
 		unlockConsole();
