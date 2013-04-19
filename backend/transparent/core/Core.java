@@ -263,7 +263,7 @@ public class Core
 	}
 	
 	private static void startConsole()
-	{		
+	{
 		try {
 			InputStreamReader in = new InputStreamReader(System.in);
 	        while (true) {
@@ -481,8 +481,7 @@ public class Core
         	if (m.getModuleName().equals("NeweggParser"))
         		newegg = m;
         }
-        for (int i = 0; i < strings.size(); i++)
-        	database.addProductIds(newegg, strings.get(i));
+        database.addProductIds(newegg, (String[]) strings.toArray());
 
         /* dispatch all tasks in the queue */
 		for (Task task : queuedJobs)
