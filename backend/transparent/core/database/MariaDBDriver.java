@@ -47,9 +47,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
         // Register JDBC driver class
         Class.forName(driver);
 
-        System.out.println("Connecting to database...");
+        Core.println("Connecting to database...");
         connection = DriverManager.getConnection(host, username, password);
-        System.out.println("Successfully connected to database...");
+        Core.println("Successfully connected to database...");
     }
 
     @Override
@@ -535,7 +535,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         while (productIDIterator.hasNext()) {
             ProductID productID = productIDIterator.next();
-            System.out.println(productID.getModuleProductId() + " " + productID.getRowId());
+            Core.println(productID.getModuleProductId() + " " + productID.getRowId());
 
             SimpleEntry<String, String> entry = new SimpleEntry("foo", "bar");
             database.addProductInfo(testModule, productID, entry);
@@ -549,10 +549,10 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
 
         database.setMetadata("key1", "value1");
-        System.out.println(database.getMetadata("key1"));
-        System.out.println(database.getMetadata("key2"));
+        Core.println(database.getMetadata("key1"));
+        Core.println(database.getMetadata("key2"));
         database.setMetadata("key1", "value2");
-        System.out.println(database.getMetadata("key1"));
+        Core.println(database.getMetadata("key1"));
     }
 }
 

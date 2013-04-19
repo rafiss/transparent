@@ -11,8 +11,8 @@ public class NoSandbox implements Sandbox
 		try {
 			return Runtime.getRuntime().exec(command);
 		} catch (IOException e) {
-			System.err.println("NoSandbox.run ERROR:"
-					+ " Error executing command '" + command + "'.");
+			module.logError("NoSandbox", "run", " Error executing command '"
+					+ command + "'.", e.getMessage());
 			return null;
 		}
 	}

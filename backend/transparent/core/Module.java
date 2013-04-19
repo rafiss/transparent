@@ -101,10 +101,10 @@ public class Module
 	{
 		log.println(className + '.' + methodName + ": " + message);
 		if (logActivity) {
-			System.out.println("Module " + getIdString() + " (name: '"
-					+ moduleName + "') information:");
-			System.out.println("\t" + className + '.' + methodName + ": " + message);
-			System.out.flush();
+			Core.println("Module " + getIdString() + " (name: '"
+					+ moduleName + "') information:" + Core.NEWLINE
+					+ className + '.' + methodName + ": " + message);
+			Core.flush();
 		}
 	}
 	
@@ -113,9 +113,11 @@ public class Module
 	{
 		log.println(className + '.' + methodName + " ERROR: " + message);
 		if (logActivity) {
-			System.out.println("Module " + getIdString() + " (name: '"
+			Core.lockConsole();
+			Core.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
 			Core.printError(className, methodName, message);
+			Core.unlockConsole();
 		}
 	}
 	
@@ -125,77 +127,83 @@ public class Module
 		log.println(className + '.' + methodName + " ERROR: "
 				+ message + " Exception thrown: " + exception);
 		if (logActivity) {
-			System.out.println("Module " + getIdString() + " (name: '"
+			Core.lockConsole();
+			Core.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
 			Core.printError(className, methodName, message, exception);
+			Core.unlockConsole();
 		}
 	}
 	
 	public void logUserAgentChange(String newUserAgent)
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.lockConsole();
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') changed user agent to: " + newUserAgent);
-			System.out.flush();
+			Core.flush();
+			Core.unlockConsole();
 		}
 	}
 	
 	public void logHttpGetRequest(String url)
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP GET: " + url);
-			System.out.flush();
+			Core.flush();
 		}
 	}
 	
 	public void logHttpPostRequest(String url, byte[] post)
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.lockConsole();
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP POST:");
-			System.out.println("\tURL: " + url);
-			System.out.print("\tPOST data: ");
+			Core.println("\tURL: " + url);
+			Core.print("\tPOST data: ");
 			try {
-				System.out.write(post);
+				Core.write(post);
 			} catch (IOException e) {
-				System.out.print("<unable to write data>");
+				Core.print("<unable to write data>");
 			}
-			System.out.println();
-			System.out.flush();
+			Core.println();
+			Core.unlockConsole();
+			Core.flush();
 		}
 	}
 	
 	public void logDownloadProgress(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') downloading: " + downloaded + " bytes");
-			System.out.flush();
+			Core.flush();
 		}
 	}
 	
 	public void logDownloadCompleted(int downloaded)
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') completed download: " + downloaded + " bytes");
-			System.out.flush();
+			Core.flush();
 		}
 	}
 	
 	public void logDownloadAborted()
 	{
 		if (logActivity) {
-			System.out.println("Module " + getIdString()
+			Core.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') aborted download due to download size limit.");
-			System.out.flush();
+			Core.flush();
 		}
 	}
 

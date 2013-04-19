@@ -1,5 +1,7 @@
 package transparent.core;
 
+import org.fusesource.jansi.AnsiConsole;
+
 import transparent.core.database.Database;
 
 /**
@@ -16,9 +18,9 @@ public class Install
 			String path, String name, String source,
 			boolean remote, boolean blockedDownload)
 	{
-		System.out.println("Installing module '" + name + "'...");
+		Core.println("Installing module '" + name + "'...");
 		Module module = new Module(Core.random(), path,
-				name, source, System.err, remote, blockedDownload);
+				name, source, AnsiConsole.out, remote, blockedDownload);
 		if (module.save(database, moduleCount))
 		{
 			moduleCount++;
