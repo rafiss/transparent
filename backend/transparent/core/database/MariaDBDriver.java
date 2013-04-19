@@ -50,10 +50,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
         Core.println("Successfully connected to database...");
     }
 
-    public Connection getConnection() {
-        return connection;
-    }
-
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
         try {
@@ -507,7 +503,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public static void main(String[] args) throws SQLException, IOException, ClassNotFoundException {
         // Test client
 
-        MariaDBDriver database = new MariaDBDriver();
+        Database database = new MariaDBDriver();
 
         // TODO: i changed the constructor for module
         Module testModule = new Module(1, null, "moduleName", "sourceName", null, false, false);
@@ -524,9 +520,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
         System.err.println(numInserts + " inserts took " + ((System.nanoTime() - start) / 1e6) +
                                    "ms");
 
-
         Iterator<ProductID> productIDIterator = database.getProductIds(testModule);
-
 
         while (productIDIterator.hasNext()) {
             ProductID productID = productIDIterator.next();
