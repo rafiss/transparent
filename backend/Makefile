@@ -21,7 +21,7 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=
+JFLAGS=-cp lib/jansi-1.9.jar:lib/jcurses.jar:lib/mariadb-java-client-1.1.0.jar:.
 MODULES=newegg
 
 #

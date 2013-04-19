@@ -3,5 +3,6 @@
 	<classpathentry excluding="src/|transparent/modules/newegg/|transparent/modules/" kind="src" path=""/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/mariadb-java-client-1.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/jansi-1.9.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

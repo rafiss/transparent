@@ -24,8 +24,8 @@ public class Install
 			moduleCount++;
 			return true;
 		} else {
-			System.err.println("Install.installModule ERROR: "
-					+ "Count not install module '" + name + "'.");
+			Core.printError("Install", "installModule",
+					"Count not install module '" + name + "'.");
 			return false;
 		}
 	}

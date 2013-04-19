@@ -115,8 +115,19 @@ public class Module
 		if (logActivity) {
 			System.out.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
-			System.out.println("\t" + className + '.' + methodName + " ERROR: " + message);
-			System.out.flush();
+			Core.printError(className, methodName, message);
+		}
+	}
+	
+	public void logError(String className, String methodName,
+			String message, String exception)
+	{
+		log.println(className + '.' + methodName + " ERROR: "
+				+ message + " Exception thrown: " + exception);
+		if (logActivity) {
+			System.out.println("Module " + getIdString() + " (name: '"
+					+ moduleName + "') reported error:");
+			Core.printError(className, methodName, message, exception);
 		}
 	}
 	
@@ -209,7 +220,7 @@ public class Module
 				remote = false;
 			
 			PrintStream log;
-			String filename = "log/" + name + "." + id + ".log";
+			String filename = "log/" + name + "." + toUnsignedString(id) + ".log";
 			File logfile = new File(filename);
 			if (!logfile.exists()) {
 				log = new PrintStream(new FileOutputStream(filename));
@@ -219,15 +230,12 @@ public class Module
 			return new Module(id, path, name, source, log, remote, blocked);
 
 		} catch (RuntimeException e) {
-			System.err.println("Module.load ERROR: "
-					+ "Error loading module id.");
-			System.err.println("\tException: " + e.getMessage());
+			Core.printError("Module", "load", "Error loading module id.", e.getMessage());
 			return null;
 		} catch (IOException e) {
-			System.err.println("Module.load ERROR: "
-					+ "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + toUnsignedString(id) + ")");
-			System.err.println("\tException: " + e.getMessage());
+			Core.printError("Module", "load", "Unable to initialize output log. "
+					+ "(name = " + name + ", id = " + toUnsignedString(id) + ")",
+					e.getMessage());
 			return null;
 		}
 	}

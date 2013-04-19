@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +16,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.fusesource.jansi.Ansi;
+import org.fusesource.jansi.Ansi.Erase;
+import org.fusesource.jansi.AnsiConsole;
+import org.fusesource.jansi.Ansi.Color;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
@@ -29,8 +35,9 @@ public class Core
 	private static final String SEED_KEY = "seed";
 	private static final String MODULE_COUNT = "modules.count";
 	private static final String INSTALL_FLAG = "--install";
+	private static final String CONSOLE_FLAG = "--console";
 	private static final int THREAD_POOL_SIZE = 64;
-	private static final String PROMPT = "$";
+	private static final String PROMPT = "$ ";
 	
 	private static final Sandbox sandbox = new NoSandbox();
 	private static HashMap<Long, Module> modules = new HashMap<Long, Module>();
@@ -44,6 +51,9 @@ public class Core
 			Collections.newSetFromMap(new ConcurrentHashMap<Task, Boolean>());
 	
 	private static long seed = 0;
+	private static String input = "";
+	private static Lock consoleLock = new ReentrantLock();
+	private static boolean consoleStarted = false;
 	
 	/**
 	 * Bit-shift random number generator with period 2^64 - 1.
@@ -236,37 +246,132 @@ public class Core
     					+ ", blockedDownloading: " + module.blockedDownload()
     					+ ", logging: " + module.isLoggingActivity());
     		}
+    	} else {
+    		System.out.println("Unrecognized command '" + command + "'.");
     	}
+	}
+	
+	private static void printPrompt()
+	{
+    	AnsiConsole.out.print(new Ansi().saveCursorPosition());
+		AnsiConsole.out.print(new Ansi().bold());
+		AnsiConsole.out.print(PROMPT);
+		AnsiConsole.out.print(new Ansi().boldOff());
+	}
+	
+	private static void startConsole()
+	{
+		AnsiConsole.systemInstall();
+		
+		try {
+			InputStreamReader in = new InputStreamReader(System.in);
+	        while (true) {
+	        	consoleLock.lock();
+	        	if (consoleStarted)
+	        		AnsiConsole.out.print(new Ansi().eraseLine(Erase.ALL).restorCursorPosition());
+	        	consoleStarted = true;
+	        	printPrompt();
+	    		AnsiConsole.out.flush();
+	        	consoleLock.unlock();
+	    		
+	        	int c = in.read();
+	        	while (c != '\n' && c != -1) {
+	        		input += (char) c;
+	        		AnsiConsole.out.print((char) c);
+	        		c = in.read();
+	        	}
+	        	
+	        	if (input.equals("exit"))
+	        		break;
+	        	parseCommand(input);
+	        	input = "";
+	        }
+	        in.close();
+		} catch (IOException e) {
+			printError("Core", "startConsole", "", e.getMessage());
+		}
+	}
+	
+	public static synchronized void printError(String className,
+			String methodName, String message)
+	{
+		consoleLock.lock();
+		if (consoleStarted)
+			AnsiConsole.out.print(new Ansi().eraseLine(Erase.ALL).restorCursorPosition());
+		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
+		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
+		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
+		AnsiConsole.out.print(message);
+		if (consoleStarted) {
+			printPrompt();
+			AnsiConsole.out.print(input);
+		}
+		consoleLock.unlock();
+	}
+	
+	public static synchronized void printError(String className,
+			String methodName, String message, String exception)
+	{
+		consoleLock.lock();
+    	AnsiConsole.out.print(new Ansi().eraseLine(Erase.ALL).restorCursorPosition());
+		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
+		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
+		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
+		AnsiConsole.out.print(message);
+		if (exception != null) {
+			if (message.length() > 0)
+				AnsiConsole.out.print(' ');
+			AnsiConsole.out.print("Exception thrown. ");
+			AnsiConsole.out.print(new Ansi().fgBright(Color.BLACK));
+			AnsiConsole.out.print(exception);
+			AnsiConsole.out.println(new Ansi().fg(Color.DEFAULT));
+		}
+		if (consoleStarted) {
+			printPrompt();
+			AnsiConsole.out.print(input);
+		}
+		consoleLock.unlock();
 	}
 	
 	public static void main(String[] args)
 	{
+		/* parse argument flags */
+		boolean install = false;
+		boolean console = false;
+		if (args.length > 0) {
+			if (args[0].equals(INSTALL_FLAG)) {
+				install = true;
+			} else if (args[0].equals(CONSOLE_FLAG)) {
+				console = true;
+			} else {
+				printError("Core", "main", "Unrecognized flag '" + args[0] + "'.");
+			}
+		}
+		
         try {
             database = new MariaDBDriver();
         } catch (Exception e) {
-            System.err.println("Core.main ERROR: "
-            		+ "Cannot connect to database: " + e.getMessage());
-            System.exit(-1);
+            printError("Core", "main", "Cannot connect to database.", e.getMessage());
+            if (console) {
+            	startConsole();
+            	return;
+            } else System.exit(-1);
         }
 
 		/* load random number generator seed */
-		loadSeed();
+        loadSeed();
+		
+		/* install the modules to the database if we were told to */
+		if (install) {
+			System.out.println("Installing modules...");
+			Install.installModules(database);
 
-		/* parse argument flags */
-		if (args.length > 0) {
-			if (args[0].equals(INSTALL_FLAG)) {
-				System.out.println("Installing modules...");
-				Install.installModules(database);
+			System.out.println("Installing job queue...");
+			Install.installJobQueue(database);
 
-				System.out.println("Installing job queue...");
-				Install.installJobQueue(database);
-
-				System.out.println("Done.");
-				System.out.flush();
-				return;
-			} else {
-				System.err.println("Core.main ERROR: Unrecognized flag '" + args[0] + "'.");
-			}
+			System.out.println("Done.");
+			System.out.flush();
+			return;
 		}
 		
 		/* load the modules */
@@ -319,32 +424,18 @@ public class Core
         /* find the newegg module */
         Module newegg = null;
         for (Module m : modules.values()) {
-        	if (m.getModuleName().equals("Newegg"))
+        	if (m.getModuleName().equals("NeweggParser"))
         		newegg = m;
         }
-        /*for (int i = 0; i < strings.size(); i++)
+        for (int i = 0; i < strings.size(); i++)
         	database.addProductIds(newegg, strings.get(i));
-        
-        int i = 2;
-        if (i == 2)
-        	return;*/
 
         /* dispatch all tasks in the queue */
 		for (Task task : queuedJobs)
 			dispatchTask(task);
         
 		/* start the main loop */
-		Scanner in = new Scanner(System.in);
-        while (true) {
-        	System.out.println(PROMPT);
-        	System.out.flush();
-        	String input = in.nextLine();
-        	
-        	if (input.equals("exit"))
-        		break;
-        	parseCommand(input);
-        }
-        in.close();
+		startConsole();
 	}
 }
 
