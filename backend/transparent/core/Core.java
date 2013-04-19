@@ -351,7 +351,7 @@ public class Core
 		AnsiConsole.out.print(new Ansi().bold().fg(Color.YELLOW));
 		AnsiConsole.out.print(className + '.' + methodName + " WARNING: ");
 		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
-		AnsiConsole.out.print(message);
+		AnsiConsole.out.println(message);
 		unlockConsole();
 	}
 	
@@ -362,7 +362,7 @@ public class Core
 		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
 		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
 		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
-		AnsiConsole.out.print(message);
+		AnsiConsole.out.println(message);
 		unlockConsole();
 	}
 	
@@ -380,8 +380,9 @@ public class Core
 			AnsiConsole.out.print("Exception thrown. ");
 			AnsiConsole.out.print(new Ansi().fgBright(Color.BLACK));
 			AnsiConsole.out.print(exception);
-			AnsiConsole.out.println(new Ansi().fg(Color.DEFAULT));
+			AnsiConsole.out.print(new Ansi().fg(Color.DEFAULT));
 		}
+		AnsiConsole.out.println();
 		unlockConsole();
 	}
 	
