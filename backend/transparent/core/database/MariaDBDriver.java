@@ -13,10 +13,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -52,29 +50,34 @@ public class MariaDBDriver implements transparent.core.database.Database {
         Core.println("Successfully connected to database...");
     }
 
+    public Connection getConnection() {
+        return connection;
+    }
+
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
         try {
             connection.setAutoCommit(false);
 
             for (String moduleProductId : moduleProductIds) {
-                if (checkModuleProductExistence(moduleProductId, module).next()) {
+                if (checkModuleProductExistence(moduleProductId, module)) {
                     continue;
                 }
 
                 // Insert moduleProductId as Entity
-                long generatedEntityKey = insertIntoEntity(moduleProductId).get(0);
+                long generatedEntityKey = insertIntoEntity(moduleProductId);
                 insertNewAttribute(module, generatedEntityKey, MODULE_ID, module.getIdString());
             }
             connection.commit();
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
+            System.err.println(e.getMessage());
+            module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
             return false;
         } finally {
             try {
                 connection.setAutoCommit(true);
             } catch (SQLException e) {
-            	module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
+                module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
             }
         }
 
@@ -94,14 +97,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
             statement.setString(2, module.getIdString());
             return new ResultSetIterator(module, statement.executeQuery());
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
+            module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                	module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
+                    module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
                 }
             }
         }
@@ -113,12 +116,20 @@ public class MariaDBDriver implements transparent.core.database.Database {
                                         ProductID productId,
                                         Entry<String, String>... keyValues) {
         try {
+            connection.setAutoCommit(false);
             for (Entry<String, String> pair : keyValues) {
                 insertNewAttribute(module, productId.getRowId(), pair.getKey(), pair.getValue());
             }
+            connection.commit();
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "addProductInfo", "", e.getMessage());
+            module.logError("MariaDBDriver", "addProductInfo", "", e.getMessage());
             return false;
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                module.logError("MariaDBDriver", "addProductInfo", "", e.getMessage());
+            }
         }
 
         return true;
@@ -142,14 +153,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
                 return null;
             }
         } catch (SQLException e) {
-        	Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+            Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                	Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+                    Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
                 }
             }
         }
@@ -179,7 +190,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             connection.commit();
             return true;
         } catch (SQLException e) {
-        	Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+            Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
             return false;
         } finally {
             if (statement != null) {
@@ -187,7 +198,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                     connection.setAutoCommit(true);
                 } catch (SQLException e) {
-                	Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+                    Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
                 }
             }
         }
@@ -198,8 +209,26 @@ public class MariaDBDriver implements transparent.core.database.Database {
         try {
             connection.close();
         } catch (SQLException e) {
-        	Core.printError("MariaDBDriver", "close", "", e.getMessage());
+            Core.printError("MariaDBDriver", "close", "", e.getMessage());
         }
+    }
+
+    private String buildReplaceTemplate(String tableName, long numFields) {
+        StringBuilder stringBuilder = new StringBuilder("REPLACE ");
+
+        stringBuilder.append("INTO ");
+        stringBuilder.append(tableName);
+        stringBuilder.append(" VALUES(");
+
+        for (int i = 0; i < numFields; i++) {
+            stringBuilder.append("?");
+            if (i != numFields - 1) {
+                stringBuilder.append(",");
+            }
+        }
+
+        stringBuilder.append(")");
+        return stringBuilder.toString();
     }
 
     private String buildInsertTemplate(String tableName, long numFields) {
@@ -217,6 +246,24 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
 
         stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
+    private String buildSelectExistsTemplate(String tableName, String... whereFields) {
+        StringBuilder stringBuilder = new StringBuilder("SELECT EXISTS(SELECT 1 FROM ");
+        stringBuilder.append(tableName);
+        stringBuilder.append(" WHERE ");
+
+        for (int i = 0; i < whereFields.length; i++) {
+            stringBuilder.append(whereFields[i]);
+            stringBuilder.append("=?");
+            if (i != whereFields.length - 1) {
+                stringBuilder.append(" AND ");
+            }
+        }
+
+        stringBuilder.append(")");
+
         return stringBuilder.toString();
     }
 
@@ -263,26 +310,34 @@ public class MariaDBDriver implements transparent.core.database.Database {
         return stringBuilder.toString();
     }
 
-    private ResultSet checkModuleProductExistence(String moduleProductId, Module module) {
+    private boolean checkModuleProductExistence(String moduleProductId, Module module) {
         PreparedStatement statement = null;
 
         try {
             String[] columns = new String[] { "PropertyName", "TraitValue", "EntityName" };
-            statement = connection.prepareStatement(buildSelectTemplate(MODEL_NAME, "*", null,
-                                                                        columns));
+            statement = connection.prepareStatement(buildSelectExistsTemplate(MODEL_NAME,
+                                                                              columns));
             statement.setString(1, MODULE_ID);
             statement.setString(2, module.getIdString());
             statement.setString(3, moduleProductId);
-            return statement.executeQuery();
+
+            ResultSet resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                return resultSet.getInt(1) == 1;
+            } else {
+                throw new SQLException("Failed to generate result.");
+            }
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "checkModuleProductExistence", "", e.getMessage());
-            return null;
+            System.err.println(e.getMessage());
+            module.logError("MariaDBDriver", "checkModuleProductExistence", "", e.getMessage());
+            return false;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                	module.logError("MariaDBDriver", "checkModuleProductExistence", "", e.getMessage());
+                    module.logError("MariaDBDriver", "checkModuleProductExistence", "", e.getMessage());
                 }
             }
         }
@@ -299,21 +354,21 @@ public class MariaDBDriver implements transparent.core.database.Database {
             statement.setString(1, name);
             return statement.executeQuery();
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "checkPropertyTypeExistence", "", e.getMessage());
+            module.logError("MariaDBDriver", "checkPropertyTypeExistence", "", e.getMessage());
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                	module.logError("MariaDBDriver", "checkPropertyTypeExistence", "", e.getMessage());
+                    module.logError("MariaDBDriver", "checkPropertyTypeExistence", "", e.getMessage());
                 }
             }
         }
     }
 
     private ResultSet checkPropertyExistence(
-    		Module module, long entityId, long propertyTypeId) {
+            Module module, long entityId, long propertyTypeId) {
         PreparedStatement statement = null;
 
         try {
@@ -325,45 +380,22 @@ public class MariaDBDriver implements transparent.core.database.Database {
             statement.setLong(2, propertyTypeId);
             return statement.executeQuery();
         } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "checkPropertyExistence", "", e.getMessage());
+            module.logError("MariaDBDriver", "checkPropertyExistence", "", e.getMessage());
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                	module.logError("MariaDBDriver", "checkPropertyExistence", "", e.getMessage());
+                    module.logError("MariaDBDriver", "checkPropertyExistence", "", e.getMessage());
                 }
             }
         }
     }
 
-    private ResultSet checkTraitExistence(Module module, long propertyId) {
-        PreparedStatement statement = null;
-
-        try {
-            String[] columns = new String[] { "property_id" };
-            statement = connection.prepareStatement(buildSelectTemplate(TRAIT_TABLE,
-                                                                        "property_id", null,
-                                                                        columns));
-            statement.setLong(1, propertyId);
-            return statement.executeQuery();
-        } catch (SQLException e) {
-        	module.logError("MariaDBDriver", "checkTraitExistence", e.getMessage());
-            return null;
-        } finally {
-            if (statement != null) {
-                try {
-                    statement.close();
-                } catch (SQLException e) {
-                	module.logError("MariaDBDriver", "checkTraitExistence", e.getMessage());
-                }
-            }
-        }
-    }
-
-    private List<Long> insertIntoEntity(String name) throws SQLException {
+    private long insertIntoEntity(String name) throws SQLException {
         PreparedStatement statement;
+        long rowId;
 
         statement = connection.prepareStatement(buildInsertTemplate(ENTITY_TABLE, 2),
                                                 Statement.RETURN_GENERATED_KEYS);
@@ -372,68 +404,65 @@ public class MariaDBDriver implements transparent.core.database.Database {
         statement.executeUpdate();
 
         ResultSet generatedKeys = statement.getGeneratedKeys();
-        List<Long> keys = new ArrayList<Long>();
 
-        while (generatedKeys.next()) {
-            keys.add(generatedKeys.getLong(1));
+        if (generatedKeys.next()) {
+            rowId = generatedKeys.getLong(1);
+            generatedKeys.close();
+            statement.close();
+            return rowId;
+        } else {
+            throw new SQLException("Failed to generate key.");
         }
-
-        generatedKeys.close();
-        statement.close();
-
-        return keys;
     }
 
-    private List<Long> insertIntoPropertyType(
-    		Module module, String name) throws SQLException {
+    private long insertIntoPropertyType(
+            Module module, String name) throws SQLException {
         PreparedStatement statement = null;
+        long rowId;
 
         try {
-            connection.setAutoCommit(false);
-
             ResultSet results = checkPropertyTypeExistence(module, name);
-            List<Long> keys = new ArrayList<Long>();
 
-            if (results.next()) {
-                keys.add(results.getLong(1));
+            if (results != null && results.next()) {
+                rowId = results.getLong(1);
+                results.close();
+                return rowId;
             } else {
-                statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TYPE_TABLE, 2),
+                statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TYPE_TABLE,
+                                                                            2),
                                                         Statement.RETURN_GENERATED_KEYS);
                 statement.setNull(1, Types.INTEGER);
                 statement.setString(2, name);
                 statement.executeUpdate();
 
                 results = statement.getGeneratedKeys();
+                if (results.next()) {
+                    rowId = results.getLong(1);
+                    results.close();
+                    return rowId;
+                } else {
+                    throw new SQLException("Failed to generate key.");
+                }
             }
-
-            while (results.next()) {
-                keys.add(results.getLong(1));
-            }
-
-            results.close();
-
+        } finally {
             if (statement != null) {
                 statement.close();
             }
-
-            return keys;
-        } finally {
-            connection.setAutoCommit(true);
         }
     }
 
-    private List<Long> insertIntoProperty(Module module,
-    		long entityId, long propertyTypeId) throws SQLException {
+    private long insertIntoProperty(Module module,
+                                    long entityId, long propertyTypeId) throws SQLException {
         PreparedStatement statement = null;
+        long rowId;
 
         try {
-            connection.setAutoCommit(false);
-
             ResultSet results = checkPropertyExistence(module, entityId, propertyTypeId);
-            List<Long> keys = new ArrayList<Long>();
 
-            if (results.next()) {
-                keys.add(results.getLong(1));
+            if (results != null && results.next()) {
+                rowId = results.getLong(1);
+                results.close();
+                return rowId;
             } else {
                 statement = connection.prepareStatement(buildInsertTemplate(PROPERTY_TABLE, 3),
                                                         Statement.RETURN_GENERATED_KEYS);
@@ -443,76 +472,74 @@ public class MariaDBDriver implements transparent.core.database.Database {
                 statement.executeUpdate();
 
                 results = statement.getGeneratedKeys();
+                if (results.next()) {
+                    rowId = results.getLong(1);
+                    results.close();
+                    return rowId;
+                } else {
+                    throw new SQLException("Failed to generate key.");
+                }
             }
-
-            while (results.next()) {
-                keys.add(results.getLong(1));
-            }
-
-            results.close();
-
+        } finally {
             if (statement != null) {
                 statement.close();
             }
-
-            return keys;
-        } finally {
-            connection.setAutoCommit(true);
         }
     }
 
-    private List<Long> insertIntoTrait(
-    		Module module, long propertyId, String value) throws SQLException {
+    private void insertIntoTrait(
+            Module module, long propertyId, String value) throws SQLException {
         PreparedStatement statement;
 
         try {
-            connection.setAutoCommit(false);
-
-            ResultSet results = checkTraitExistence(module, propertyId);
-            List<Long> keys = new ArrayList<Long>();
-
-            if (results.next()) {
-                String whereField = "property_id='" + propertyId + "'";
-                String[] columns = new String[] { "value" };
-                statement = connection.prepareStatement(buildUpdateTemplate(TRAIT_TABLE,
-                                                                            whereField, columns),
-                                                        Statement.RETURN_GENERATED_KEYS);
-                statement.setString(1, value);
-                statement.executeUpdate();
-
-                keys.add(results.getLong(1));
-            } else {
-                statement = connection.prepareStatement(buildInsertTemplate(TRAIT_TABLE, 2),
-                                                        Statement.RETURN_GENERATED_KEYS);
-                statement.setLong(1, propertyId);
-                statement.setString(2, value);
-                statement.executeUpdate();
-
-                results = statement.getGeneratedKeys();
-            }
-
-            while (results.next()) {
-                keys.add(results.getLong(1));
-            }
-
-            results.close();
+            statement = connection.prepareStatement(buildReplaceTemplate(TRAIT_TABLE, 2));
+            statement.setLong(1, propertyId);
+            statement.setString(2, value);
+            statement.executeUpdate();
             statement.close();
-            return keys;
+            return;
+
+            //ResultSet results = checkTraitExistence(module, propertyId);
+//            List<Long> keys = new ArrayList<Long>();
+//
+//            if (results.next()) {
+//                String whereField = "property_id='" + propertyId + "'";
+//                String[] columns = new String[] { "value" };
+//                statement = connection.prepareStatement(buildUpdateTemplate(TRAIT_TABLE,
+//                                                                            whereField, columns),
+//                                                        Statement.RETURN_GENERATED_KEYS);
+//                statement.setString(1, value);
+//                statement.executeUpdate();
+//
+//                keys.add(results.getLong(1));
+//            } else {
+//                statement = connection.prepareStatement(buildInsertTemplate(TRAIT_TABLE, 2),
+//                                                        Statement.RETURN_GENERATED_KEYS);
+//                statement.setLong(1, propertyId);
+//                statement.setString(2, value);
+//                statement.executeUpdate();
+//
+//                results = statement.getGeneratedKeys();
+//            }
+//
+//            while (results.next()) {
+//                keys.add(results.getLong(1));
+//            }
+//
+//            results.close();
+//            statement.close();
+//            return keys;
         } finally {
-            connection.setAutoCommit(true);
         }
     }
 
     private void insertNewAttribute(Module module, long entityId,
-    		String key, String value) throws SQLException {
+                                    String key, String value) throws SQLException {
         try {
-            connection.setAutoCommit(false);
-            long propertyTypeId = insertIntoPropertyType(module, key).get(0);
-            long propertyId = insertIntoProperty(module, entityId, propertyTypeId).get(0);
+            long propertyTypeId = insertIntoPropertyType(module, key);
+            long propertyId = insertIntoProperty(module, entityId, propertyTypeId);
             insertIntoTrait(module, propertyId, value);
-            connection.commit();
         } finally {
-            connection.setAutoCommit(true);
         }
     }
 
@@ -520,33 +547,45 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public static void main(String[] args) throws SQLException, IOException, ClassNotFoundException {
         // Test client
 
-        Database database = new MariaDBDriver();
+        MariaDBDriver database = new MariaDBDriver();
 
         // TODO: i changed the constructor for module
-        Module testModule = null; //new Module(null, "source", "module", 1, null, false, false);
+        Module testModule = new Module(1, null, "moduleName", "sourceName", null, false, false);
 
-        database.addProductIds(testModule, "product1", "product2");
-        database.addProductIds(testModule, "product1", "product2");
-        database.addProductIds(testModule, "product1", "product2");
-        database.addProductIds(testModule, "product1", "product2");
+        int numInserts = 1000;
+        Connection connection = database.getConnection();
+
+
+        String[] products = new String[numInserts];
+
+        for (int i = 0; i < numInserts; i++) {
+            products[i] = "product" + i;
+        }
+
+        long start = System.nanoTime();
+        database.addProductIds(testModule, products);
+        System.err.println(numInserts + " inserts took " + ((System.nanoTime() - start) / 1e6) +
+                                   "ms");
 
 
         Iterator<ProductID> productIDIterator = database.getProductIds(testModule);
 
+
         while (productIDIterator.hasNext()) {
             ProductID productID = productIDIterator.next();
-            Core.println(productID.getModuleProductId() + " " + productID.getRowId());
+            //Core.println(productID.getModuleProductId() + " " + productID.getRowId());
 
-            SimpleEntry<String, String> entry = new SimpleEntry("foo", "bar");
+            AbstractMap.SimpleEntry<String, String> entry = new AbstractMap.SimpleEntry("foo", "bar");
             database.addProductInfo(testModule, productID, entry);
-            entry = new SimpleEntry("baz", "grep");
+            entry = new AbstractMap.SimpleEntry("baz", "grep");
             database.addProductInfo(testModule, productID, entry);
-            entry = new SimpleEntry("something", "else");
+            entry = new AbstractMap.SimpleEntry("something", "else");
             database.addProductInfo(testModule, productID, entry);
-            entry = new SimpleEntry("something", "else2");
+            entry = new AbstractMap.SimpleEntry("something", "else2");
             database.addProductInfo(testModule, productID, entry);
 
         }
+
 
         database.setMetadata("key1", "value1");
         Core.println(database.getMetadata("key1"));
@@ -571,7 +610,7 @@ class ResultSetIterator implements Iterator<ProductID> {
         try {
             return !resultSet.isLast();
         } catch (SQLException e) {
-        	owner.logError("ResultSetIterator", "hasNext", "", e.getMessage());
+            owner.logError("ResultSetIterator", "hasNext", "", e.getMessage());
             return false;
         }
     }
@@ -585,7 +624,7 @@ class ResultSetIterator implements Iterator<ProductID> {
                 return null;
             }
         } catch (SQLException e) {
-        	owner.logError("ResultSetIterator", "next", "", e.getMessage());
+            owner.logError("ResultSetIterator", "next", "", e.getMessage());
             return null;
         }
     }

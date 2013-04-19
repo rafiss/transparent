@@ -26,15 +26,12 @@ CREATE TABLE IF NOT EXISTS Property (
     property_id INT AUTO_INCREMENT,
     entity_id INT,
     property_type_id INT,
-    PRIMARY KEY (property_id),
-    FOREIGN KEY (entity_id) REFERENCES Entity(entity_id),
-    FOREIGN KEY (property_type_id) REFERENCES PropertyType(property_type_id)
+    PRIMARY KEY (property_id)
 );
 
 CREATE TABLE IF NOT EXISTS Trait (
-    property_id INT,
-    value TEXT,
-    FOREIGN KEY (property_id) REFERENCES Property(property_id)
+    property_id INT UNIQUE,
+    value TEXT
 );
 
 CREATE OR REPLACE VIEW vModel AS
