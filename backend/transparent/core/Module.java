@@ -34,9 +34,6 @@ public class Module
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
 
-	/* needed to print unsigned 64-bit long values */
-	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
-
 	public Module(long id, String path,
 			String moduleName, String sourceName,
 			PrintStream log, boolean isRemote,
@@ -61,7 +58,7 @@ public class Module
 	}
 	
     public String getIdString() {
-    	return toUnsignedString(id);
+    	return Core.toUnsignedString(id);
     }
 	
 	public String getPath() {
@@ -228,7 +225,7 @@ public class Module
 				remote = false;
 			
 			PrintStream log;
-			String filename = "log/" + name + "." + toUnsignedString(id) + ".log";
+			String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
 			File logfile = new File(filename);
 			if (!logfile.exists()) {
 				log = new PrintStream(new FileOutputStream(filename));
@@ -242,7 +239,7 @@ public class Module
 			return null;
 		} catch (IOException e) {
 			Core.printError("Module", "load", "Unable to initialize output log. "
-					+ "(name = " + name + ", id = " + toUnsignedString(id) + ")",
+					+ "(name = " + name + ", id = " + Core.toUnsignedString(id) + ")",
 					e.getMessage());
 			return null;
 		}
@@ -264,11 +261,5 @@ public class Module
 		 && database.setMetadata(
 				"module." + index + ".blocked",
 				useBlockedDownload ? "1" : "0"));
-	}
-	
-	private static String toUnsignedString(long value)
-	{
-        if (value >= 0) return String.valueOf(value);
-        return BigInteger.valueOf(value).add(B64).toString();
 	}
 }

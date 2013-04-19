@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,6 +39,7 @@ public class Core
 	private static final String MODULE_COUNT = "modules.count";
 	private static final String INSTALL_FLAG = "--install";
 	private static final String CONSOLE_FLAG = "--console";
+	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final String PROMPT = "$ ";
 	
@@ -57,6 +59,15 @@ public class Core
 	private static ReentrantLock consoleLock = new ReentrantLock();
 	private static boolean consoleStarted = false;
 	private static int nestedLock = 0;
+
+	/* needed to print unsigned 64-bit long values */
+	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
+	
+	public static String toUnsignedString(long value)
+	{
+        if (value >= 0) return String.valueOf(value);
+        return BigInteger.valueOf(value).add(B64).toString();
+	}
 	
 	/**
 	 * Bit-shift random number generator with period 2^64 - 1.
@@ -67,7 +78,7 @@ public class Core
 		seed ^= (seed << 21);
 		seed ^= (seed >>> 35);
 		seed ^= (seed << 4);
-		database.setMetadata("seed", Long.toString(seed));
+		database.setMetadata("seed", toUnsignedString(seed));
 		return seed;
 	}
 	
@@ -124,7 +135,8 @@ public class Core
 					+ "' (id: " + module.getIdString() + ")");
 			modules.put(module.getId(), module);
 		}
-		
+
+		Core.println("Done loading modules.");
 		return true;
 	}
 
@@ -398,6 +410,7 @@ public class Core
 				install = true;
 			} else if (args[0].equals(CONSOLE_FLAG)) {
 				console = true;
+			} else if (args[0].equals(HELP_FLAG)) {
 			} else {
 				printError("Core", "main", "Unrecognized flag '" + args[0] + "'.");
 			}
@@ -432,6 +445,8 @@ public class Core
 		/* load the modules */
 		if (!loadModules()) {
 			printError("Core", "main", "Unable to load modules.");
+            if (console)
+            	startConsole();
 			return;
 		}
 		
@@ -440,53 +455,58 @@ public class Core
 					+ " Creating empty queue...");
 		}
 		
-    	ArrayList<String> strings = new ArrayList<String>();
-        try {
-        	Reader r = new InputStreamReader(
-        			new BufferedInputStream(new FileInputStream("Entity.sql")));
-        	boolean QUOTE_STATE = false;
-        	StringBuilder b = new StringBuilder();
-        	
-        	boolean done = false;
-        	while (!done) {
-        		int c = r.read();
-        		
-        		switch (c) {
-        		case -1:
-        			if (QUOTE_STATE)
-        				System.err.println("Should not end in the quote state...");
-        			done = true;
-        			break;
-        		case '\'':
-        			if (QUOTE_STATE) {
-        				strings.add(b.toString());
-        				b = new StringBuilder();
-        			}
-        			QUOTE_STATE = !QUOTE_STATE;
-        			break;
-        			
-        		default:
-        			if (QUOTE_STATE)
-        				b.append((char) c);
-        		}
-        	}
-        	r.close();
-        } catch (IOException e) {
-        	e.printStackTrace();
-        	return;
-        }
-        
-        /* find the newegg module */
-        Module newegg = null;
-        for (Module m : modules.values()) {
-        	if (m.getModuleName().equals("NeweggParser"))
-        		newegg = m;
-        }
-        database.addProductIds(newegg, (String[]) strings.toArray());
+		ArrayList<String> strings = new ArrayList<String>();
+		try {
+			Reader r = new InputStreamReader(
+					new BufferedInputStream(new FileInputStream("Entity.sql")));
+			boolean QUOTE_STATE = false;
+			StringBuilder b = new StringBuilder();
+			
+			boolean done = false;
+			while (!done) {
+				int c = r.read();
+				
+				switch (c) {
+				case -1:
+					if (QUOTE_STATE)
+						System.err.println("Should not end in the quote state...");
+					done = true;
+					break;
+				case '\'':
+					if (QUOTE_STATE) {
+						strings.add(b.toString());
+						b = new StringBuilder();
+					}
+					QUOTE_STATE = !QUOTE_STATE;
+					break;
+				
+				default:
+					if (QUOTE_STATE)
+					b.append((char) c);
+				}
+			}
+			r.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+
+		/* find the newegg module */
+		Module newegg = null;
+		for (Module m : modules.values()) {
+			if (m.getModuleName().equals("NeweggParser"))
+				newegg = m;
+		}
+		String[] strarr = new String[strings.size()];
+		strarr = strings.toArray(strarr);
+		database.addProductIds(newegg, strarr);
+
 
         /* dispatch all tasks in the queue */
-		for (Task task : queuedJobs)
-			dispatchTask(task);
+		if (!console) {
+			for (Task task : queuedJobs)
+				dispatchTask(task);
+		}
         
 		/* start the main loop */
 		startConsole();
