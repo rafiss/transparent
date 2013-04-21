@@ -3,6 +3,8 @@ DROP DATABASE IF EXISTS transparent;
 CREATE DATABASE transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.AddProductId TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.InsertNewAttribute TO 'darius'@'localhost';
 
 CREATE TABLE IF NOT EXISTS transparent.Metadata (
     `meta_key` TEXT,
