@@ -41,8 +41,6 @@ public class ModuleThread implements Runnable, Interruptable
 			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
 	
 	private final Module module;
-	private final Sandbox sandbox;
-	private final Database database;
 	private byte requestType;
 	private boolean alive;
 	private boolean dummy;
@@ -50,12 +48,9 @@ public class ModuleThread implements Runnable, Interruptable
 	private Iterator<ProductID> requestedProductIds;
 	private String userAgent;
 	
-	public ModuleThread(Module module, Sandbox sandbox,
-			Database database, boolean dummy)
+	public ModuleThread(Module module, boolean dummy)
 	{
-		this.sandbox = sandbox;
 		this.module = module;
-		this.database = database;
 		this.requestType = 0;
 		this.alive = true;
 		this.dummy = dummy;
@@ -201,7 +196,7 @@ public class ModuleThread implements Runnable, Interruptable
 		}
 
 		if (dummy) return;
-		if (!database.addProductIds(module, productIds)) {
+		if (!Core.getDatabase().addProductIds(module, productIds)) {
 			module.logError("ModuleThread", "getProductListResponse",
 					"Error occurred while adding product IDs.");
 		}
@@ -234,7 +229,7 @@ public class ModuleThread implements Runnable, Interruptable
 		}
 
 		if (dummy) return;
-		if (!database.addProductInfo(module, productId, keyValues)) {
+		if (!Core.getDatabase().addProductInfo(module, productId, keyValues)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
 		}
@@ -284,7 +279,7 @@ public class ModuleThread implements Runnable, Interruptable
 			}
 		}
 		
-		process = sandbox.run(module);
+		process = Core.getSandbox().run(module);
 		DataOutputStream out = new DataOutputStream(process.getOutputStream());
 		DataInputStream in = new DataInputStream(new InterruptableInputStream(
 				process.getInputStream(), this, INPUT_SLEEP_DURATION));

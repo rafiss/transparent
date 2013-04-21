@@ -1,6 +1,6 @@
 package transparent.core.database;
 
-import transparent.core.Core;
+import transparent.core.Console;
 import transparent.core.Module;
 import transparent.core.ProductID;
 
@@ -45,9 +45,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
         // Register JDBC driver class
         Class.forName(driver);
 
-        Core.println("Connecting to database...");
+        Console.println("Connecting to database...");
         connection = DriverManager.getConnection(host, username, password);
-        Core.println("Successfully connected to database...");
+        Console.println("Successfully connected to database...");
     }
 
     @Override
@@ -149,14 +149,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
                 return null;
             }
         } catch (SQLException e) {
-            Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+        	Console.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                    Core.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+                	Console.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
                 }
             }
         }
@@ -186,7 +186,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             connection.commit();
             return true;
         } catch (SQLException e) {
-            Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+        	Console.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
             return false;
         } finally {
             if (statement != null) {
@@ -194,7 +194,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                     connection.setAutoCommit(true);
                 } catch (SQLException e) {
-                    Core.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+                	Console.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
                 }
             }
         }
@@ -205,7 +205,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
         try {
             connection.close();
         } catch (SQLException e) {
-            Core.printError("MariaDBDriver", "close", "", e.getMessage());
+        	Console.printError("MariaDBDriver", "close", "", e.getMessage());
         }
     }
 
@@ -538,10 +538,10 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
 
         database.setMetadata("key1", "value1");
-        Core.println(database.getMetadata("key1"));
-        Core.println(database.getMetadata("key2"));
+        Console.println(database.getMetadata("key1"));
+        Console.println(database.getMetadata("key2"));
         database.setMetadata("key1", "value2");
-        Core.println(database.getMetadata("key1"));
+        Console.println(database.getMetadata("key1"));
     }
 }
 

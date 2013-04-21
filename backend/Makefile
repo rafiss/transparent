@@ -7,6 +7,7 @@ SRCS = \
 	transparent/core/Sandbox.java \
 	transparent/core/NoSandbox.java \
 	transparent/core/Core.java \
+	transparent/core/Console.java \
 	transparent/core/Interruptable.java \
 	transparent/core/InterruptableInputStream.java \
 	transparent/core/InterruptedStreamException.java \
@@ -21,7 +22,7 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=-cp lib/jansi-1.9.jar:lib/mariadb-java-client-1.1.0.jar:.
+JFLAGS=-cp lib/jansi-1.9.jar:lib/mariadb-java-client-1.1.0.jar:lib/jline-1.0.jar:.
 MODULES=newegg
 
 #
