@@ -415,17 +415,20 @@ public class Console
 					return;
 				}
 
-				String name = args.get(3).getToken();
-				String source = args.get(4).getToken();
-				String path = args.get(5).getToken();
+				String name = args.get(2).getToken();
+				String source = args.get(3).getToken();
+				String path = args.get(4).getToken();
+				
+				Console.println(RED + "name: " + name + DEFAULT);
+				Console.println(RED + "source: " + source + DEFAULT);
 
 				Boolean remote = false;
 				if (args.size() > 6)
-					remote = Console.parseBoolean(args.get(6).getToken());
+					remote = Console.parseBoolean(args.get(5).getToken());
 
 				Boolean blocked = true;
 				if (args.size() > 7)
-					remote = Console.parseBoolean(args.get(7).getToken());
+					remote = Console.parseBoolean(args.get(6).getToken());
 
 				if (remote == null || blocked == null) {
 					Console.println("[is remote] and [use blocked downloading]"
@@ -445,12 +448,14 @@ public class Console
 				}
 
 				try {
-					String response = "y";
+					char response = 'y';
 					if (!force) {
 						Console.print("Add this module? (y/n) ");
-						response = in.readLine().toLowerCase();
+						Console.flush();
+						response = (char) System.in.read();
+						Console.println();
 					}
-					if (response.equals("y") || response.equals("yes")) {
+					if (response == 'y' || response == 'Y') {
 						Module module = Module.load(id, name, source, path, remote, blocked);
 						if (module != null
 								&& Core.addModule(module)
