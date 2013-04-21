@@ -1,2 +1,4 @@
 modules forceadd "Amazon Parser" "Amazon" "java -cp transparent/modules/amazon/:transparent/modules/amazon/jsoup-1.7.2.jar AmazonParser" false true
 modules forceadd "Newegg Parser" "Newegg" "java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar:transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser" false true
+modules save
+exit

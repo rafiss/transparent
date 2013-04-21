@@ -33,6 +33,8 @@ public class Console
 	/* ANSI string codes for text formatting */
 	private static final String BOLD = new Ansi().bold().toString();
 	private static final String UNBOLD = new Ansi().boldOff().toString();
+	private static final String RED = new Ansi().fg(Color.RED).toString();
+	private static final String DEFAULT = new Ansi().fg(Color.DEFAULT).toString();
 	
 	private static final BufferedReader in =
 			new BufferedReader(new InputStreamReader(System.in));
@@ -352,7 +354,8 @@ public class Console
 			super("modules",
 					new AddModuleCommand(false),
 					new AddModuleCommand(true),
-					new RemoveModuleCommand());
+					new RemoveModuleCommand(),
+					new SaveModulesCommand());
 		}
 
 		@Override
@@ -459,6 +462,23 @@ public class Console
 					Console.unlockConsole();
 				}
 			}
+		}
+	}
+
+	private static class SaveModulesCommand extends Command
+	{
+		public SaveModulesCommand() {
+			super("save");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (Core.saveModules())
+				Console.println("Successfully saved " + Core.getModuleCount() + " modules.");
+			else
+				Console.println(RED + BOLD + "modules save ERROR:" + UNBOLD + DEFAULT
+						+ " Error occurred while saving modules.");
 		}
 	}
 

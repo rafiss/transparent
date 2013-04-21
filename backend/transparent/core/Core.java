@@ -3,6 +3,7 @@ package transparent.core;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -40,6 +41,7 @@ public class Core
 	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
+	private static final String DEFAULT_SCRIPT = "rc.transparent";
 	
 	private static final Sandbox sandbox = new NoSandbox();
 	private static Database database;
@@ -346,7 +348,7 @@ public class Core
 		AnsiConsole.systemInstall();
 		
 		/* parse argument flags */
-		String script = null;
+		String script = DEFAULT_SCRIPT;
 		boolean console = false;
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].equals(SCRIPT_FLAG)) {
@@ -374,14 +376,6 @@ public class Core
 
 		/* load random number generator seed */
         loadSeed();
-		
-		/* load the modules */
-		if (!loadModules())
-			Console.printError("Core", "main", "Unable to load modules.");
-
-		if (!loadQueue())
-			Console.printWarning("Core", "main", "Unable to load task queue."
-					+ " Creating empty queue...");
 
 		HashSet<String> strings = new HashSet<String>();
 		try {
@@ -440,6 +434,9 @@ public class Core
 	        		if (!Console.parseCommand(line))
 	        			return;
 	        	}
+        	} catch (FileNotFoundException e) {
+        		Console.printError("Core", "main", "Script file '"
+        				+ script + "' not found.");
         	} catch (IOException e) {
         		Console.printError("Core", "main", "Error occured"
         				+ " while reading script.", e.getMessage());
