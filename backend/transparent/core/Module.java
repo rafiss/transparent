@@ -1,13 +1,13 @@
 package transparent.core;
 
+import transparent.core.database.Database;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.math.BigInteger;
-
-import transparent.core.database.Database;
 
 public class Module
 {
@@ -99,10 +99,10 @@ public class Module
 	{
 		log.println(className + '.' + methodName + ": " + message);
 		if (logActivity) {
-			Core.println("Module " + getIdString() + " (name: '"
+			Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') information:" + Core.NEWLINE
 					+ className + '.' + methodName + ": " + message);
-			Core.flush();
+            Console.flush();
 		}
 	}
 	
@@ -111,11 +111,11 @@ public class Module
 	{
 		log.println(className + '.' + methodName + " ERROR: " + message);
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString() + " (name: '"
+            Console.lockConsole();
+            Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
-			Core.printError(className, methodName, message);
-			Core.unlockConsole();
+            Console.printError(className, methodName, message);
+            Console.unlockConsole();
 		}
 	}
 	
@@ -125,83 +125,83 @@ public class Module
 		log.println(className + '.' + methodName + " ERROR: "
 				+ message + " Exception thrown: " + exception);
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString() + " (name: '"
+            Console.lockConsole();
+            Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
-			Core.printError(className, methodName, message, exception);
-			Core.unlockConsole();
+            Console.printError(className, methodName, message, exception);
+            Console.unlockConsole();
 		}
 	}
 	
 	public void logUserAgentChange(String newUserAgent)
 	{
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString()
+            Console.lockConsole();
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') changed user agent to: " + newUserAgent);
-			Core.flush();
-			Core.unlockConsole();
+            Console.flush();
+            Console.unlockConsole();
 		}
 	}
 	
 	public void logHttpGetRequest(String url)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP GET: " + url);
-			Core.flush();
+            Console.flush();
 		}
 	}
 	
 	public void logHttpPostRequest(String url, byte[] post)
 	{
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString()
+            Console.lockConsole();
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP POST:");
-			Core.println("\tURL: " + url);
-			Core.print("\tPOST data: ");
+            Console.println("\tURL: " + url);
+            Console.print("\tPOST data: ");
 			try {
-				Core.write(post);
+                Console.write(post);
 			} catch (IOException e) {
-				Core.print("<unable to write data>");
+                Console.print("<unable to write data>");
 			}
-			Core.println();
-			Core.unlockConsole();
-			Core.flush();
+            Console.println();
+            Console.unlockConsole();
+            Console.flush();
 		}
 	}
 	
 	public void logDownloadProgress(int downloaded)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') downloading: " + downloaded + " bytes");
-			Core.flush();
+            Console.flush();
 		}
 	}
 	
 	public void logDownloadCompleted(int downloaded)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') completed download: " + downloaded + " bytes");
-			Core.flush();
+            Console.flush();
 		}
 	}
 	
 	public void logDownloadAborted()
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+            Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') aborted download due to download size limit.");
-			Core.flush();
+            Console.flush();
 		}
 	}
 
@@ -226,7 +226,7 @@ public class Module
 			if (remoteString.equals("0"))
 				remote = false;
 		} catch (RuntimeException e) {
-			Core.printError("Module", "load", "Error loading module id.", e.getMessage());
+            Console.printError("Module", "load", "Error loading module id.", e.getMessage());
 			return null;
 		}
 
@@ -234,12 +234,12 @@ public class Module
 		try {
 			File logdir = new File("log");
 			if (!logdir.exists() && !logdir.mkdir()) {
-				Core.printError("Module", "load", "Unable to create log directory."
+                Console.printError("Module", "load", "Unable to create log directory."
 						+ " Logging is disabled for this module. (name = " + name
 						+ ", id = " + Core.toUnsignedString(id) + ")");
 				log = new PrintStream(new NullOutputStream());
 			} else if (!logdir.isDirectory()) {
-				Core.printError("Module", "load", "'log' is not a directory."
+                Console.printError("Module", "load", "'log' is not a directory."
 						+ " Logging is disabled for this module. (name = " + name
 						+ ", id = " + Core.toUnsignedString(id) + ")");
 				log = new PrintStream(new NullOutputStream());
@@ -253,7 +253,7 @@ public class Module
 				}
 			}
 		} catch (IOException e) {
-			Core.printError("Module", "load", "Unable to initialize output log."
+            Console.printError("Module", "load", "Unable to initialize output log."
 					+ " Logging is disabled for this module. (name = " + name
 					+ ", id = " + Core.toUnsignedString(id) + ")", e.getMessage());
 			log = new PrintStream(new NullOutputStream());

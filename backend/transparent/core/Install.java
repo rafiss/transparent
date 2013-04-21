@@ -18,7 +18,7 @@ public class Install
 			String path, String name, String source,
 			boolean remote, boolean blockedDownload)
 	{
-		Core.println("Installing module '" + name + "'...");
+        Console.println("Installing module '" + name + "'...");
 		Module module = new Module(Core.random(), path,
 				name, source, AnsiConsole.out, remote, blockedDownload);
 		if (module.save(database, moduleCount))
@@ -26,7 +26,7 @@ public class Install
 			moduleCount++;
 			return true;
 		} else {
-			Core.printError("Install", "installModule",
+            Console.printError("Install", "installModule",
 					"Count not install module '" + name + "'.");
 			return false;
 		}
