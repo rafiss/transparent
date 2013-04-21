@@ -85,10 +85,8 @@ public class Core
 		seed ^= (seed << 21);
 		seed ^= (seed >>> 35);
 		seed ^= (seed << 4);
-		if (database != null) {
-			database.setMetadata("seed", toUnsignedString(seed));
+		if (database != null && !database.setMetadata("seed", toUnsignedString(seed)))
 			Console.printWarning("Core", "random", "Cannot save new seed.");
-		}
 		return seed;
 	}
 	
