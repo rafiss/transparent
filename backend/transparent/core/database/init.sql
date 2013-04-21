@@ -36,17 +36,17 @@ SELECT
     , e.name AS EntityName
     , x.property_name AS PropertyName
     , t.value AS TraitValue
-FROM Entity           AS e
-JOIN Property         AS p ON e.entity_id        = p.entity_id
-JOIN PropertyType     AS x ON x.property_type_id = p.property_type_id
-LEFT JOIN Trait       AS t ON t.property_id      = p.property_id
+FROM transparent.Entity         AS e
+JOIN transparent.Property       AS p ON e.entity_id        = p.entity_id
+JOIN transparent.PropertyType   AS x ON x.property_type_id = p.property_type_id
+LEFT JOIN transparent.Trait     AS t ON t.property_id      = p.property_id
 ;
 
 DELIMITER //
 
 CREATE PROCEDURE transparent.GetEntityId(
     IN moduleProductId TEXT,
-    OUT generatedKey LONG)
+    OUT generatedKey INT)
     SQL SECURITY INVOKER
 BEGIN
     INSERT INTO Entity VALUES(NULL, moduleProductId);
@@ -55,7 +55,7 @@ END//
 
 CREATE PROCEDURE transparent.InsertNewAttribute(
     IN moduleId TEXT,
-    IN entityId LONG,
+    IN entityId INT,
     IN keyName TEXT,
     IN valueName TEXT)
     SQL SECURITY INVOKER
