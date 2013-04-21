@@ -377,6 +377,30 @@ public class Core
 		/* load random number generator seed */
         loadSeed();
 
+		/* run the user-specified script */
+        if (script != null) {
+        	BufferedReader reader = null;
+        	try {
+	        	reader = new BufferedReader(new FileReader(script));
+	        	String line;
+	        	while ((line = reader.readLine()) != null) {
+	        		if (!Console.parseCommand(line))
+	        			return;
+	        	}
+        	} catch (FileNotFoundException e) {
+        		Console.printError("Core", "main", "Script file '"
+        				+ script + "' not found.");
+        	} catch (IOException e) {
+        		Console.printError("Core", "main", "Error occured"
+        				+ " while reading script.", e.getMessage());
+        	} finally {
+        		try {
+	        		if (reader != null)
+	        			reader.close();
+        		} catch (IOException e) { }
+        	}
+        }
+
 		HashSet<String> strings = new HashSet<String>();
 		try {
 			Reader r = new InputStreamReader(
@@ -423,30 +447,6 @@ public class Core
 		strarr = strings.toArray(strarr);
 		if (database != null)
 			database.addProductIds(newegg, strarr);
-
-		/* run the user-specified script */
-        if (script != null) {
-        	BufferedReader reader = null;
-        	try {
-	        	reader = new BufferedReader(new FileReader(script));
-	        	String line;
-	        	while ((line = reader.readLine()) != null) {
-	        		if (!Console.parseCommand(line))
-	        			return;
-	        	}
-        	} catch (FileNotFoundException e) {
-        		Console.printError("Core", "main", "Script file '"
-        				+ script + "' not found.");
-        	} catch (IOException e) {
-        		Console.printError("Core", "main", "Error occured"
-        				+ " while reading script.", e.getMessage());
-        	} finally {
-        		try {
-	        		if (reader != null)
-	        			reader.close();
-        		} catch (IOException e) { }
-        	}
-        }
 
         /* dispatch all tasks in the queue */
 		if (!console) {
