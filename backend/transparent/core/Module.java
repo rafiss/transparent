@@ -14,27 +14,27 @@ public class Module
 	/* contains the full command to execute the module, or the remote URL */
 	private final String path;
 
-    /* name of source for which this module is a parser */
-    private final String sourceName;
+	/* name of source for which this module is a parser */
+	private final String sourceName;
 
-    /* unique name of module */
-    private final String moduleName;
+	/* unique name of module */
+	private final String moduleName;
 
 	/* specifies whether the module is remote */
 	private final boolean remote;
-	
+
 	/* specifies whether websites should be downloaded in blocks or all at once */
 	private final boolean useBlockedDownload;
-	
+
 	/* unique integer identifier for the module */
 	private final long id;
 
 	/* the output log associated with this module */
 	private final PrintStream log;
-	
+
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
-	
+
 	/* the index of this module as it is stored in the persistent database */
 	private int persistentIndex = -1;
 
@@ -45,8 +45,8 @@ public class Module
 	{
 		this.path = path;
 		this.sourceName = sourceName;
-        this.moduleName = moduleName;
-        this.remote = isRemote;
+		this.moduleName = moduleName;
+		this.remote = isRemote;
 		this.useBlockedDownload = blockedDownload;
 		this.id = id;
 		this.log = log;
@@ -61,21 +61,21 @@ public class Module
 		return id;
 	}
 	
-    public String getIdString() {
-    	return Core.toUnsignedString(id);
-    }
+	public String getIdString() {
+		return Core.toUnsignedString(id);
+	}
 	
 	public String getPath() {
 		return path;
 	}
 
-    public String getSourceName() {
-        return sourceName;
-    }
+	public String getSourceName() {
+		return sourceName;
+	}
 
-    public String getModuleName() {
-        return moduleName;
-    }
+	public String getModuleName() {
+		return moduleName;
+	}
 	
 	public boolean isRemote() {
 		return remote;

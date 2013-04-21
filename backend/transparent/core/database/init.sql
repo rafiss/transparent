@@ -3,6 +3,8 @@ DROP DATABASE IF EXISTS transparent;
 CREATE DATABASE transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.AddProductId TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.InsertNewAttribute TO 'darius'@'localhost';
 
 CREATE TABLE IF NOT EXISTS transparent.Metadata (
     `meta_key` TEXT,
@@ -43,15 +45,6 @@ LEFT JOIN transparent.Trait     AS t ON t.property_id      = p.property_id
 ;
 
 DELIMITER //
-
-CREATE PROCEDURE transparent.GetEntityId(
-    IN moduleProductId TEXT,
-    OUT generatedKey INT)
-    SQL SECURITY INVOKER
-BEGIN
-    INSERT INTO Entity VALUES(NULL, moduleProductId);
-    SET generatedKey = LAST_INSERT_ID();
-END//
 
 CREATE PROCEDURE transparent.InsertNewAttribute(
     IN moduleId TEXT,
@@ -97,7 +90,8 @@ BEGIN
         EntityName=moduleProductId) INTO alreadyExists;
 
     IF alreadyExists = 0 THEN
-        CALL transparent.GetEntityId(moduleProductId, generatedEntityId);
+        INSERT INTO Entity VALUES(NULL, moduleProductId);
+        SET generatedEntityId = LAST_INSERT_ID();
         CALL transparent.InsertNewAttribute(
             moduleId, generatedEntityId, fieldName, moduleId);
     END IF;
