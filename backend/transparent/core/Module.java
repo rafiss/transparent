@@ -273,7 +273,7 @@ public class Module
 			log = new PrintStream(new NullOutputStream());
 		}
 
-		return new Module(id, path, name, source, log, isRemote, blockedDownload);
+		return new Module(id, name, source, path, log, isRemote, blockedDownload);
 	}
 
 	public static Module load(Database database, int index)

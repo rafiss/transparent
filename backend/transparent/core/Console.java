@@ -418,9 +418,6 @@ public class Console
 				String name = args.get(2).getToken();
 				String source = args.get(3).getToken();
 				String path = args.get(4).getToken();
-				
-				Console.println(RED + "name: " + name + DEFAULT);
-				Console.println(RED + "source: " + source + DEFAULT);
 
 				Boolean remote = false;
 				if (args.size() > 6)
