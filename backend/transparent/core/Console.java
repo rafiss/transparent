@@ -347,7 +347,7 @@ public class Console
 			return position;
 		}
 	}
-	
+
 	private static class ModulesCommand extends Command
 	{
 		public ModulesCommand() {
@@ -355,6 +355,7 @@ public class Console
 					new AddModuleCommand(false),
 					new AddModuleCommand(true),
 					new RemoveModuleCommand(),
+					new LoadModulesCommand(),
 					new SaveModulesCommand());
 		}
 
@@ -384,12 +385,12 @@ public class Console
 	private static class AddModuleCommand extends Command
 	{
 		private final boolean force;
-		
+
 		public AddModuleCommand(boolean force) {
 			super(force ? "forceadd" : "add");
 			this.force = force;
 		}
-		
+
 		private void usage() {
 			Console.println("usage: modules add [name] [source]"
 					+ " [path] [is remote] [use blocked downloading]");
@@ -491,7 +492,22 @@ public class Console
 		@Override
 		public void run(List<Token> args, int index)
 		{
-			
+			/* TODO: implement this */
+		}
+	}
+
+	private static class LoadModulesCommand extends Command
+	{
+		public LoadModulesCommand() {
+			super("load");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (!Core.loadModules())
+				Console.println(RED + BOLD + "modules load ERROR:" + UNBOLD
+					+ DEFAULT + " Error occurred while loading modules.");
 		}
 	}
 
