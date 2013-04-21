@@ -9,8 +9,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -19,13 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
-import org.fusesource.jansi.Ansi;
-import org.fusesource.jansi.Ansi.Erase;
 import org.fusesource.jansi.AnsiConsole;
-import org.fusesource.jansi.Ansi.Color;
-import org.fusesource.jansi.AnsiString;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
@@ -43,10 +36,10 @@ public class Core
 	private static final String CONSOLE_FLAG = "--console";
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
-	private static final String PROMPT = "$ ";
 	
 	private static final Sandbox sandbox = new NoSandbox();
-	private static HashMap<Long, Module> modules = new HashMap<Long, Module>();
+	private static ConcurrentHashMap<Long, Module> modules =
+			new ConcurrentHashMap<Long, Module>();
 	private static Database database;
 
 	private static ScheduledExecutorService dispatcher =
@@ -57,12 +50,6 @@ public class Core
 			Collections.newSetFromMap(new ConcurrentHashMap<Task, Boolean>());
 	
 	private static long seed = 0;
-	private static String input = "";
-	private static ReentrantLock consoleLock = new ReentrantLock();
-	private static boolean consoleStarted = false;
-	private static int nestedLock = 0;
-	
-	private static ArrayList<String> history = new ArrayList<String>();
 
 	/* needed to print unsigned 64-bit long values */
 	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
@@ -90,7 +77,7 @@ public class Core
 	{
 		String seedValue = database.getMetadata(SEED_KEY);
 		if (seedValue == null) {
-			Core.printWarning("Core", "loadSeed", "No stored seed, regenerating...");
+			Console.printWarning("Core", "loadSeed", "No stored seed, regenerating...");
 			while (seed == 0)
 				seed = System.nanoTime();
 			database.setMetadata(SEED_KEY, Long.toString(seed));
@@ -98,22 +85,22 @@ public class Core
 			try {
 				seed = Long.parseLong(seedValue);
 			} catch (NumberFormatException e) {
-				Core.printWarning("Core", "loadSeed",
+				Console.printWarning("Core", "loadSeed",
 						"Unable to read seed, regenerating...");
 				while (seed == 0)
 					seed = System.nanoTime();
 				database.setMetadata(SEED_KEY, Long.toString(seed));
 			}
 		}
-		Core.flush();
+		Console.flush();
 	}
 	
 	private static boolean loadModules()
 	{
-		Core.println("Loading modules...");
+		Console.println("Loading modules...");
 		String moduleCount = database.getMetadata(MODULE_COUNT);
 		if (moduleCount == null) {
-			printError("Core", "loadModules",
+			Console.printError("Core", "loadModules",
 					"No modules stored. Run with " + INSTALL_FLAG + " flag.");
 			return false;
 		}
@@ -122,25 +109,25 @@ public class Core
 		try {
 			count = Integer.parseInt(moduleCount);
 		} catch (NumberFormatException e) {
-			printError("Core", "loadModules", "Could not parse module count.");
+			Console.printError("Core", "loadModules", "Could not parse module count.");
 			return false;
 		}
 		
-		Core.println("Found " + count + " modules.");
+		Console.println("Found " + count + " modules.");
 		for (int i = 0; i < count; i++) {
 			Module module = Module.load(database, i);
 			if (module == null) {
-				Core.printError("Core", "loadModules",
+				Console.printError("Core", "loadModules",
 						"Error loading module at index " + i + ".");
 				return false;
 			}
 			
-			Core.println("Loaded module '" + module.getModuleName()
+			Console.println("Loaded module '" + module.getModuleName()
 					+ "' (id: " + module.getIdString() + ")");
 			modules.put(module.getId(), module);
 		}
 
-		Core.println("Done loading modules.");
+		Console.println("Done loading modules.");
 		return true;
 	}
 
@@ -154,7 +141,7 @@ public class Core
 			String job = database.getMetadata(queue + "." + i);
 			Task task = Task.load(job);
 			if (task == null) {
-				Core.printError("Core", "loadQueue",
+				Console.printError("Core", "loadQueue",
 						"Unable to parse task at index " + i + ".");
 				continue;
 			}
@@ -173,13 +160,25 @@ public class Core
 				queuedJobs.add(task);
 			return true;
 		} catch (RuntimeException e) {
-			Core.printError("Core", "loadQueue", "Unable to load task queue.");
+			Console.printError("Core", "loadQueue", "Unable to load task queue.");
 			return false;
 		}
 	}
 	
 	public static Module getModule(long moduleId) {
 		return modules.get(moduleId);
+	}
+	
+	public static Collection<Module> getModules() {
+		return modules.values();
+	}
+	
+	public static Set<Task> getQueuedTasks() {
+		return queuedJobs;
+	}
+	
+	public static Set<Task> getRunningTasks() {
+		return runningJobs;
 	}
 	
 	public static Database getDatabase() {
@@ -211,202 +210,6 @@ public class Core
 		task.setFuture(future);
 	}
 	
-	private static void printTasks(Collection<Task> tasks)
-	{
-		Core.println(tasks.size() + " tasks.");
-		for (Task task : tasks) {
-			String module = "<null>";
-			if (task.getModule() != null)
-				module = task.getModule().getIdString() + " ("
-						+ task.getModule().getModuleName() + ")";
-			
-			Core.println("Task type: " + task.getType().toString()
-					+ ", module: " + module
-					+ ", scheduled execution: " + new Date(task.getTime())
-					+ ", is running: " + runningJobs.contains(task)
-					+ ", reschedules: " + task.reschedules()
-					+ ", dummy: " + task.isDummy());
-		}
-	}
-	
-	private static void parseCommand(String command)
-	{
-    	if (command.equals("tasks queued")) {
-    		ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : queuedJobs)
-    			jobs.add(task);
-    		
-    		Collections.sort(jobs);
-    		printTasks(jobs);
-    	} else if (command.equals("tasks running")) {
-    		ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : runningJobs)
-    			jobs.add(task);
-    		
-    		Collections.sort(jobs);
-    		printTasks(jobs);
-    	} else if (command.equals("tasks")) {
-    		ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : queuedJobs)
-    			jobs.add(task);
-    		for (Task task : runningJobs)
-    			jobs.add(task);
-    		
-    		Collections.sort(jobs);
-    		printTasks(jobs);
-    	} else if (command.equals("modules")) {
-    		Core.println(modules.size() + " modules.");
-    		for (Module module : modules.values()) {
-    			Core.println("Module id: " + module.getIdString()
-    					+ ", name: " + module.getModuleName()
-    					+ ", source: " + module.getSourceName()
-    					+ ", remote: " + module.isRemote()
-    					+ ", blockedDownloading: " + module.blockedDownload()
-    					+ ", logging: " + module.isLoggingActivity());
-    		}
-    	} else {
-    		Core.println("Unrecognized command '" + command + "'.");
-    	}
-	}
-	
-	private static void printPrompt()
-	{
-		AnsiConsole.out.flush();
-    	AnsiConsole.out.print(new Ansi().saveCursorPosition());
-		AnsiConsole.out.print(new Ansi().bold());
-		AnsiConsole.out.print(PROMPT);
-		AnsiConsole.out.print(new Ansi().boldOff());
-	}
-	
-	private static void startConsole()
-	{
-		try {
-			InputStreamReader in = new InputStreamReader(System.in);
-	        while (true) {
-	        	lockConsole();
-	        	consoleStarted = true;
-	        	unlockConsole();
-	    		Core.flush();
-	    		
-	        	int c = in.read();
-	        	while (c != '\n' && c != -1) {
-	        		input += (char) c;
-	        		/*AnsiString temp = new AnsiString(input);
-	        		for (int i = 0; i < temp.getEncoded().length(); i++)
-	        			Core.println("temp[" + i + "]: " + temp.charAt(i));
-	        		Core.flush();*/
-	        		AnsiConsole.out.print((char) c);
-	        		c = in.read();
-	        	}
-	        	
-	        	if (input.equals("exit"))
-	        		break;
-	        	String command = input;
-	        	input = "";
-	        	history.add(command);
-	        	parseCommand(command);
-	        }
-	        in.close();
-		} catch (IOException e) {
-			printError("Core", "startConsole", "", e.getMessage());
-		}
-	}
-	
-	public static void flush() {
-		AnsiConsole.out.flush();
-	}
-	
-	public static void lockConsole() {
-		boolean held = consoleLock.isHeldByCurrentThread();
-		if (!held) {
-			consoleLock.lock();
-			if (consoleStarted)
-				AnsiConsole.out.print(new Ansi().eraseLine(Erase.ALL).restorCursorPosition());
-		}
-		else nestedLock++;
-	}
-	
-	public static void unlockConsole() {
-		if (nestedLock == 0) {
-			if (consoleStarted) {
-				printPrompt();
-				AnsiConsole.out.print(input);
-			}
-			consoleLock.unlock();
-		}
-		else nestedLock--;
-	}
-	
-	public static void write(byte[] data) throws IOException
-	{
-		lockConsole();
-		AnsiConsole.out.write(data);
-		unlockConsole();
-	}
-	
-	public static void print(String s)
-	{
-		lockConsole();
-		AnsiConsole.out.print(s);
-		unlockConsole();
-	}
-	
-	public static void println(String s)
-	{
-		lockConsole();
-		AnsiConsole.out.println(s);
-		unlockConsole();
-	}
-	
-	public static void println()
-	{
-		lockConsole();
-		AnsiConsole.out.println();
-		unlockConsole();
-	}
-	
-	public static void printWarning(String className,
-			String methodName, String message)
-	{
-		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold());
-		AnsiConsole.out.print(className + '.' + methodName + " WARNING: ");
-		AnsiConsole.out.print(new Ansi().boldOff());
-		AnsiConsole.out.println(message);
-		unlockConsole();
-	}
-	
-	public static void printError(String className,
-			String methodName, String message)
-	{
-		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
-		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
-		AnsiConsole.out.println(message);
-		unlockConsole();
-	}
-	
-	public static void printError(String className,
-			String methodName, String message, String exception)
-	{
-		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
-		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
-		AnsiConsole.out.print(message);
-		if (exception != null) {
-			if (message.length() > 0)
-				AnsiConsole.out.print(' ');
-			AnsiConsole.out.print("Exception thrown. ");
-			AnsiConsole.out.print(new Ansi().fgBright(Color.BLACK));
-			AnsiConsole.out.print(exception);
-			AnsiConsole.out.print(new Ansi().fg(Color.DEFAULT));
-		}
-		AnsiConsole.out.println();
-		unlockConsole();
-	}
-	
 	public static void main(String[] args)
 	{
 		AnsiConsole.systemInstall();
@@ -421,16 +224,17 @@ public class Core
 				console = true;
 			} else if (args[0].equals(HELP_FLAG)) {
 			} else {
-				printError("Core", "main", "Unrecognized flag '" + args[0] + "'.");
+				Console.printError("Core", "main",
+						"Unrecognized flag '" + args[0] + "'.");
 			}
 		}
 		
         try {
             database = new MariaDBDriver();
         } catch (Exception e) {
-            printError("Core", "main", "Cannot connect to database.", e.getMessage());
+        	Console.printError("Core", "main", "Cannot connect to database.", e.getMessage());
             if (console) {
-            	startConsole();
+            	Console.startConsole();
             	return;
             } else System.exit(-1);
         }
@@ -440,30 +244,30 @@ public class Core
 		
 		/* install the modules to the database if we were told to */
 		if (install) {
-			Core.println("Installing modules...");
+			Console.println("Installing modules...");
 			Install.installModules(database);
 
-			Core.println("Installing job queue...");
+			Console.println("Installing job queue...");
 			Install.installJobQueue(database);
 
-			Core.println("Done.");
-			Core.flush();
+			Console.println("Done.");
+			Console.flush();
 			return;
 		}
 		
 		/* load the modules */
 		if (!loadModules()) {
-			printError("Core", "main", "Unable to load modules.");
+			Console.printError("Core", "main", "Unable to load modules.");
             if (console)
-            	startConsole();
+            	Console.startConsole();
 			return;
 		}
-		
+
 		if (!loadQueue()) {
-			Core.printWarning("Core", "main", "Unable to load task queue."
+			Console.printWarning("Core", "main", "Unable to load task queue."
 					+ " Creating empty queue...");
 		}
-		
+
 		HashSet<String> strings = new HashSet<String>();
 		try {
 			Reader r = new InputStreamReader(
@@ -510,7 +314,6 @@ public class Core
 		strarr = strings.toArray(strarr);
 		database.addProductIds(newegg, strarr);
 
-
         /* dispatch all tasks in the queue */
 		if (!console) {
 			for (Task task : queuedJobs)
@@ -518,7 +321,7 @@ public class Core
 		}
         
 		/* start the main loop */
-		startConsole();
+		Console.startConsole();
 	}
 }
 
@@ -579,7 +382,7 @@ class Task implements Comparable<Task>, Callable<Object>
 	{
 		String[] tokens = data.split("\\.");
 		if (tokens.length != 5) {
-			Core.printError("Task", "load", "Unable to parse string.");
+			Console.printError("Task", "load", "Unable to parse string.");
 			return null;
 		}
 		
@@ -591,7 +394,7 @@ class Task implements Comparable<Task>, Callable<Object>
 		else if (tokens[0].equals("2"))
 			type = TaskType.IMAGE_FETCH;
 		else {
-			Core.printError("Task", "load", "Unable to parse task type.");
+			Console.printError("Task", "load", "Unable to parse task type.");
 			return null;
 		}
 		
@@ -617,7 +420,7 @@ class Task implements Comparable<Task>, Callable<Object>
 			typeString = "2";
 			break;
 		default:
-			Core.printError("Task", "save", "Unrecognized type.");
+			Console.printError("Task", "save", "Unrecognized type.");
 			return null;
 		}
 		
@@ -645,24 +448,24 @@ class Task implements Comparable<Task>, Callable<Object>
 		ModuleThread wrapper;
 		switch (type) {
 		case PRODUCT_LIST_PARSE:
-			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase(), dummy);
+			wrapper = new ModuleThread(module, dummy);
 			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
 			wrapper.run();
 			Core.stopTask(this);
 			return null;
 		case PRODUCT_INFO_PARSE:
-			wrapper = new ModuleThread(module, Core.getSandbox(), Core.getDatabase(), dummy);
+			wrapper = new ModuleThread(module, dummy);
 			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
 			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
 			wrapper.run();
 			Core.stopTask(this);
 			return null;
 		case IMAGE_FETCH:
-			Core.printError("Task", "call", "Image fetching not implemented.");
+			Console.printError("Task", "call", "Image fetching not implemented.");
 			Core.stopTask(this);
 			return null;
 		default:
-			Core.printError("Task", "call", "Unrecognized task type.");
+			Console.printError("Task", "call", "Unrecognized task type.");
 			Core.stopTask(this);
 			return null;
 		}
