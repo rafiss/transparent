@@ -1,6 +1,8 @@
 package transparent.core;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -12,6 +14,7 @@ import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.AnsiConsole;
 import org.fusesource.jansi.Ansi.Color;
 
+import jline.CandidateListCompletionHandler;
 import jline.Completor;
 import jline.ConsoleReader;
 
@@ -30,6 +33,27 @@ public class Console
 	/* ANSI string codes for text formatting */
 	private static final String BOLD = new Ansi().bold().toString();
 	private static final String UNBOLD = new Ansi().boldOff().toString();
+	
+	private static final BufferedReader in =
+			new BufferedReader(new InputStreamReader(System.in));
+	
+	private static List<Token> tokens = new ArrayList<Token>();
+	
+	public static Boolean parseBoolean(String token)
+	{
+		if (token.equals("1"))
+			return true;
+		else if (token.equals("0"))
+			return false;
+		
+		String lower = token.toLowerCase();
+		if (lower.equals("true"))
+			return true;
+		else if (lower.equals("false"))
+			return false;
+		
+		return null;
+	}
 
 	public static void flush() {
 		AnsiConsole.out.flush();
@@ -164,7 +188,7 @@ public class Console
 					state = LexerState.NORMAL_ESCAPE;
 				else if (Character.isWhitespace(input.charAt(i))) {
 					if (token.length() > 0)
-						tokens.add(new Token(token.toString(), start));
+						tokens.add(new Token(token.toString(), start, i - start));
 					token = new StringBuilder();
 					start = i + 1;
 				} else
@@ -206,13 +230,14 @@ public class Console
 			pointer = new Cursor(tokens.size(), token.length());
 
 		if (token.length() > 0)
-			tokens.add(new Token(token.toString(), start));
+			tokens.add(new Token(token.toString(), start, input.length() - start));
 		
 		return pointer;
 	}
 
 	private static void printTasks(Collection<Task> tasks, String suffix)
 	{
+		Console.lockConsole();
 		println(tasks.size() + suffix);
 		for (Task task : tasks) {
 			String module = "<null>";
@@ -227,6 +252,20 @@ public class Console
 					+ ", reschedules: " + task.reschedules()
 					+ ", dummy: " + task.isDummy());
 		}
+		Console.unlockConsole();
+	}
+	
+	public static boolean parseCommand(String line)
+	{
+		lexCommand(line, line.length(), tokens);
+		
+		if (tokens.size() > 0) {
+    		if (tokens.get(0).getToken().equals("exit"))
+    			return false;
+    		root.run(tokens, 0);
+		}
+    	tokens.clear();
+    	return true;
 	}
 
 	public static void startConsole()
@@ -234,16 +273,15 @@ public class Console
 		try {
 			ConsoleReader in = new ConsoleReader();
 			in.addCompletor(new ConsoleCompleter());
-			ArrayList<Token> tokens = new ArrayList<Token>();
+			
+			CandidateListCompletionHandler handler = new CandidateListCompletionHandler();
+			handler.setAlwaysIncludeNewline(false);
+			in.setCompletionHandler(handler);
+			
 	        while (true) {
 	    		String input = in.readLine(BOLD + PROMPT + UNBOLD);
-	    		
-	    		lexCommand(input, input.length(), tokens);
-	    		
-	    		if (tokens.size() > 0 && tokens.get(0).getToken().equals("exit"))
+	    		if (!parseCommand(input))
 	    			break;
-	    		root.run(tokens, 0);
-	        	tokens.clear();
 	        }
 		} catch (IOException e) {
 			printError("Core", "startConsole", "", e.getMessage());
@@ -258,17 +296,21 @@ public class Console
 			String match = "";
 			if (tokenIndex < tokens.size())
 				match = tokens.get(tokenIndex).getToken();
-			if (tokenIndex == cursor.getTokenIndex()) {
+			if (tokenIndex == cursor.getTokenIndex())
+			{
 				match = match.substring(0, cursor.getTokenPosition());
 
 				for (Command subcommand : command.getSubcommands()) {
 					if (subcommand.getName().startsWith(match))
-						completions.add(subcommand.getName());
+						completions.add(subcommand.getName() + ' ');
 				}
 
 				if (tokenIndex < tokens.size())
 					return tokens.get(tokenIndex).getSourcePosition();
-				return 0;
+				else if (tokens.size() > 0)
+					return tokens.get(tokenIndex - 1).getSourcePosition()
+						+ tokens.get(tokenIndex - 1).getSourceLength() + 1;
+				else return 0;
 			} else {
 				int found = -1;
 				boolean multiple = false;
@@ -285,7 +327,7 @@ public class Console
 						}
 					}
 				}
-
+				
 				if (multiple) return tokens.get(tokenIndex).getSourcePosition();
 				else return found;
 			}
@@ -307,32 +349,12 @@ public class Console
 	private static class ModulesCommand extends Command
 	{
 		public ModulesCommand() {
-			super("modules");
+			super("modules",
+					new AddModuleCommand(false),
+					new AddModuleCommand(true),
+					new RemoveModuleCommand());
 		}
-		
-		@Override
-		public void run(List<Token> args, int index)
-		{
-    		println(Core.getModules().size() + " module(s).");
-    		for (Module module : Core.getModules()) {
-    			println("Module id: " + module.getIdString()
-    					+ ", name: " + module.getModuleName()
-    					+ ", source: " + module.getSourceName()
-    					+ ", remote: " + module.isRemote()
-    					+ ", blockedDownloading: " + module.blockedDownload()
-    					+ ", logging: " + module.isLoggingActivity());
-    		}
-		}
-	}
-	
-	private static class TasksCommand extends Command
-	{
-		public TasksCommand() {
-			super("tasks",
-					new QueuedTasksCommand(),
-					new RunningTasksCommand());
-		}
-		
+
 		@Override
 		public void run(List<Token> args, int index)
 		{
@@ -340,7 +362,135 @@ public class Console
 				super.run(args, index);
 				return;
 			}
+
+			Console.lockConsole();
+    		println(Core.getModuleCount() + " module(s).");
+    		for (Module module : Core.getModules()) {
+    			println("Module id: " + module.getIdString()
+    					+ ", name: " + module.getModuleName()
+    					+ ", source: " + module.getSourceName()
+    					+ ", remote: " + module.isRemote()
+    					+ ", blockedDownloading: " + module.blockedDownload()
+    					+ ", logging: " + module.isLoggingActivity()
+    					+ ", is saved: " + (module.getPersistentIndex() != -1));
+    		}
+			Console.unlockConsole();
+		}
+	}
+
+	private static class AddModuleCommand extends Command
+	{
+		private final boolean force;
+		
+		public AddModuleCommand(boolean force) {
+			super(force ? "forceadd" : "add");
+			this.force = force;
+		}
+		
+		private void usage() {
+			Console.println("usage: modules add [name] [source]"
+					+ " [path] [is remote] [use blocked downloading]");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() > 2) {
+				/* parse the arguments */
+				if (args.size() < 5) {
+					Console.lockConsole();
+					Console.println("Too few arguments.");
+					usage();
+					Console.unlockConsole();
+					return;
+				} else if (args.size() > 7) {
+					Console.lockConsole();
+					Console.println("Too many arguments.");
+					usage();
+					Console.unlockConsole();
+					return;
+				}
+
+				String name = args.get(3).getToken();
+				String source = args.get(4).getToken();
+				String path = args.get(5).getToken();
+
+				Boolean remote = false;
+				if (args.size() > 6)
+					remote = Console.parseBoolean(args.get(6).getToken());
+
+				Boolean blocked = true;
+				if (args.size() > 7)
+					remote = Console.parseBoolean(args.get(7).getToken());
+
+				if (remote == null || blocked == null) {
+					Console.println("[is remote] and [use blocked downloading]"
+							+ " must be boolean arguments.");
+					return;
+				}
+
+				long id = Core.random();
+				Console.lockConsole();
+				if (!force) {
+					Console.println("Module id: " + Core.toUnsignedString(id));
+					Console.println("  name: " + name);
+					Console.println("  source: " + source);
+					Console.println("  path: " + path);
+					Console.println("  is remote: " + remote);
+					Console.println("  use blocked downloading: " + blocked);
+				}
+
+				try {
+					String response = "y";
+					if (!force) {
+						Console.print("Add this module? (y/n) ");
+						response = in.readLine().toLowerCase();
+					}
+					if (response.equals("y") || response.equals("yes")) {
+						Module module = Module.load(id, name, source, path, remote, blocked);
+						if (module != null
+								&& Core.addModule(module)
+								&& Core.saveModules())
+							Console.println("Module '" + name + "' saved to database.");
+					}
+				} catch (IOException e) {
+					return;
+				} finally {
+					Console.unlockConsole();
+				}
+			}
+		}
+	}
+
+	private static class RemoveModuleCommand extends Command
+	{
+		public RemoveModuleCommand() {
+			super("remove");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
 			
+		}
+	}
+
+	private static class TasksCommand extends Command
+	{
+		public TasksCommand() {
+			super("tasks",
+					new QueuedTasksCommand(),
+					new RunningTasksCommand());
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() > 1) {
+				super.run(args, index);
+				return;
+			}
+
 			ArrayList<Task> jobs = new ArrayList<Task>();
     		for (Task task : Core.getQueuedTasks())
     			jobs.add(task);
@@ -351,31 +501,31 @@ public class Console
     		printTasks(jobs, " total task(s).");
 		}
 	}
-	
+
 	private static class QueuedTasksCommand extends Command
 	{
 		public QueuedTasksCommand() {
 			super("queued");
 		}
-		
+
 		@Override
 		public void run(List<Token> args, int index)
 		{
     		ArrayList<Task> jobs = new ArrayList<Task>();
     		for (Task task : Core.getQueuedTasks())
     			jobs.add(task);
-    		
+
     		Collections.sort(jobs);
     		printTasks(jobs, " task(s) queued.");
 		}
 	}
-	
+
 	private static class RunningTasksCommand extends Command
 	{
 		public RunningTasksCommand() {
 			super("running");
 		}
-		
+
 		@Override
 		public void run(List<Token> args, int index)
 		{
@@ -387,7 +537,7 @@ public class Console
     		printTasks(jobs, " task(s) running.");
 		}
 	}
-	
+
 	private static class ExitCommand extends Command
 	{
 		public ExitCommand() {
@@ -484,11 +634,13 @@ class Command
 
 class Token {
 	private String token;
-	private int source;
+	private int sourcePos;
+	private int sourceLength;
 	
-	public Token (String token, int sourcePosition) {
+	public Token (String token, int sourcePosition, int sourceLength) {
 		this.token = token;
-		this.source = sourcePosition;
+		this.sourcePos = sourcePosition;
+		this.sourceLength = sourceLength;
 	}
 	
 	public String getToken() {
@@ -496,7 +648,11 @@ class Token {
 	}
 	
 	public int getSourcePosition() {
-		return source;
+		return sourcePos;
+	}
+	
+	public int getSourceLength() {
+		return sourceLength;
 	}
 }
 

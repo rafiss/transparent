@@ -1,15 +1,18 @@
 package transparent.core;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.fusesource.jansi.AnsiConsole;
 
@@ -32,14 +36,12 @@ public class Core
 	
 	private static final String SEED_KEY = "seed";
 	private static final String MODULE_COUNT = "modules.count";
-	private static final String INSTALL_FLAG = "--install";
 	private static final String CONSOLE_FLAG = "--console";
+	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
 	
 	private static final Sandbox sandbox = new NoSandbox();
-	private static ConcurrentHashMap<Long, Module> modules =
-			new ConcurrentHashMap<Long, Module>();
 	private static Database database;
 
 	private static ScheduledExecutorService dispatcher =
@@ -53,6 +55,18 @@ public class Core
 
 	/* needed to print unsigned 64-bit long values */
 	private static final BigInteger B64 = BigInteger.ZERO.setBit(64);
+
+	/* data structures to keep track of modules */
+	private static ReentrantLock modulesLock = new ReentrantLock();
+	private static ConcurrentHashMap<Long, Module> modules =
+			new ConcurrentHashMap<Long, Module>();
+	
+	/* represents the list encoding of modules in the database */
+	private static HashMap<Module, Integer> indexModuleMap =
+			new HashMap<Module, Integer>();
+	private static HashMap<Integer, Module> moduleIndexMap =
+			new HashMap<Integer, Module>();
+	private static ArrayList<Module> moduleList = new ArrayList<Module>();
 	
 	public static String toUnsignedString(long value)
 	{
@@ -69,12 +83,23 @@ public class Core
 		seed ^= (seed << 21);
 		seed ^= (seed >>> 35);
 		seed ^= (seed << 4);
-		database.setMetadata("seed", toUnsignedString(seed));
+		if (database != null) {
+			database.setMetadata("seed", toUnsignedString(seed));
+			Console.printWarning("Core", "random", "Cannot save new seed.");
+		}
 		return seed;
 	}
 	
 	private static void loadSeed()
 	{
+		if (database == null) {
+			Console.printError("Core", "loadSeed",
+					"No database available. Generating temporary seed...");
+			while (seed == 0)
+				seed = System.nanoTime();
+			return;
+		}
+
 		String seedValue = database.getMetadata(SEED_KEY);
 		if (seedValue == null) {
 			Console.printWarning("Core", "loadSeed", "No stored seed, regenerating...");
@@ -95,40 +120,134 @@ public class Core
 		Console.flush();
 	}
 	
-	private static boolean loadModules()
+	public static boolean loadModules()
 	{
-		Console.println("Loading modules...");
-		String moduleCount = database.getMetadata(MODULE_COUNT);
-		if (moduleCount == null) {
+		if (database == null) {
 			Console.printError("Core", "loadModules",
-					"No modules stored. Run with " + INSTALL_FLAG + " flag.");
+					"No database available. No modules loaded.");
 			return false;
 		}
-		
-		int count;
+
+		modulesLock.lock();
 		try {
-			count = Integer.parseInt(moduleCount);
-		} catch (NumberFormatException e) {
-			Console.printError("Core", "loadModules", "Could not parse module count.");
-			return false;
-		}
-		
-		Console.println("Found " + count + " modules.");
-		for (int i = 0; i < count; i++) {
-			Module module = Module.load(database, i);
-			if (module == null) {
-				Console.printError("Core", "loadModules",
-						"Error loading module at index " + i + ".");
+			Console.println("Loading modules...");
+			String moduleCountString = database.getMetadata(MODULE_COUNT);
+			if (moduleCountString == null) {
+				Console.printError("Core", "loadModules", "No modules stored.");
 				return false;
 			}
-			
-			Console.println("Loaded module '" + module.getModuleName()
-					+ "' (id: " + module.getIdString() + ")");
-			modules.put(module.getId(), module);
+
+			int moduleCount;
+			try {
+				moduleCount = Integer.parseInt(moduleCountString);
+			} catch (NumberFormatException e) {
+				Console.printError("Core", "loadModules", "Could not parse module count.");
+				return false;
+			}
+
+			Console.println("Found " + moduleCount + " modules.");
+			for (int i = 0; i < moduleCount; i++) {
+				Module module = Module.load(database, i);
+				if (module == null) {
+					Console.printError("Core", "loadModules",
+							"Error loading module at index " + i + ".");
+					return false;
+				}
+
+				Console.println("Loaded module '" + module.getModuleName()
+						+ "' (id: " + module.getIdString() + ")");
+				modules.put(module.getId(), module);
+				moduleList.add(module);
+				indexModuleMap.put(module, i);
+				moduleIndexMap.put(i, module);
+			}
+		} finally {
+			modulesLock.unlock();
 		}
 
 		Console.println("Done loading modules.");
 		return true;
+	}
+	
+	public static boolean addModule(Module module)
+	{
+		modulesLock.lock();
+		try {
+			Module old = modules.put(module.getId(), module);
+			if (old != null) {
+				modules.put(old.getId(), old);
+				Console.printError("Core", "addModule", "Module with id "
+						+ module.getIdString() + " already exists. "
+						+ "(name: '" + old.getModuleName() + "')");
+				return false;
+			} else {
+				moduleList.add(module);
+				return true;
+			}
+		} finally {
+			modulesLock.unlock();
+		}
+	}
+	
+	public static boolean removeModule(Module module)
+	{
+		modulesLock.lock();
+		try {
+			if (modules.remove(module.getId()) == null) {
+				Console.printWarning("Core", "removeModule",
+						"Specified module does not exist.");
+				return false;
+			}
+			int index = indexModuleMap.remove(module);
+
+			/* move the last module into the removed module's place */
+			Module last = moduleIndexMap.remove(moduleIndexMap.size() - 1);
+			moduleIndexMap.put(index, last);
+			indexModuleMap.put(last, index);
+			return true;
+		} finally {
+			modulesLock.unlock();
+		}
+	}
+
+	public static boolean saveModules()
+	{
+		modulesLock.lock();
+		try {
+			boolean success = true;
+			for (Entry<Integer, Module> pair : moduleIndexMap.entrySet()) {
+				int index = pair.getKey();
+				Module module = pair.getValue();
+				if (index < moduleList.size()) {
+					Module current = moduleList.get(index);
+					if (!current.deepEquals(module) && !module.save(database, index)) {
+						Console.printError("Core", "saveModules", "Unable to save module '"
+								+ module.getModuleName() + "' (id: " + module.getIdString()
+								+ ") at position " + index + ".");
+						success = false;
+					} else {
+						moduleList.set(index, module);
+					}
+				} else {
+					if (!module.save(database, index)) {
+						Console.printError("Core", "saveModules", "Unable to save module '"
+								+ module.getModuleName() + "' (id: " + module.getIdString()
+								+ ") at position " + index + ".");
+						success = false;
+					} else {
+						moduleList.add(module);
+					}
+				}
+			}
+
+			if (database == null)
+				success = false;
+			else success &= database.setMetadata(
+					MODULE_COUNT, Integer.toString(moduleList.size()));
+			return success;
+		} finally {
+			modulesLock.unlock();
+		}
 	}
 
 	private static ArrayList<Task> loadQueue(String queue)
@@ -169,8 +288,20 @@ public class Core
 		return modules.get(moduleId);
 	}
 	
-	public static Collection<Module> getModules() {
-		return modules.values();
+	public static Iterable<Module> getModules()
+	{
+		/* to ensure we get a thread-safe snapshot of the current modules */
+		modulesLock.lock();
+		try {
+			Iterable<Module> toreturn = new ArrayList<Module>(modules.values());
+			return toreturn;
+		} finally {
+			modulesLock.unlock();
+		}
+	}
+	
+	public static int getModuleCount() {
+		return modules.size();
 	}
 	
 	public static Set<Task> getQueuedTasks() {
@@ -215,17 +346,23 @@ public class Core
 		AnsiConsole.systemInstall();
 		
 		/* parse argument flags */
-		boolean install = false;
+		String script = null;
 		boolean console = false;
-		if (args.length > 0) {
-			if (args[0].equals(INSTALL_FLAG)) {
-				install = true;
-			} else if (args[0].equals(CONSOLE_FLAG)) {
+		for (int i = 0; i < args.length; i++) {
+			if (args[i].equals(SCRIPT_FLAG)) {
+				if (i + 1 < args.length) {
+					i++;
+					script = args[i];
+				} else {
+					Console.printError("Core", "main", "Unspecified script filepath.");
+				}
+			} else if (args[i].equals(CONSOLE_FLAG)) {
 				console = true;
-			} else if (args[0].equals(HELP_FLAG)) {
+			} else if (args[i].equals(HELP_FLAG)) {
+				/* TODO: implement this */
 			} else {
 				Console.printError("Core", "main",
-						"Unrecognized flag '" + args[0] + "'.");
+						"Unrecognized flag '" + args[i] + "'.");
 			}
 		}
 		
@@ -233,40 +370,18 @@ public class Core
             database = new MariaDBDriver();
         } catch (Exception e) {
         	Console.printError("Core", "main", "Cannot connect to database.", e.getMessage());
-            if (console) {
-            	Console.startConsole();
-            	return;
-            } else System.exit(-1);
         }
 
 		/* load random number generator seed */
         loadSeed();
 		
-		/* install the modules to the database if we were told to */
-		if (install) {
-			Console.println("Installing modules...");
-			Install.installModules(database);
-
-			Console.println("Installing job queue...");
-			Install.installJobQueue(database);
-
-			Console.println("Done.");
-			Console.flush();
-			return;
-		}
-		
 		/* load the modules */
-		if (!loadModules()) {
+		if (!loadModules())
 			Console.printError("Core", "main", "Unable to load modules.");
-            if (console)
-            	Console.startConsole();
-			return;
-		}
 
-		if (!loadQueue()) {
+		if (!loadQueue())
 			Console.printWarning("Core", "main", "Unable to load task queue."
 					+ " Creating empty queue...");
-		}
 
 		HashSet<String> strings = new HashSet<String>();
 		try {
@@ -312,7 +427,29 @@ public class Core
 		}
 		String[] strarr = new String[strings.size()];
 		strarr = strings.toArray(strarr);
-		database.addProductIds(newegg, strarr);
+		if (database != null)
+			database.addProductIds(newegg, strarr);
+
+		/* run the user-specified script */
+        if (script != null) {
+        	BufferedReader reader = null;
+        	try {
+	        	reader = new BufferedReader(new FileReader(script));
+	        	String line;
+	        	while ((line = reader.readLine()) != null) {
+	        		if (!Console.parseCommand(line))
+	        			return;
+	        	}
+        	} catch (IOException e) {
+        		Console.printError("Core", "main", "Error occured"
+        				+ " while reading script.", e.getMessage());
+        	} finally {
+        		try {
+	        		if (reader != null)
+	        			reader.close();
+        		} catch (IOException e) { }
+        	}
+        }
 
         /* dispatch all tasks in the queue */
 		if (!console) {

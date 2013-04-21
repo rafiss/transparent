@@ -34,9 +34,12 @@ public class Module
 	
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
+	
+	/* the index of this module as it is stored in the persistent database */
+	private int persistentIndex = -1;
 
-	public Module(long id, String path,
-			String moduleName, String sourceName,
+	public Module(long id, String moduleName,
+			String sourceName, String path,
 			PrintStream log, boolean isRemote,
 			boolean blockedDownload)
 	{
@@ -94,15 +97,47 @@ public class Module
 		return log;
 	}
 	
+	public int getPersistentIndex() {
+		return persistentIndex;
+	}
+	
+	@Override
+	public boolean equals(Object that) {
+		if (that == null) return false;
+		else if (that == this) return true;
+		else if (!that.getClass().equals(this.getClass()))
+			return false;
+
+		Module other = (Module) that;
+		return (other.id == id);
+	}
+
+	public boolean deepEquals(Module that) {
+		if (that == null) return false;
+		else if (that == this) return true;
+
+		return (that.id == this.id
+				&& that.path.equals(this.path)
+				&& that.moduleName.equals(this.moduleName)
+				&& that.sourceName.equals(this.sourceName)
+				&& that.remote == this.remote
+				&& that.useBlockedDownload == this.useBlockedDownload); 
+	}
+
+	@Override
+	public int hashCode() {
+		return (int) ((id >> 32) ^ id);
+	}
+	
 	public void logInfo(String className,
 			String methodName, String message)
 	{
 		log.println(className + '.' + methodName + ": " + message);
 		if (logActivity) {
-			Core.println("Module " + getIdString() + " (name: '"
+			Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') information:" + Core.NEWLINE
 					+ className + '.' + methodName + ": " + message);
-			Core.flush();
+			Console.flush();
 		}
 	}
 	
@@ -111,11 +146,11 @@ public class Module
 	{
 		log.println(className + '.' + methodName + " ERROR: " + message);
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString() + " (name: '"
+			Console.lockConsole();
+			Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
-			Core.printError(className, methodName, message);
-			Core.unlockConsole();
+			Console.printError(className, methodName, message);
+			Console.unlockConsole();
 		}
 	}
 	
@@ -125,84 +160,120 @@ public class Module
 		log.println(className + '.' + methodName + " ERROR: "
 				+ message + " Exception thrown: " + exception);
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString() + " (name: '"
+			Console.lockConsole();
+			Console.println("Module " + getIdString() + " (name: '"
 					+ moduleName + "') reported error:");
-			Core.printError(className, methodName, message, exception);
-			Core.unlockConsole();
+			Console.printError(className, methodName, message, exception);
+			Console.unlockConsole();
 		}
 	}
 	
 	public void logUserAgentChange(String newUserAgent)
 	{
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString()
+			Console.lockConsole();
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') changed user agent to: " + newUserAgent);
-			Core.flush();
-			Core.unlockConsole();
+			Console.flush();
+			Console.unlockConsole();
 		}
 	}
 	
 	public void logHttpGetRequest(String url)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP GET: " + url);
-			Core.flush();
+			Console.flush();
 		}
 	}
 	
 	public void logHttpPostRequest(String url, byte[] post)
 	{
 		if (logActivity) {
-			Core.lockConsole();
-			Core.println("Module " + getIdString()
+			Console.lockConsole();
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') requested HTTP POST:");
-			Core.println("\tURL: " + url);
-			Core.print("\tPOST data: ");
+			Console.println("\tURL: " + url);
+			Console.print("\tPOST data: ");
 			try {
-				Core.write(post);
+				Console.write(post);
 			} catch (IOException e) {
-				Core.print("<unable to write data>");
+				Console.print("<unable to write data>");
 			}
-			Core.println();
-			Core.unlockConsole();
-			Core.flush();
+			Console.println();
+			Console.unlockConsole();
+			Console.flush();
 		}
 	}
 	
 	public void logDownloadProgress(int downloaded)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') downloading: " + downloaded + " bytes");
-			Core.flush();
+			Console.flush();
 		}
 	}
 	
 	public void logDownloadCompleted(int downloaded)
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') completed download: " + downloaded + " bytes");
-			Core.flush();
+			Console.flush();
 		}
 	}
 	
 	public void logDownloadAborted()
 	{
 		if (logActivity) {
-			Core.println("Module " + getIdString()
+			Console.println("Module " + getIdString()
 					+ " (name: '" + moduleName
 					+ "') aborted download due to download size limit.");
-			Core.flush();
+			Console.flush();
 		}
+	}
+
+	public static Module load(long id,
+			String name, String source, String path,
+			boolean isRemote, boolean blockedDownload)
+	{
+		PrintStream log;
+		try {
+			File logdir = new File("log");
+			if (!logdir.exists() && !logdir.mkdir()) {
+				Console.printError("Module", "load", "Unable to create log directory."
+						+ " Logging is disabled for this module. (name = " + name
+						+ ", id = " + Core.toUnsignedString(id) + ")");
+				log = new PrintStream(new NullOutputStream());
+			} else if (!logdir.isDirectory()) {
+				Console.printError("Module", "load", "'log' is not a directory."
+						+ " Logging is disabled for this module. (name = " + name
+						+ ", id = " + Core.toUnsignedString(id) + ")");
+				log = new PrintStream(new NullOutputStream());
+			} else {
+				String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
+				File logfile = new File(filename);
+				if (!logfile.exists()) {
+					log = new PrintStream(new FileOutputStream(filename));
+				} else {
+					log = new PrintStream(new FileOutputStream(filename, true));
+				}
+			}
+		} catch (IOException e) {
+			Console.printError("Module", "load", "Unable to initialize output log."
+					+ " Logging is disabled for this module. (name = " + name
+					+ ", id = " + Core.toUnsignedString(id) + ")", e.getMessage());
+			log = new PrintStream(new NullOutputStream());
+		}
+
+		return new Module(id, path, name, source, log, isRemote, blockedDownload);
 	}
 
 	public static Module load(Database database, int index)
@@ -226,45 +297,18 @@ public class Module
 			if (remoteString.equals("0"))
 				remote = false;
 		} catch (RuntimeException e) {
-			Core.printError("Module", "load", "Error loading module id.", e.getMessage());
+			Console.printError("Module", "load", "Error loading module id.", e.getMessage());
 			return null;
 		}
 
-		PrintStream log;
-		try {
-			File logdir = new File("log");
-			if (!logdir.exists() && !logdir.mkdir()) {
-				Core.printError("Module", "load", "Unable to create log directory."
-						+ " Logging is disabled for this module. (name = " + name
-						+ ", id = " + Core.toUnsignedString(id) + ")");
-				log = new PrintStream(new NullOutputStream());
-			} else if (!logdir.isDirectory()) {
-				Core.printError("Module", "load", "'log' is not a directory."
-						+ " Logging is disabled for this module. (name = " + name
-						+ ", id = " + Core.toUnsignedString(id) + ")");
-				log = new PrintStream(new NullOutputStream());
-			} else {
-				String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
-				File logfile = new File(filename);
-				if (!logfile.exists()) {
-					log = new PrintStream(new FileOutputStream(filename));
-				} else {
-					log = new PrintStream(new FileOutputStream(filename, true));
-				}
-			}
-		} catch (IOException e) {
-			Core.printError("Module", "load", "Unable to initialize output log."
-					+ " Logging is disabled for this module. (name = " + name
-					+ ", id = " + Core.toUnsignedString(id) + ")", e.getMessage());
-			log = new PrintStream(new NullOutputStream());
-		}
-
-		return new Module(id, path, name, source, log, remote, blocked);
+		Module module = load(id, name, source, path, remote, blocked);
+		module.persistentIndex = index;
+		return module;
 	}
 	
 	public boolean save(Database database, int index)
 	{
-		return (database.setMetadata(
+		if (database.setMetadata(
 				"module." + index + ".id", getIdString())
 		 && database.setMetadata(
 					"module." + index + "path", path)
@@ -277,7 +321,12 @@ public class Module
 				remote ? "1" : "0")
 		 && database.setMetadata(
 				"module." + index + ".blocked",
-				useBlockedDownload ? "1" : "0"));
+				useBlockedDownload ? "1" : "0"))
+		{
+			persistentIndex = index;
+			return true;
+		}
+		return false;
 	}
 }
 
