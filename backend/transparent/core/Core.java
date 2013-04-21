@@ -181,7 +181,8 @@ public class Core
 						+ "(name: '" + old.getModuleName() + "')");
 				return false;
 			} else {
-				moduleList.add(module);
+				moduleIndexMap.put(moduleIndexMap.size(), module);
+				indexModuleMap.put(module, indexModuleMap.size());
 				return true;
 			}
 		} finally {

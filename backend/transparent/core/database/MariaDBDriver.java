@@ -133,7 +133,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
             for (Entry<String, String> pair : keyValues) {
                 statement.setString(1, module.getIdString());
-                statement.setInt(2, (int) productId.getRowId());
+                statement.setInt(2, productId.getRowId());
                 statement.setString(3, pair.getKey());
                 statement.setString(4, pair.getValue());
                 statement.addBatch();
@@ -552,7 +552,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         Database database = new MariaDBDriver();
 
-        // TODO: i changed the constructor for module
         Module testModule = new Module(1, null, "moduleName", "sourceName", null, false, false);
 
         int numInserts = 1000;
@@ -619,7 +618,7 @@ class ResultSetIterator implements Iterator<ProductID> {
     public ProductID next() {
         try {
             if (resultSet.next()) {
-                return new ProductID(resultSet.getLong(1), resultSet.getString(2));
+                return new ProductID(resultSet.getInt(1), resultSet.getString(2));
             } else {
                 return null;
             }

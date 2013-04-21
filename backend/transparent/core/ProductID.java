@@ -2,15 +2,15 @@ package transparent.core;
 
 public class ProductID
 {
-    private final long rowId;
+    private final int rowId;
 	private final String moduleProductId;
 
 	public ProductID() {
-        this.rowId = 0L;
+        this.rowId = 0;
 		this.moduleProductId = null;
 	}
 	
-	public ProductID(long rowId, String moduleId) {
+	public ProductID(int rowId, String moduleId) {
         this.rowId = rowId;
 		this.moduleProductId = moduleId;
 	}
@@ -19,7 +19,7 @@ public class ProductID
 		return moduleProductId;
 	}
 
-    public long getRowId() {
+    public int getRowId() {
         return rowId;
     }
 }
