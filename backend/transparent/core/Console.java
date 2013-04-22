@@ -1,8 +1,7 @@
 package transparent.core;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,24 +33,22 @@ public class Console
 	private static final String BOLD = new Ansi().bold().toString();
 	private static final String UNBOLD = new Ansi().boldOff().toString();
 	private static final String RED = new Ansi().fg(Color.RED).toString();
+	private static final String GRAY = new Ansi().fgBright(Color.BLACK).toString();
 	private static final String DEFAULT = new Ansi().fg(Color.DEFAULT).toString();
-	
-	private static final BufferedReader in =
-			new BufferedReader(new InputStreamReader(System.in));
-	
+
 	private static List<Token> tokens = new ArrayList<Token>();
-	
+
 	public static Boolean parseBoolean(String token)
 	{
 		if (token.equals("1"))
 			return true;
 		else if (token.equals("0"))
 			return false;
-		
+
 		String lower = token.toLowerCase();
-		if (lower.equals("true"))
+		if (lower.equals("true") || lower.equals("on") || lower.equals("yes"))
 			return true;
-		else if (lower.equals("false"))
+		else if (lower.equals("false") || lower.equals("off") || lower.equals("no"))
 			return false;
 		
 		return null;
@@ -105,9 +102,9 @@ public class Console
 			String methodName, String message)
 	{
 		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold());
+		AnsiConsole.out.print(BOLD);
 		AnsiConsole.out.print(className + '.' + methodName + " WARNING: ");
-		AnsiConsole.out.print(new Ansi().boldOff());
+		AnsiConsole.out.print(UNBOLD);
 		AnsiConsole.out.println(message);
 		unlockConsole();
 	}
@@ -116,9 +113,9 @@ public class Console
 			String methodName, String message)
 	{
 		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
+		AnsiConsole.out.print(RED);
 		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
+		AnsiConsole.out.print(DEFAULT);
 		AnsiConsole.out.println(message);
 		unlockConsole();
 	}
@@ -127,17 +124,17 @@ public class Console
 			String methodName, String message, String exception)
 	{
 		lockConsole();
-		AnsiConsole.out.print(new Ansi().bold().fg(Color.RED));
+		AnsiConsole.out.print(RED);
 		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(new Ansi().boldOff().fg(Color.DEFAULT));
+		AnsiConsole.out.print(DEFAULT);
 		AnsiConsole.out.print(message);
 		if (exception != null) {
 			if (message.length() > 0)
 				AnsiConsole.out.print(' ');
 			AnsiConsole.out.print("Exception thrown. ");
-			AnsiConsole.out.print(new Ansi().fgBright(Color.BLACK));
+			AnsiConsole.out.print(GRAY);
 			AnsiConsole.out.print(exception);
-			AnsiConsole.out.print(new Ansi().fg(Color.DEFAULT));
+			AnsiConsole.out.print(DEFAULT);
 		}
 		AnsiConsole.out.println();
 		unlockConsole();
@@ -356,7 +353,9 @@ public class Console
 					new AddModuleCommand(true),
 					new RemoveModuleCommand(),
 					new LoadModulesCommand(),
-					new SaveModulesCommand());
+					new SaveModulesCommand(),
+					new GetModuleCommand(),
+					new SetModuleCommand());
 		}
 
 		@Override
@@ -463,6 +462,125 @@ public class Console
 					return;
 				} finally {
 					Console.unlockConsole();
+				}
+			} else {
+				/* TODO: implement this */
+			}
+		}
+	}
+
+	private static class GetModuleCommand extends Command
+	{
+		public GetModuleCommand() {
+			super("get");
+		}
+
+		private void usage() {
+			Console.println("usage: modules get [id] [name|source|path|remote|blocked|log]");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() != 4) {
+				lockConsole();
+				Console.println(RED + BOLD + "modules get ERROR:" + UNBOLD + DEFAULT
+						+ " Incorrect number of arguments.");
+				usage();
+				unlockConsole();
+				return;
+			}
+
+			long id;
+			try {
+				id = new BigInteger(args.get(2).getToken()).longValue();
+			} catch (NumberFormatException e) {
+				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+						+ " Unable to parse module id.");
+				return;
+			}
+
+			Module module = Core.getModule(id);
+			String key = args.get(3).getToken();
+			if (key.equals("name"))
+				Console.println(module.getModuleName());
+			else if (key.equals("source"))
+				Console.println(module.getSourceName());
+			else if (key.equals("path"))
+				Console.println(module.getPath());
+			else if (key.equals("remote")) {
+				Console.println(Boolean.toString(module.isRemote()));
+			} else if (key.equals("blocked")) {
+				Console.println(Boolean.toString(module.blockedDownload()));
+			} else if (key.equals("log")) {
+				Console.println(Boolean.toString(module.isLoggingActivity()));
+			}
+		}
+	}
+
+	private static class SetModuleCommand extends Command
+	{
+		public SetModuleCommand() {
+			super("set");
+		}
+
+		private void usage() {
+			Console.println("usage: modules set [id] [name|source|path|remote|blocked|log] [value]");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() != 5) {
+				lockConsole();
+				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+						+ " Incorrect number of arguments.");
+				usage();
+				unlockConsole();
+				return;
+			}
+
+			long id;
+			try {
+				id = new BigInteger(args.get(2).getToken()).longValue();
+			} catch (NumberFormatException e) {
+				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+						+ " Unable to parse module id.");
+				return;
+			}
+
+			Module module = Core.getModule(id);
+			String key = args.get(3).getToken();
+			String value = args.get(4).getToken();
+			if (key.equals("name"))
+				module.setModuleName(value);
+			else if (key.equals("source"))
+				module.setSourceName(value);
+			else if (key.equals("path"))
+				module.setPath(value);
+			else if (key.equals("remote")) {
+				Boolean parsed = parseBoolean(value);
+				if (parsed != null)
+					module.setRemote(parsed);
+				else {
+					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+							+ " Unable to parse boolean parameter.");
+				}
+			} else if (key.equals("blocked")) {
+				Boolean parsed = parseBoolean(value);
+				if (parsed != null)
+					module.setBlockedDownload(parsed);
+				else {
+					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+							+ " Unable to parse boolean parameter.");
+				}
+			} else if (key.equals("log")) {
+				Boolean parsed = parseBoolean(value);
+				if (parsed != null)
+					module.setLoggingActivity(parsed);
+				else {
+					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
+							+ " Unable to parse boolean parameter.");
 				}
 			}
 		}

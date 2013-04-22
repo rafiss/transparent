@@ -12,19 +12,19 @@ import transparent.core.database.Database;
 public class Module
 {
 	/* contains the full command to execute the module, or the remote URL */
-	private final String path;
+	private String path;
 
 	/* name of source for which this module is a parser */
-	private final String sourceName;
+	private String sourceName;
 
 	/* unique name of module */
-	private final String moduleName;
+	private String moduleName;
 
 	/* specifies whether the module is remote */
-	private final boolean remote;
+	private boolean remote;
 
 	/* specifies whether websites should be downloaded in blocks or all at once */
-	private final boolean useBlockedDownload;
+	private boolean useBlockedDownload;
 
 	/* unique integer identifier for the module */
 	private final long id;
@@ -87,6 +87,26 @@ public class Module
 	
 	public boolean isLoggingActivity() {
 		return logActivity;
+	}
+	
+	public void setPath(String path) {
+		this.path = path;
+	}
+	
+	public void setSourceName(String sourceName) {
+		this.sourceName = sourceName;
+	}
+	
+	public void setModuleName(String moduleName) {
+		this.moduleName = moduleName;
+	}
+	
+	public void setRemote(boolean isRemote) {
+		this.remote = isRemote;
+	}
+	
+	public void setBlockedDownload(boolean useBlockedDownload) {
+		this.useBlockedDownload = useBlockedDownload;
 	}
 	
 	public void setLoggingActivity(boolean logActivity) {
@@ -311,7 +331,7 @@ public class Module
 		if (database.setMetadata(
 				"module." + index + ".id", getIdString())
 		 && database.setMetadata(
-					"module." + index + "path", path)
+					"module." + index + ".path", path)
 		 && database.setMetadata(
 				 "module." + index + ".name", moduleName)
 		 && database.setMetadata(

@@ -400,53 +400,6 @@ public class Core
         	}
         }
 
-		HashSet<String> strings = new HashSet<String>();
-		try {
-			Reader r = new InputStreamReader(
-					new BufferedInputStream(new FileInputStream("Entity.sql")));
-			boolean QUOTE_STATE = false;
-			StringBuilder b = new StringBuilder();
-			
-			boolean done = false;
-			while (!done) {
-				int c = r.read();
-				
-				switch (c) {
-				case -1:
-					if (QUOTE_STATE)
-						System.err.println("Should not end in the quote state...");
-					done = true;
-					break;
-				case '\'':
-					if (QUOTE_STATE) {
-						strings.add(b.toString());
-						b = new StringBuilder();
-					}
-					QUOTE_STATE = !QUOTE_STATE;
-					break;
-				
-				default:
-					if (QUOTE_STATE)
-					b.append((char) c);
-				}
-			}
-			r.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
-
-		/* find the newegg module */
-		Module newegg = null;
-		for (Module m : modules.values()) {
-			if (m.getModuleName().equals("NeweggParser"))
-				newegg = m;
-		}
-		String[] strarr = new String[strings.size()];
-		strarr = strings.toArray(strarr);
-		if (database != null)
-			database.addProductIds(newegg, strarr);
-
         /* dispatch all tasks in the queue */
 		if (!console) {
 			for (Task task : queuedJobs)
