@@ -1,6 +1,4 @@
-DROP DATABASE IF EXISTS transparent;
-
-CREATE DATABASE transparent;
+CREATE DATABASE IF NOT EXISTS transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
 GRANT EXECUTE ON PROCEDURE transparent.AddProductId TO 'darius'@'localhost';
@@ -46,6 +44,9 @@ LEFT JOIN transparent.Trait     AS t ON t.property_id      = p.property_id
 
 DELIMITER //
 
+DROP PROCEDURE IF EXISTS transparent.InsertNewAttribute;
+DROP PROCEDURE IF EXISTS transparent.AddProductId;
+
 CREATE PROCEDURE transparent.InsertNewAttribute(
     IN moduleId TEXT,
     IN entityId INT,
@@ -81,13 +82,10 @@ CREATE PROCEDURE transparent.AddProductId(
     IN moduleProductId TEXT)
     SQL SECURITY INVOKER
 BEGIN
-    DECLARE alreadyExists, generatedEntityId INT;
+    DECLARE alreadyExists, generatedEntityId INT DEFAULT 0;
     DECLARE fieldName TEXT DEFAULT 'module_id';
 
-    SELECT EXISTS(SELECT 1 FROM vModel WHERE
-        PropertyName=fieldName AND
-        TraitValue=moduleId AND
-        EntityName=moduleProductId) INTO alreadyExists;
+
 
     IF alreadyExists = 0 THEN
         INSERT INTO Entity VALUES(NULL, moduleProductId);

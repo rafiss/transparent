@@ -64,14 +64,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
                 statement.setString(2, moduleProductId);
                 statement.addBatch();
 
-                if (++index % 1000 == 0) {
-                    statement.executeBatch();
-                    statement.clearBatch();
-                }
-
+				if (++index % 1000 == 0) {
+					statement.executeBatch();
+					statement.clearBatch();
+				}
             }
 
-            if (index % 1000 != 0) {
+	        if (index % 1000 != 0) {
                 statement.executeBatch();
             }
             connection.commit();
