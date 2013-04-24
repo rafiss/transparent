@@ -1,55 +1,98 @@
-DROP DATABASE IF EXISTS transparent;
-
-CREATE DATABASE transparent;
-USE transparent;
+CREATE DATABASE IF NOT EXISTS transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.AddProductId TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.InsertNewAttribute TO 'darius'@'localhost';
 
-CREATE TABLE IF NOT EXISTS Entity (
-    entity_id INT AUTO_INCREMENT,
-    name TEXT,
-    PRIMARY KEY (entity_id)
+CREATE TABLE IF NOT EXISTS transparent.Metadata (
+    `meta_key` TEXT,
+    `meta_value` TEXT
 );
 
-CREATE TABLE IF NOT EXISTS PropertyType (
-    property_type_id INT AUTO_INCREMENT,
-    property_name VARCHAR(512),  -- A limitation of UNIQUE keys -- TODO(asaparov): I removed UNIQUE because mysql was complaining about the key size being too big.
-    is_trait BOOL, -- TODO(asaparov): I changed this to a boolean type for better performance
-    PRIMARY KEY (property_type_id)
+CREATE TABLE IF NOT EXISTS transparent.Entity (
+    `entity_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    `name` TEXT
 );
 
-CREATE TABLE IF NOT EXISTS Property (
-    property_id INT AUTO_INCREMENT,
-    entity_id INT,
-    property_type_id INT,
-    PRIMARY KEY (property_id),
-    FOREIGN KEY (entity_id) REFERENCES Entity(entity_id),
-    FOREIGN KEY (property_type_id) REFERENCES PropertyType(property_type_id)
+CREATE TABLE IF NOT EXISTS transparent.PropertyType (
+    `property_type_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    `property_name` TEXT
 );
 
-CREATE TABLE IF NOT EXISTS Measurement (
-    property_id INT,
-    unit TEXT,
-    value INT,
-    FOREIGN KEY (property_id) REFERENCES Property(property_id)
+CREATE TABLE IF NOT EXISTS transparent.Property (
+    `property_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    `entity_id` INT NOT NULL,
+    `property_type_id` INT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS Trait (
-    property_id INT,
-    value TEXT,
-    FOREIGN KEY (property_id) REFERENCES Property(property_id)
+CREATE TABLE IF NOT EXISTS transparent.Trait (
+    `property_id` INT PRIMARY KEY NOT NULL,
+    `value` TEXT
 );
 
-CREATE OR REPLACE VIEW vModel AS
+CREATE OR REPLACE VIEW transparent.vModel AS
 SELECT
       e.entity_id AS EntityID
+    , e.name AS EntityName
     , x.property_name AS PropertyName
-    , m.value AS MeasurementValue
-    , m.unit AS MeasurementUnit
     , t.value AS TraitValue
-FROM Entity           AS e
-JOIN Property         AS p ON p.entity_id        = p.entity_id
-JOIN PropertyType     AS x ON x.property_type_id = p.property_type_id
-LEFT JOIN Measurement AS m ON m.property_id      = p.property_id
-LEFT JOIN Trait       AS t ON t.property_id      = p.property_id
+FROM transparent.Entity         AS e
+JOIN transparent.Property       AS p ON e.entity_id        = p.entity_id
+JOIN transparent.PropertyType   AS x ON x.property_type_id = p.property_type_id
+LEFT JOIN transparent.Trait     AS t ON t.property_id      = p.property_id
 ;
+
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS transparent.InsertNewAttribute;
+DROP PROCEDURE IF EXISTS transparent.AddProductId;
+
+CREATE PROCEDURE transparent.InsertNewAttribute(
+    IN moduleId TEXT,
+    IN entityId INT,
+    IN keyName TEXT,
+    IN valueName TEXT)
+    SQL SECURITY INVOKER
+BEGIN
+    DECLARE propertyTypeId, propertyId INT;
+
+    SELECT property_type_id FROM PropertyType
+        WHERE property_name=keyName
+        INTO propertyTypeId;
+
+    IF propertyTypeId IS NULL THEN
+        INSERT INTO PropertyType VALUES(NULL, keyName);
+        SET propertyTypeId = LAST_INSERT_ID();
+    END IF;
+
+    SELECT property_id FROM Property
+        WHERE entity_id=entityId AND property_type_id=propertyTypeId
+        INTO propertyId;
+
+    IF propertyId IS NULL THEN
+        INSERT INTO Property VALUES(NULL, entityId, propertyTypeId);
+        SET propertyId = LAST_INSERT_ID();
+    END IF;
+
+    REPLACE INTO Trait VALUES(propertyId, valueName);
+END//
+
+CREATE PROCEDURE transparent.AddProductId(
+    IN moduleId TEXT,
+    IN moduleProductId TEXT)
+    SQL SECURITY INVOKER
+BEGIN
+    DECLARE alreadyExists, generatedEntityId INT DEFAULT 0;
+    DECLARE fieldName TEXT DEFAULT 'module_id';
+
+
+
+    IF alreadyExists = 0 THEN
+        INSERT INTO Entity VALUES(NULL, moduleProductId);
+        SET generatedEntityId = LAST_INSERT_ID();
+        CALL transparent.InsertNewAttribute(
+            moduleId, generatedEntityId, fieldName, moduleId);
+    END IF;
+END//
+
+DELIMITER ;

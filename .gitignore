@@ -17,6 +17,9 @@ backend/bin/
 # C extensions
 *.so
 
+# log files
+log
+
 # Packages
 *.egg
 *.egg-info
@@ -29,6 +32,6 @@ var
 sdist
 develop-eggs
 .installed.cfg
-lib
+frontend/lib
 lib64
 __pycache__
