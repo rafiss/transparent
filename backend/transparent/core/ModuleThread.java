@@ -55,7 +55,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.userAgent = DEFAULT_USER_AGENT;
 	}
 	
-	private void stop() {
+	public void stop() {
 		this.alive = false;
 	}
 	
@@ -80,7 +80,6 @@ public class ModuleThread implements Runnable, Interruptable
 					total += read;
 					if (total > MAX_DOWNLOAD_SIZE)
 						break;
-					module.logDownloadProgress(total);
 					dest.writeShort(read);
 					dest.write(buf, 0, read);
 				}
@@ -92,8 +91,6 @@ public class ModuleThread implements Runnable, Interruptable
 			int read = stream.read();
 			total = read;
 			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
-				if (total > 0)
-					module.logDownloadProgress(total);
 				page.write(read);
 				read = stream.read();
 				total += read;
@@ -237,10 +234,10 @@ public class ModuleThread implements Runnable, Interruptable
 	{
 		pipe.stop();
 		piper.interrupt();
+		process.destroy();
 		try {
 			piper.join();
 		} catch (InterruptedException e) { }
-		process.destroy();
 	}
 	
 	public void setRequestType(byte requestType) {

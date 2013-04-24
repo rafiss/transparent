@@ -7,6 +7,7 @@ SRCS = \
 	transparent/core/Sandbox.java \
 	transparent/core/NoSandbox.java \
 	transparent/core/Core.java \
+	transparent/core/Task.java \
 	transparent/core/Console.java \
 	transparent/core/Interruptable.java \
 	transparent/core/InterruptableInputStream.java \

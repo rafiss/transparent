@@ -35,8 +35,18 @@ public class Module
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
 
-	/* the index of this module as it is stored in the persistent database */
+	/**
+	 * The index of this module as it is stored in the persistent database.
+	 * A value of -1 indicates either this module is not stored in the 
+	 * underlying database, or that the stored copy is stale.
+	 */
 	private int persistentIndex = -1;
+
+	/**
+	 * The newly-assigned index of this module as it will be stored
+	 * in the persistent database when it is saved.
+	 */
+	private int index = -1;
 
 	public Module(long id, String moduleName,
 			String sourceName, String path,
@@ -51,7 +61,7 @@ public class Module
 		this.id = id;
 		this.log = log;
 	}
-	
+
 	/**
 	 * WARNING: do not convert this directly to a string, as Java will
 	 * interpret it as a signed value. Use {@link Module#getIdString()}
@@ -60,11 +70,11 @@ public class Module
 	public long getId() {
 		return id;
 	}
-	
+
 	public String getIdString() {
 		return Core.toUnsignedString(id);
 	}
-	
+
 	public String getPath() {
 		return path;
 	}
@@ -76,51 +86,66 @@ public class Module
 	public String getModuleName() {
 		return moduleName;
 	}
-	
+
 	public boolean isRemote() {
 		return remote;
 	}
-	
+
 	public boolean blockedDownload() {
 		return useBlockedDownload;
 	}
-	
+
 	public boolean isLoggingActivity() {
 		return logActivity;
 	}
-	
+
 	public void setPath(String path) {
 		this.path = path;
+		this.persistentIndex = -1;
 	}
-	
+
 	public void setSourceName(String sourceName) {
 		this.sourceName = sourceName;
+		this.persistentIndex = -1;
 	}
-	
+
 	public void setModuleName(String moduleName) {
 		this.moduleName = moduleName;
+		this.persistentIndex = -1;
 	}
-	
+
 	public void setRemote(boolean isRemote) {
+		if (this.remote != isRemote)
+			this.persistentIndex = -1;
 		this.remote = isRemote;
 	}
-	
+
 	public void setBlockedDownload(boolean useBlockedDownload) {
+		if (this.useBlockedDownload != useBlockedDownload)
+			this.persistentIndex = -1;
 		this.useBlockedDownload = useBlockedDownload;
 	}
-	
+
 	public void setLoggingActivity(boolean logActivity) {
 		this.logActivity = logActivity;
 	}
-	
+
 	public PrintStream getLogStream() {
 		return log;
 	}
-	
+
 	public int getPersistentIndex() {
 		return persistentIndex;
 	}
-	
+
+	public int getIndex() {
+		return index;
+	}
+
+	public void setIndex(int index) {
+		this.index = index;
+	}
+
 	@Override
 	public boolean equals(Object that) {
 		if (that == null) return false;
@@ -130,18 +155,6 @@ public class Module
 
 		Module other = (Module) that;
 		return (other.id == id);
-	}
-
-	public boolean deepEquals(Module that) {
-		if (that == null) return false;
-		else if (that == this) return true;
-
-		return (that.id == this.id
-				&& that.path.equals(this.path)
-				&& that.moduleName.equals(this.moduleName)
-				&& that.sourceName.equals(this.sourceName)
-				&& that.remote == this.remote
-				&& that.useBlockedDownload == this.useBlockedDownload); 
 	}
 
 	@Override
@@ -323,6 +336,7 @@ public class Module
 
 		Module module = load(id, name, source, path, remote, blocked);
 		module.persistentIndex = index;
+		module.index = index;
 		return module;
 	}
 	
@@ -343,7 +357,8 @@ public class Module
 				"module." + index + ".blocked",
 				useBlockedDownload ? "1" : "0"))
 		{
-			persistentIndex = index;
+			this.persistentIndex = index;
+			this.index = index;
 			return true;
 		}
 		return false;

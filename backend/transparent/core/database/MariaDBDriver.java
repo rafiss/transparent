@@ -52,7 +52,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
         CallableStatement statement = null;
-        String query = "{ CALL transparent.AddProductId(?, ?) }";
+        String query = "{ CALL transparent.AddProductId(?, ?, ?) }";
         int index = 0;
 
         try {
@@ -61,17 +61,22 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
             for (String moduleProductId : moduleProductIds) {
                 statement.setString(1, module.getIdString());
-                statement.setString(2, moduleProductId);
-                statement.addBatch();
+                statement.setLong(2, module.getId());
+                statement.setString(3, moduleProductId);
+                //statement.addBatch();
+                statement.executeUpdate();
+
+                if (index % 100 == 0)
+                	Console.printWarning("Ajay", "Roopakalu", "index: " + index);
 
 				if (++index % 1000 == 0) {
-					statement.executeBatch();
-					statement.clearBatch();
+					//statement.executeBatch();
+					//statement.clearBatch();
 				}
             }
 
 	        if (index % 1000 != 0) {
-                statement.executeBatch();
+                //statement.executeBatch();
             }
             connection.commit();
 
@@ -95,13 +100,12 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public Iterator<ProductID> getProductIds(Module module) {
         PreparedStatement statement = null;
         try {
-            String[] columns = new String[] { "PropertyName", "TraitValue" };
+            String[] columns = new String[] { "ModuleID" };
             statement = connection.prepareStatement(buildSelectTemplate(MODEL_NAME,
                                                                         "EntityID, EntityName",
-                                                                        "EntityID",
+                                                                        null,
                                                                         columns));
-            statement.setString(1, MODULE_ID);
-            statement.setString(2, module.getIdString());
+            statement.setString(1, module.getIdString());
             return new ResultSetIterator(module, statement.executeQuery());
         } catch (SQLException e) {
             module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());

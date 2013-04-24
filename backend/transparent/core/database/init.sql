@@ -1,3 +1,4 @@
+DROP DATABASE IF EXISTS transparent;
 CREATE DATABASE IF NOT EXISTS transparent;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
@@ -11,7 +12,8 @@ CREATE TABLE IF NOT EXISTS transparent.Metadata (
 
 CREATE TABLE IF NOT EXISTS transparent.Entity (
     `entity_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-    `name` TEXT
+    `name` TEXT,
+	`module_id` LONG NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS transparent.PropertyType (
@@ -33,6 +35,7 @@ CREATE TABLE IF NOT EXISTS transparent.Trait (
 CREATE OR REPLACE VIEW transparent.vModel AS
 SELECT
       e.entity_id AS EntityID
+	, e.module_id AS ModuleID
     , e.name AS EntityName
     , x.property_name AS PropertyName
     , t.value AS TraitValue
@@ -78,20 +81,20 @@ BEGIN
 END//
 
 CREATE PROCEDURE transparent.AddProductId(
-    IN moduleId TEXT,
+    IN moduleIdString TEXT,
+	IN moduleIdLong LONG,
     IN moduleProductId TEXT)
     SQL SECURITY INVOKER
 BEGIN
-    DECLARE alreadyExists, generatedEntityId INT DEFAULT 0;
+    DECLARE generatedEntityId INT;
     DECLARE fieldName TEXT DEFAULT 'module_id';
 
+	SELECT entity_id from Entity WHERE
+		name=moduleProductId AND
+		module_id=moduleIdLong INTO generatedEntityId;
 
-
-    IF alreadyExists = 0 THEN
-        INSERT INTO Entity VALUES(NULL, moduleProductId);
-        SET generatedEntityId = LAST_INSERT_ID();
-        CALL transparent.InsertNewAttribute(
-            moduleId, generatedEntityId, fieldName, moduleId);
+    IF generatedEntityId IS NULL THEN
+        INSERT INTO Entity VALUES(NULL, moduleProductId, moduleIdLong);
     END IF;
 END//
 

@@ -19,6 +19,7 @@ backend/bin/
 
 # log files
 log
+backend/history
 
 # Packages
 *.egg
