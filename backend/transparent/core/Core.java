@@ -10,6 +10,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -29,8 +31,9 @@ import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
+import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
+import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler.Operator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
@@ -94,7 +97,7 @@ public class Core
 	/* for product name search indexing */
 	private static IndexWriter indexWriter = null;
 	private static IndexSearcher searcher = null;
-	private static QueryParser parser = null;
+	private static StandardQueryParser parser = null;
 	private static int indexCounter = 0;
 	private static final int INDEX_PERIOD = 1024;
 
@@ -180,7 +183,6 @@ public class Core
 
 		/* periodically refresh our index reader */
 		indexCounter++;
-		indexCounter = 0;
 		if (indexCounter % INDEX_PERIOD == 0) {
 			try {
 				searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
@@ -191,15 +193,32 @@ public class Core
 		}
 	}
 
+	private static HashSet<Character> special = new HashSet<Character>(Arrays.asList(
+			'&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', ':', '\\', '/'));
+
+	private static String sanitize(String search) {
+		StringBuilder builder = new StringBuilder();
+		for (int i = 0; i < search.length(); i++) {
+			if (special.contains(search.charAt(i)))
+				builder.append('\\');
+			builder.append(search.charAt(i));
+		}
+		return builder.toString();
+	}
+
 	public static Iterator<ProductID> searchProductName(String term)
 	{
 		Query query = null;
 		try {
-			query = parser.parse(term);
-		} catch (ParseException e) {
-			Console.printError("Core", "searchProductName",
-					"Unable to parse search query.", e.getMessage());
-			return null;
+			query = parser.parse(term, PRODUCT_NAME_FIELD);
+		} catch (QueryNodeException e) {
+			try {
+				query = parser.parse(sanitize(term), PRODUCT_NAME_FIELD);
+			} catch (QueryNodeException e2) {
+				Console.printError("Core", "searchProductName",
+						"Unable to parse search query.", e2.getMessage());
+				return null;
+			}
 		}
 
 		try {
@@ -644,7 +663,6 @@ public class Core
         	} else {
         		directory = FSDirectory.open(index);
     	        indexWriter = new IndexWriter(directory, config);
-        		DirectoryReader reader = DirectoryReader.open(indexWriter, false);
     	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
         	}
         } catch (IOException e) {
@@ -659,7 +677,8 @@ public class Core
             			+ "create memory index.", e2.getMessage());
         	}
         }
-        parser = new QueryParser(Version.LUCENE_42, PRODUCT_NAME_FIELD, analyzer);
+        parser = new StandardQueryParser(analyzer);
+        parser.setDefaultOperator(Operator.AND);
 
         /* load the script engine */
         boolean consoleReady = Console.initConsole();
