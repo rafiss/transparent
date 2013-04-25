@@ -24,7 +24,7 @@ SRCS = \
 
 JC=javac
 JFLAGS=-cp lib/jansi-1.9.jar:lib/mariadb-java-client-1.1.0.jar:lib/jline-1.0.jar:.
-MODULES=newegg
+MODULES=newegg amazon
 
 #
 # Compile command
@@ -47,11 +47,11 @@ default: all
 
 all: core modules
 
-modules:
-		${MAKE} -C transparent/modules/${MODULES} all
+modules: ; $(foreach dir,$(MODULES),${MAKE} -C transparent/modules/$(dir) all &&) :
 
 core: ${SRCS:.java=.class}
 
 clean:
-		${RM} -f core/*.class; ${MAKE} -C transparent/modules/${MODULES} clean
-
+	$(foreach dir,$(MODULES),${MAKE} -C transparent/modules/$(dir) clean &&) :
+	${RM} -f transparent/core/*.class;
+	${RM} -f transparent/core/database/*.class;

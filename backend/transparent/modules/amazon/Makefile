@@ -11,14 +11,14 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=
+JFLAGS=-cp jsoup-1.7.2.jar
 
 #
 # Compile command
 #
 
-.java.class:
-		${JC} ${JFLAGS} -cp jsoup-1.7.2.jar $*.java
+%.class : %.java
+		${JC} ${JFLAGS} $<
 
 #
 # GNU Make: targets that don't build files

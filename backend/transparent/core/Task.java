@@ -1,5 +1,6 @@
 package transparent.core;
 
+import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -33,6 +34,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 	private int persistentIndex = -1;
 	private int index = -1;
 	private boolean running = false;
+	private boolean stopped = false;
 
 	public Task(TaskType type, Module module,
 			long time, boolean reschedules, boolean dummy)
@@ -129,8 +131,8 @@ public class Task implements Comparable<Task>, Callable<Object>
 			return null;
 		}
 
-		long id = Long.parseLong(tokens[1]);
-		long time = Long.parseLong(tokens[2]);
+		long id = new BigInteger(tokens[1]).longValue();
+		long time = new BigInteger(tokens[2]).longValue();
 		boolean reschedules = !tokens[3].equals("0");
 		boolean dummy = !tokens[4].equals("0");
 
@@ -183,6 +185,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 		if (data != null && database.setMetadata(queue + "." + index, data)) {
 			this.persistentIndex = index;
 			this.index = index;
+			return true;
 		}
 		return false;
 	}
@@ -196,9 +199,11 @@ public class Task implements Comparable<Task>, Callable<Object>
 		else return 0;
 	}
 
-	public void stop() {
+	public void stop(boolean cancelRescheduling) {
 		if (wrapper != null)
 			wrapper.stop();
+		if (cancelRescheduling)
+			this.stopped = true;
 	}
 
 	@Override
@@ -212,22 +217,40 @@ public class Task implements Comparable<Task>, Callable<Object>
 			wrapper = new ModuleThread(module, dummy);
 			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
 			wrapper.run();
-			Core.stopTask(this);
+			Core.stopTask(this, false);
+			if (reschedules && !stopped) {
+				Core.queueTask(new Task(TaskType.PRODUCT_INFO_PARSE,
+						module, System.currentTimeMillis(), true, dummy));
+				if (!Core.saveQueue())
+					Console.printError("Task", "call", "Unable to save tasks.");
+			}
 			return null;
 		case PRODUCT_INFO_PARSE:
 			wrapper = new ModuleThread(module, dummy);
 			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
 			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
 			wrapper.run();
-			Core.stopTask(this);
+			Core.stopTask(this, false);
+			if (reschedules && !stopped) {
+				Core.queueTask(new Task(TaskType.PRODUCT_LIST_PARSE,
+						module, System.currentTimeMillis(), true, dummy));
+				if (!Core.saveQueue())
+					Console.printError("Task", "call", "Unable to save tasks.");
+			}
 			return null;
 		case IMAGE_FETCH:
 			Console.printError("Task", "call", "Image fetching not implemented.");
-			Core.stopTask(this);
+			Core.stopTask(this, false);
+			if (reschedules) {
+				Core.queueTask(new Task(TaskType.IMAGE_FETCH,
+						module, System.currentTimeMillis(), true, dummy));
+				if (!Core.saveQueue())
+					Console.printError("Task", "call", "Unable to save tasks.");
+			}
 			return null;
 		default:
 			Console.printError("Task", "call", "Unrecognized task type.");
-			Core.stopTask(this);
+			Core.stopTask(this, true);
 			return null;
 		}
 	}

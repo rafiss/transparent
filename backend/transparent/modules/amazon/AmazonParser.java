@@ -30,10 +30,53 @@ public class AmazonParser
 	private static final String PAGE_NUMBER = "&page=";
 
 	private static final String[] CATEGORY_URLS = new String[] {
-		"http://www.amazon.com/gp/search/ref=sr_nr_n_0?rh=n%3A572238",
-		"http://www.amazon.com/gp/search/ref=sr_nr_n_1?rh=n%3A229189",
-		"http://www.amazon.com/gp/search/ref=sr_nr_n_3?rh=n%3A3012290011",
-		"http://www.amazon.com/gp/search/ref=sr_nr_n_4?rh=n%3A284822"
+		/* Computer Cases */
+		"http://www.amazon.com/s/ref=sr_nr_n_0?rh=n%3A572238",
+
+		/* CPU Processors */
+		"http://www.amazon.com/s/ref=sr_nr_n_1?rh=n%3A229189",
+
+		/* Fans & Cooling */
+		"http://www.amazon.com/s/ref=sr_nr_n_3?rh=n%3A3012290011",
+
+		/* Graphics Cards */
+		"http://www.amazon.com/s/ref=sr_nr_n_4?rh=n%3A284822",
+
+		/* I/O Port Cards */
+		"http://www.amazon.com/s/ref=sr_nr_n_4?rh=n%3A3012291011",
+
+		/* Internal Hard Drives */
+		"http://www.amazon.com/s/ref=sr_nr_n_4?rh=n%3A1254762011",
+
+		/* Internal Optical Drives */
+		"http://www.amazon.com/s/ref=sr_nr_n_8?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A1292107011",
+
+		/* Internal Sound Cards */
+		"http://www.amazon.com/s/ref=sr_nr_n_9?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A284823",
+
+		/* Memory */
+		"http://www.amazon.com/s/ref=sr_nr_n_11?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A172500",
+
+		/* Motherboards */
+		"http://www.amazon.com/s/ref=sr_nr_n_12?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A1048424",
+
+		/* Network Cards */
+		"http://www.amazon.com/s/ref=sr_nr_n_13?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A13983711",
+
+		/* Power Supplies */
+		"http://www.amazon.com/s/ref=sr_nr_n_14?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A1161760",
+
+		/* Video Capture Cards */
+		"http://www.amazon.com/s/ref=sr_nr_n_15?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A284824",
+
+		/* Internal Modems */
+		"http://www.amazon.com/s/ref=sr_nr_n_16?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A172508",
+
+		/* Internal Solid State Drives */
+		"http://www.amazon.com/s/ref=sr_nr_n_17?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A1292116011",
+
+		/* Internal Memory Card Readers */
+		"http://www.amazon.com/s/ref=sr_nr_n_18?rh=n%3A172282%2Cn%3A!493964%2Cn%3A541966%2Cn%3A193870011%2Cn%3A3310626011"
 	};
 
 	private static final DataOutputStream out =
@@ -163,7 +206,7 @@ public class AmazonParser
 					price = elements.last().select(".newp").text();
 				else price = priceElement.text();
 				
-				lowPrice = price;
+				lowPrice = price.trim().replaceAll("\\$", "");
 				page = 0;
 			}
 			productIds.clear();
@@ -192,7 +235,7 @@ public class AmazonParser
 				break;
 			case PRODUCT_INFO_REQUEST:
 				int length = in.readUnsignedShort();
-				while (length  > 0) {
+				while (length > 0) {
 					byte[] data = new byte[length];
 					in.readFully(data);
 					parseProductInfo(new String(data, UTF8));

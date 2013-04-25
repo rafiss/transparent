@@ -30,7 +30,6 @@ public class Core
 	private static final String MODULE_COUNT = "modules.count";
 	private static final String RUNNING_TASKS = "running";
 	private static final String QUEUED_TASKS = "queued";
-	private static final String CONSOLE_FLAG = "--console";
 	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
@@ -42,8 +41,6 @@ public class Core
 	private static ScheduledExecutorService dispatcher =
 			Executors.newScheduledThreadPool(THREAD_POOL_SIZE);
 	private static ReentrantLock tasksLock = new ReentrantLock();
-	private static ArrayList<Task> queuedTasks = new ArrayList<Task>();
-	private static ArrayList<Task> runningTasks = new ArrayList<Task>();
 	
 	private static long seed = 0;
 
@@ -221,23 +218,18 @@ public class Core
 			boolean success = true;
 			for (int index = 0; index < moduleList.size(); index++) {
 				Module module = moduleList.get(index);
-				if (index < moduleList.size()) {
-					if ((module.getIndex() == -1
-							|| module.getPersistentIndex() != module.getIndex())
-							&& !module.save(database, index))
-					{
-						Console.printError("Core", "saveModules", "Unable to save module '"
-								+ module.getModuleName() + "' (id: " + module.getIdString()
-								+ ") at position " + index + ".");
-						success = false;
-					}
+				if ((module.getIndex() == -1
+						|| module.getPersistentIndex() != module.getIndex())
+						&& !module.save(database, index))
+				{
+					Console.printError("Core", "saveModules", "Unable to save module '"
+							+ module.getModuleName() + "' (id: " + module.getIdString()
+							+ ") at position " + index + ".");
+					moduleList.set(index, null);
+					module.setIndex(-1);
+					success = false;
 				} else {
-					if (!module.save(database, index)) {
-						Console.printError("Core", "saveModules", "Unable to save module '"
-								+ module.getModuleName() + "' (id: " + module.getIdString()
-								+ ") at position " + index + ".");
-						success = false;
-					}
+					moduleList.set(index, module);
 				}
 			}
 
@@ -251,8 +243,7 @@ public class Core
 		}
 	}
 
-	private static boolean loadQueue(
-			String queue, ArrayList<Task> list, ArrayList<Task> tasks)
+	private static boolean loadQueue(String queue, ArrayList<Task> list)
 	{
 		int taskCount;
 		try {
@@ -270,43 +261,38 @@ public class Core
 
 		list.ensureCapacity(taskCount);
 		for (int i = 0; i < taskCount; i++) {
+			if (list.size() > i && list.get(i) != null) {
+				Console.printError("Core", "loadQueue",
+						"A task already exists at index " + i + ".");
+				continue;
+			}
 			Task task = Task.load(database, queue, i);
 			list.add(task);
-			tasks.add(task);
-
-			if (task != null)
-				tasks.add(task);
 		}
 		return true;
 	}
 
-	private static boolean saveQueue(boolean isRunning,
-			ArrayList<Task> list, ArrayList<Task> tasks)
+	private static boolean saveQueue(
+			boolean isRunning, ArrayList<Task> list)
 	{
 		String queue = getQueueName(isRunning);
 
 		boolean success = true;
 		for (int index = 0; index < list.size(); index++) {
 			Task task = list.get(index);
-			if (index < list.size()) {
-				if ((task.getIndex() == -1 || task.isRunning() != isRunning
-						|| task.getPersistentIndex() != task.getIndex())
-						&& !task.save(database, isRunning, index))
-				{
-					Module module = task.getModule();
-					Console.printError("Core", "saveQueue", "Unable to save task (module name: '"
-							+ module.getModuleName() + "', id: " + module.getIdString()
-							+ ") at position " + index + ".");
-					success = false;
-				}
+			if ((task.getIndex() == -1 || task.isRunning() != isRunning
+					|| task.getPersistentIndex() != task.getIndex())
+					&& !task.save(database, isRunning, index))
+			{
+				Module module = task.getModule();
+				Console.printError("Core", "saveQueue", "Unable to save task (module name: '"
+						+ module.getModuleName() + "', id: " + module.getIdString()
+						+ ") at position " + index + ".");
+				task.setIndex(-1);
+				list.set(index, null);
+				success = false;
 			} else {
-				if (!task.save(database, isRunning, index)) {
-					Module module = task.getModule();
-					Console.printError("Core", "saveQueue", "Unable to save task (module name: '"
-							+ module.getModuleName() + "', id: " + module.getIdString()
-							+ ") at position " + index + ".");
-					success = false;
-				}
+				list.set(index, task);
 			}
 		}
 
@@ -327,8 +313,18 @@ public class Core
 
 		tasksLock.lock();
 		try {
-			return (loadQueue("running", runningList, runningTasks)
-					&& loadQueue("queued", queuedList, queuedTasks));
+			boolean success = (loadQueue("running", runningList)
+					&& loadQueue("queued", queuedList));
+
+	        /* dispatch all tasks in the queue */
+			for (Task task : runningList) {
+				task.setRunning(true);
+				dispatchTask(task);
+			}
+			for (Task task : queuedList)
+				dispatchTask(task);
+
+			return success;
 		} finally {
 			tasksLock.unlock();
 		}
@@ -344,8 +340,8 @@ public class Core
 
 		tasksLock.lock();
 		try {
-			return (saveQueue(true, runningList, runningTasks)
-					&& saveQueue(false, queuedList, queuedTasks));
+			return (saveQueue(true, runningList)
+					&& saveQueue(false, queuedList));
 		} finally {
 			tasksLock.unlock();
 		}
@@ -378,7 +374,7 @@ public class Core
 	{
 		modulesLock.lock();
 		try {
-			return queuedTasks.size() + runningTasks.size();
+			return queuedList.size() + runningList.size();
 		} finally {
 			modulesLock.unlock();
 		}
@@ -388,7 +384,7 @@ public class Core
 		/* to ensure we get a thread-safe snapshot of the queued tasks */
 		tasksLock.lock();
 		try {
-			return new ArrayList<Task>(queuedTasks);
+			return new ArrayList<Task>(queuedList);
 		} finally {
 			tasksLock.unlock();
 		}
@@ -398,7 +394,7 @@ public class Core
 		/* to ensure we get a thread-safe snapshot of the running tasks */
 		tasksLock.lock();
 		try {
-			return new ArrayList<Task>(runningTasks);
+			return new ArrayList<Task>(runningList);
 		} finally {
 			tasksLock.unlock();
 		}
@@ -412,6 +408,22 @@ public class Core
 		return sandbox;
 	}
 
+	public static void queueTask(Task task)
+	{
+		if (task.isRunning() || task.getIndex() != -1)
+			return;
+
+		tasksLock.lock();
+		try {
+			task.setRunning(false);
+			task.setIndex(queuedList.size());
+			queuedList.add(task);
+			dispatchTask(task);
+		} finally {
+			tasksLock.unlock();
+		}
+	}
+
 	public static void startTask(Task task)
 	{
 		if (task.isRunning())
@@ -420,12 +432,14 @@ public class Core
 		tasksLock.lock();
 		try {
 			int index = task.getIndex();
-			if (index < 0 || index >= queuedTasks.size())
+			if (index < 0 || index >= queuedList.size())
 				return;
-			queuedTasks.remove(index);
+			queuedList.remove(index);
 			task.setRunning(true);
-			task.setIndex(runningTasks.size());
-			runningTasks.add(task);
+			task.setIndex(runningList.size());
+			runningList.add(task);
+			if (!saveQueue())
+				Console.printError("Core", "startTask", "Unable to save tasks.");
 		} finally {
 			tasksLock.unlock();
 		}
@@ -450,34 +464,19 @@ public class Core
 		}
 	}
 
-	public static void stopTask(Task task)
+	public static void stopTask(Task task, boolean cancelRescheduling)
 	{
 		tasksLock.lock();
 		try {
 			if (task.isRunning())
-				removeTask(runningTasks, task);
-			else removeTask(queuedTasks, task);
+				removeTask(runningList, task);
+			else removeTask(queuedList, task);
 			Task.removeTask(task.getId());
 
 			/* interrupt the thread if it is running */
 			ScheduledFuture<Object> thread = task.getFuture();
+			task.stop(cancelRescheduling);
 			thread.cancel(true);
-		} finally {
-			tasksLock.unlock();
-		}
-	}
-
-	public static void queueTask(Task task)
-	{
-		if (task.isRunning() || task.getIndex() != -1)
-			return;
-
-		tasksLock.lock();
-		try {
-			task.setRunning(false);
-			task.setIndex(queuedTasks.size());
-			queuedTasks.add(task);
-			dispatchTask(task);
 		} finally {
 			tasksLock.unlock();
 		}
@@ -496,7 +495,6 @@ public class Core
 
 		/* parse argument flags */
 		String script = DEFAULT_SCRIPT;
-		boolean console = false;
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].equals(SCRIPT_FLAG)) {
 				if (i + 1 < args.length) {
@@ -505,8 +503,6 @@ public class Core
 				} else {
 					Console.printError("Core", "main", "Unspecified script filepath.");
 				}
-			} else if (args[i].equals(CONSOLE_FLAG)) {
-				console = true;
 			} else if (args[i].equals(HELP_FLAG)) {
 				/* TODO: implement this */
 			} else {
@@ -554,12 +550,6 @@ public class Core
         	}
         }
 
-        /* dispatch all tasks in the queue */
-		if (!console) {
-			for (Task task : queuedTasks)
-				dispatchTask(task);
-		}
-
 		/* start the main loop */
 		if (consoleReady)
 			Console.runConsole();
@@ -567,9 +557,12 @@ public class Core
 		/* tell all tasks to end */
 		tasksLock.lock();
 		try {
-			for (Task task : runningTasks) {
-				task.stop();
-				task.getFuture().cancel(true);
+			for (Task task : runningList) {
+				if (task != null) {
+					task.stop(true);
+					if (task.getFuture() != null)
+						task.getFuture().cancel(true);
+				}
 			}
 		} finally {
 			tasksLock.unlock();

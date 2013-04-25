@@ -148,7 +148,7 @@ public class Console
 	{
 		lockConsole();
 		AnsiConsole.out.print(BOLD);
-		AnsiConsole.out.print(command + " WARNING:");
+		AnsiConsole.out.print(command + " WARNING: ");
 		AnsiConsole.out.print(UNBOLD);
 		AnsiConsole.out.print(message);
 		AnsiConsole.out.println();
@@ -526,11 +526,11 @@ public class Console
 				String path = args.get(4).getToken();
 
 				Boolean remote = false;
-				if (args.size() > 6)
+				if (args.size() > 5)
 					remote = parseBoolean(args.get(5).getToken());
 
 				Boolean blocked = true;
-				if (args.size() > 7)
+				if (args.size() > 6)
 					blocked = parseBoolean(args.get(6).getToken());
 
 				if (remote == null || blocked == null) {
@@ -970,11 +970,11 @@ public class Console
 				}
 
 				Boolean reschedules = false;
-				if (args.size() > 6)
+				if (args.size() > 5)
 					reschedules = parseBoolean(args.get(5).getToken());
 
 				Boolean dummy = true;
-				if (args.size() > 7)
+				if (args.size() > 6)
 					dummy = parseBoolean(args.get(6).getToken());
 
 				if (reschedules == null || dummy == null) {
@@ -1006,7 +1006,7 @@ public class Console
 
 					long id;
 					try {
-						id = new BigInteger(in.readLine("Enter module source: ")).longValue();
+						id = new BigInteger(in.readLine("Enter module id: ")).longValue();
 					} catch (NumberFormatException e) {
 						commandError("tasks add", "Unable to parse module id.");
 						return;
@@ -1087,7 +1087,7 @@ public class Console
 				return;
 			}
 
-			Core.stopTask(task);
+			Core.stopTask(task, true);
 		}
 	}
 

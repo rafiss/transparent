@@ -167,7 +167,7 @@ public class NeweggParser
 			response.write(data);
 			length = in.readUnsignedShort();
 		}
-		
+
 		int errorCode = in.readUnsignedByte();
 		if (errorCode != DOWNLOAD_OK) {
 			System.err.println("NeweggParser.httpResponse ERROR:"
@@ -201,13 +201,17 @@ public class NeweggParser
 
 	private static void respond(Map<String, String> keyValues) throws IOException
 	{
+		keyValues.remove("features");
+		keyValues.remove("operating systems supported");
+
 		out.writeByte(MODULE_RESPONSE);
 		out.writeShort(keyValues.size());
 		for (Entry<String, String> pair : keyValues.entrySet()) {
-			byte[] key = pair.getKey().getBytes(UTF8);
+			String keyString = pair.getKey().toLowerCase();
+			byte[] key = keyString.getBytes(UTF8);
 			out.writeShort(key.length);
 			out.write(key);
-			
+
 			byte[] value = pair.getValue().getBytes(UTF8);
 			out.writeShort(value.length);
 			out.write(value);
@@ -233,7 +237,7 @@ public class NeweggParser
 					System.err.println("NeweggParser.findKeyValues ERROR:"
 							+ " Expected String key-value pair.");
 				} else
-					keyValues.put((String) key, (String) value);
+					keyValues.put(((String) key).toLowerCase(), (String) value);
 			}
 
 			/* it could be in its children */
@@ -461,7 +465,7 @@ public class NeweggParser
 				break;
 			case PRODUCT_INFO_REQUEST:
 				int length = in.readUnsignedShort();
-				while (length  > 0) {
+				while (length > 0) {
 					byte[] data = new byte[length];
 					in.readFully(data);
 					parseProductInfo(new String(data, UTF8));

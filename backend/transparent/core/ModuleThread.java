@@ -285,7 +285,9 @@ public class ModuleThread implements Runnable, Interruptable
 		StreamPipe pipe = new StreamPipe(error, module.getLogStream());
 		Thread piper = new Thread(pipe);
 		piper.start();
-		
+
+		boolean responded = true;
+		ProductID requestedProductId = null;
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(requestType);
@@ -293,8 +295,7 @@ public class ModuleThread implements Runnable, Interruptable
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */
-				ProductID requestedProductId = null;
-				if (requestType == Core.PRODUCT_INFO_REQUEST) {
+				if (requestType == Core.PRODUCT_INFO_REQUEST && responded) {
 					if (requestedProductIds.hasNext()) {
 						requestedProductId = requestedProductIds.next();
 						String moduleProductId = requestedProductId.getModuleProductId();
@@ -304,6 +305,7 @@ public class ModuleThread implements Runnable, Interruptable
 						out.writeShort(0);
 						break;
 					}
+					responded = false;
 				}
 				out.flush();
 				
@@ -364,6 +366,7 @@ public class ModuleThread implements Runnable, Interruptable
 						getProductListResponse(module, in);
 					else if (requestType == Core.PRODUCT_INFO_REQUEST)
 						getProductInfoResponse(module, requestedProductId, in);
+					responded = true;
 					break;
 
 				default:

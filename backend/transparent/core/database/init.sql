@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS transparent.Metadata (
 CREATE TABLE IF NOT EXISTS transparent.Entity (
     `entity_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
     `name` TEXT,
-	`module_id` LONG NOT NULL
+	`module_id` BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS transparent.PropertyType (
@@ -82,7 +82,7 @@ END//
 
 CREATE PROCEDURE transparent.AddProductId(
     IN moduleIdString TEXT,
-	IN moduleIdLong LONG,
+	IN moduleIdLong BIGINT,
     IN moduleProductId TEXT)
     SQL SECURITY INVOKER
 BEGIN

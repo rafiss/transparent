@@ -2,7 +2,6 @@
 # Unix/Linux makefile for COS 333 project
 #
 
-.SUFFIXES: .java .class
 SRCS = \
 	NeweggParser.java
 
@@ -11,14 +10,14 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=
+JFLAGS=-cp json-smart-1.1.1.jar:jsoup-1.7.2.jar
 
 #
 # Compile command
 #
 
-.java.class:
-		${JC} ${JFLAGS} -cp json-smart-1.1.1.jar:jsoup-1.7.2.jar $*.java
+%.class : %.java
+		${JC} ${JFLAGS} $<
 
 #
 # GNU Make: targets that don't build files
