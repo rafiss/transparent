@@ -75,7 +75,8 @@ def search(request):
 def product(request, model):
     name = request.GET['q']
     payload = {'select': ['name', 'image', 'price', 'model'],
-            'where': {'name': '=' + name[0] + '*', 'model': '=' + model}}
+            'where': {'name': '=' + name[0] + '*', 'model': '=' + model},
+            'limit': 1}
     resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
     results = json.loads(resp.read())
     product = {}
