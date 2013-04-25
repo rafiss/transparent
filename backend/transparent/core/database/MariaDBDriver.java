@@ -587,7 +587,19 @@ public class MariaDBDriver implements transparent.core.database.Database {
 	public Results<String> query(String[] select, ProductID[] rowIds,
 			String[] whereClause, String[] whereArgs, String sortBy)
 	{
-		// TODO Auto-generated method stub
+		StringBuilder stringBuilder = new StringBuilder();
+		
+		stringBuilder.append("SELECT ");
+		
+		for (int i = 0; i < select.length; i++) {
+			stringBuilder.append(select[i]);
+			if (i != select.length - 1)
+				stringBuilder.append(",");
+		}
+		
+		stringBuilder.append(" FROM ");
+		stringBuilder.append(MODEL_NAME);
+		stringBuilder.append(" WHERE ");
 		return null;
 	}
 }
