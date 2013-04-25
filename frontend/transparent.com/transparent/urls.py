@@ -1,6 +1,6 @@
 from django.conf.urls import patterns, include, url
-from finder.views import index, hello, register, profile
-from django.contrib.auth.views import login, logout
+from finder import views
+#from django.contrib.auth.views import login, logout
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -10,12 +10,14 @@ urlpatterns = patterns('',
     # Examples:
     # url(r'^$', 'transparent.views.home', name='home'),
     # url(r'^transparent/', include('transparent.foo.urls')),
-    (r'^$', index),
-    (r'^hello/$', hello),
-    (r'^login/$',  login),
-    (r'^logout/$', logout, {'template_name' : 'index.html'}),
-    (r'^profile/$',  profile),
-    (r'^register/$', register),
+    (r'^$', views.index),
+    (r'^hello/$', views.hello),
+    (r'^search/$', views.search),
+    (r'^product/$', views.product),
+    (r'^profile/$',  views.profile),
+    (r'^login/$',  views.login),
+    (r'^logout/$', views.logout),
+    (r'^register/$', views.register),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
