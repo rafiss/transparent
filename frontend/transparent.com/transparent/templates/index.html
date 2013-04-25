@@ -1,18 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}The Home Page{% endblock %}
-
 {% block content %}
 
-    {% if user.is_authenticated %}
-        <h1>Welcome!</h1>
+<!-- Search bar -->
+<div class="content">
+    <div class="btn-group btn-group-vertical">
+            <!-- INCLUDE LOGO SOURCE HERE instead of "..." -->
 
-        <p>There isn't much to see here, but you can log out.</p>
-        <p><a href="/logout/">Logout</a></p>
-    {% else %}
-        <h1>Please create an account or login</h1>
+            <a href="/"><img src="../images/Logo Place Holder.jpg" width="512" height="94" class="img-rounded"></a>
+            <br>
+            <br>
+            
+        <!-- Search bar form -->
+        <div class="input-append">
+        <form action="/search/">
+            <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. GTX 670, Intel 3770K, ...)" type="text" name="q">
+            <input type="hidden" type="text" name="p" value="1">
+            <input class="btn btn-primary" type="submit" value="Search">
+        </form>
+    	</div>
+    </div>	
+</div>
 
-        <p><a href="/register/">Register</a></p>
-        <p><a href="/login/">Login</a></p>
-    {% endif %}
 {% endblock %}

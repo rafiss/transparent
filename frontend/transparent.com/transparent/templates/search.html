@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Search bar -->
+<div class="content">
+  <div class="btn-group btn-group-vertical">
+            <!-- INCLUDE LOGO SOURCE HERE instead of "..." --            <!-- Search bar form -->
+        <div class="input-append">
+        <form action="/search/">
+            <input class="span5" id="appendedInputButton" placeholder="{{ query }}" type="text" name="q">
+            <input type="hidden" type="text" name="p" value="1">
+            <input class="btn btn-primary" type="submit" value="Search">
+        </form>
+        </div>
+    </div>
+    
+<!-- Display results of search -->
+
+<!-- THING TO DO -->
+    <!-- Replace src="" with correct image source -->
+	<!-- Replace href="/product/?q=memory" in thumbnail with product page -->
+    <!-- Replace the placeholder in the search bar -->
+    <!-- Pagination should point back to this page, but change the results being displayed -->
+
+{% for row in products %}
+<!-- ROW -->
+<div class="row-fluid">
+	<ul class="thumbnails">
+        {% for product in row %}
+    	<li class="span4">
+        	<div class="thumbnail">
+        	    <a href="/product/?q=memory"><img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0" /></a>
+            	<div class="caption">
+            	<h4>{{ product.name }}</h4>    
+                <ul style="list-style:none;">
+	                <li> Price: {{ product.price }} </li>
+                    <li> Attribute: value </li>
+	                <li> Attribute: value </li>
+                </ul>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+
+    </ul>
+</div> 
+{% endfor %}
+    
+<!-- End of Product Diplays. -->
+
+<!-- Pagination-->
+<div class="pagination pagination-large pagination-centered">
+    <ul>
+        <li><a href="#">Prev</a></li>
+        <li><a href="#">1</a></li>
+        <li><a href="#">2</a></li>
+        <li><a href="#">3</a></li>
+        <li><a href="#">4</a></li>
+        <li><a href="#">5</a></li>
+        <li><a href="#">Next</a></li>
+    </ul>
+</div>
+<!-- End Pagination -->
+
+
+</div> <!-- End of Contents-->
+
+{% endblock %}
