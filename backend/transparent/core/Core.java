@@ -95,6 +95,8 @@ public class Core
 	private static IndexWriter indexWriter = null;
 	private static IndexSearcher searcher = null;
 	private static QueryParser parser = null;
+	private static int indexCounter = 0;
+	private static final int INDEX_PERIOD = 1024;
 
 	public static InetAddress FRONTEND_ADDRESS = null;
 
@@ -172,8 +174,20 @@ public class Core
 		try {
 			indexWriter.addDocument(doc);
 		} catch (IOException e) {
-			Console.printError("Core", "productName", "Error adding "
+			Console.printError("Core", "addToIndex", "Error adding "
 					+ "product name to search index.", e.getMessage());
+		}
+
+		/* periodically refresh our index reader */
+		indexCounter++;
+		indexCounter = 0;
+		if (indexCounter % INDEX_PERIOD == 0) {
+			try {
+				searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+			} catch (IOException e) {
+				Console.printError("Core", "addToIndex", "Error refreshing "
+						+ " search index.", e.getMessage());
+			}
 		}
 	}
 

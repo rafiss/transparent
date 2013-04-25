@@ -1237,7 +1237,11 @@ public class Console
 		public void run(List<Token> args, int index)
 		{
 			try {
-				URLConnection connection = new URL("http://localhost:16317").openConnection();
+				String query = "raid";
+				if (args.size() > 1)
+					query = args.get(1).getToken();
+				
+				URLConnection connection = new URL("http://140.180.186.131:16317").openConnection();
 				HttpURLConnection http = (HttpURLConnection) connection;
 				http.setDoInput(true);
 				http.setDoOutput(true);
@@ -1247,7 +1251,7 @@ public class Console
 	
 				http.getOutputStream().write(
 						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\"],"
-						+ " \"where\":{\"name\":\"=raid\"}}").getBytes());
+						+ " \"where\":{\"name\":\"=" + query + "\"}}").getBytes());
 				http.getOutputStream().flush();
 				http.getOutputStream().close();
 

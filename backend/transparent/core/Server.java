@@ -243,6 +243,7 @@ public class Server implements Container
 
 	@Override
 	public void handle(Request request, Response response) {
+		/* TODO: uncomment this */
 		/*if (!request.getClientAddress().getAddress().equals(Core.FRONTEND_ADDRESS))
 			return;*/
 
