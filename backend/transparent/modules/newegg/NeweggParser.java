@@ -24,6 +24,8 @@ import net.minidev.json.parser.ParseException;
 
 public class NeweggParser
 {
+	private static final boolean PARSE_IMAGES = true;
+
 	private static final byte PRODUCT_LIST_REQUEST = 0;
 	private static final byte PRODUCT_INFO_REQUEST = 1;
 	private static final byte MODULE_RESPONSE = 0;
@@ -443,8 +445,54 @@ public class NeweggParser
 			return;
 		}
 
+		/* parse product specifications */
 		HashMap<String, String> keyValues = new HashMap<String, String>();
 		findKeyValues(keyValues, parsed);
+
+		/* parse general product info */
+		url = PRODUCT_URL + productId;
+		
+		try {
+			data = httpGetRequest(url);
+		} catch (IOException e) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Error requesting URL '" + url + "'.");
+			return;
+		}
+
+		try {
+			parsed = parser.parse(data);
+		} catch (ParseException e) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Error parsing JSON.");
+			return;
+		}
+		if (!(parsed instanceof JSONObject)) {
+			System.err.println("NeweggParser.parseProductInfo ERROR:"
+					+ " Expected a JSON map at root.");
+			return;
+		}
+
+		JSONObject map = (JSONObject) parsed;
+		Object name = map.get("Title");
+		if (name != null)
+			keyValues.put("name", name.toString());
+		Object price = map.get("FinalPrice");
+		if (price != null)
+			keyValues.put("price", price.toString());
+		if (PARSE_IMAGES) {
+			Object image = map.get("Image");
+			if (!(image instanceof JSONObject)) {
+				System.err.println("NeweggParser.parseProductInfo ERROR:"
+						+ " Expected a map value for key 'Image'.");
+				return;
+			}
+
+			JSONObject imageMap = (JSONObject) image;
+			Object imagePath = imageMap.get("PathSize640");
+			if (imagePath != null)
+				keyValues.put("image", imagePath.toString());
+		}
 
 		try {
 			respond(keyValues);

@@ -4,9 +4,13 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigInteger;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,7 +36,8 @@ public class Console
 			new TasksCommand(),
 			new HistoryCommand(),
 			new ExitCommand(),
-			new MigrateCommand());
+			new MigrateCommand(),
+			new TestServerCommand());
 
 	private static ReentrantLock consoleLock = new ReentrantLock();
 	private static int nestedLock = 0;
@@ -50,7 +55,7 @@ public class Console
 	private static final String ERASE = new Ansi().eraseLine(Erase.ALL).toString();
 
 	private static List<Token> tokens = new ArrayList<Token>();
-	
+
 	private static ConsoleReader in = null;
 	private static final ConsoleCompletor completor = new ConsoleCompletor();
 	private static AtomicBoolean historyEnabled = new AtomicBoolean(true);
@@ -1219,6 +1224,44 @@ public class Console
 			strarr = strings.toArray(strarr);
 			if (Core.getDatabase() != null)
 				Core.getDatabase().addProductIds(newegg, strarr);
+		}
+	}
+
+	private static class TestServerCommand extends Command
+	{
+		public TestServerCommand() {
+			super("testserver");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			try {
+				URLConnection connection = new URL("http://localhost:16317").openConnection();
+				HttpURLConnection http = (HttpURLConnection) connection;
+				http.setDoInput(true);
+				http.setDoOutput(true);
+				http.setUseCaches(false);
+				http.setRequestMethod("GET");
+				http.connect();
+	
+				http.getOutputStream().write(
+						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\"],"
+						+ " \"where\":{\"name\":\"=raid\"}}").getBytes());
+				http.getOutputStream().flush();
+				http.getOutputStream().close();
+
+				InputStream input = http.getInputStream();
+				while (true) {
+					int c = input.read();
+					if (c == -1) break;
+					AnsiConsole.out.print((char) c);
+				}
+
+				input.close();
+			} catch (IOException e) {
+				Console.commandError("testserver", "", e.getMessage());
+			}
 		}
 	}
 

@@ -24,7 +24,7 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=-cp lib/jansi-1.9.jar:lib/json-smart-1.1.1.jar:lib/mariadb-java-client-1.1.0.jar:lib/jline-1.0.jar:lib/lucene-core-4.2.1.jar:lib/lucene-analyzers-common-4.2.1.jar:lib/lucene-queryparser-4.2.1.jar:simple-5.1.1.jar:.
+JFLAGS=-cp lib/jansi-1.9.jar:lib/json-smart-1.1.1.jar:lib/mariadb-java-client-1.1.0.jar:lib/jline-1.0.jar:lib/lucene-core-4.2.1.jar:lib/lucene-analyzers-common-4.2.1.jar:lib/lucene-queryparser-4.2.1.jar:lib/simple-5.1.1.jar:.
 MODULES=newegg amazon
 
 #

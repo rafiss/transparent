@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -38,6 +39,9 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Version;
 import org.fusesource.jansi.AnsiConsole;
+import org.simpleframework.http.core.ContainerServer;
+import org.simpleframework.transport.connect.Connection;
+import org.simpleframework.transport.connect.SocketConnection;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
@@ -60,6 +64,7 @@ public class Core
 	private static final String ROW_ID_FIELD = "row";
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final int SEARCH_LIMIT = 256;
+	private static final int HTTP_SERVER_PORT = 16317;
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
 
 	private static final Sandbox sandbox = new NoSandbox();
@@ -617,7 +622,7 @@ public class Core
         		} else {
         			directory = FSDirectory.open(index);
         	        indexWriter = new IndexWriter(directory, config);
-        	        searcher = new IndexSearcher(DirectoryReader.open(directory));
+        	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
         		}
         	} else if (!index.isDirectory()) {
     			Console.printError("Core", "main",
@@ -625,7 +630,8 @@ public class Core
         	} else {
         		directory = FSDirectory.open(index);
     	        indexWriter = new IndexWriter(directory, config);
-    	        searcher = new IndexSearcher(DirectoryReader.open(directory));
+        		DirectoryReader reader = DirectoryReader.open(indexWriter, false);
+    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
         	}
         } catch (IOException e) {
         	Console.printError("Core", "main", "Unable to open "
@@ -633,7 +639,7 @@ public class Core
         	try {
         		Directory indexDirectory = new RAMDirectory();
                 indexWriter = new IndexWriter(indexDirectory, config);
-                searcher = new IndexSearcher(DirectoryReader.open(indexDirectory));
+    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
         	} catch (IOException e2) {
             	Console.printError("Core", "main", "Unable to "
             			+ "create memory index.", e2.getMessage());
@@ -678,6 +684,16 @@ public class Core
         			+ " Queries will not be processed.");
         }
 
+        /* start the back-end HTTP server */
+        Connection connection = null;
+        try {
+        	connection = new SocketConnection(new ContainerServer(new Server()));
+        	connection.connect(new InetSocketAddress(HTTP_SERVER_PORT));
+        } catch (IOException e) {
+        	Console.printError("Core", "main", "Cannot start HTTP server."
+        			+ " Queries will not be processed.");
+        }
+
 		/* start the main loop */
 		if (consoleReady)
 			Console.runConsole();
@@ -696,6 +712,15 @@ public class Core
 			tasksLock.unlock();
 		}
 		dispatcher.shutdown();
+
+		/* shutdown the HTTP server */
+		try {
+			if (connection != null)
+				connection.close();
+		} catch (IOException e) {
+			Console.printError("Core", "main", "Unable "
+					+ "to shutdown HTTP server.", e.getMessage());
+		}
 
 		/* close the search index */
 		try {

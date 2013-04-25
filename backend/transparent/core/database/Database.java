@@ -1,10 +1,10 @@
 package transparent.core.database;
 
-import java.util.Iterator;
-import java.util.Map.Entry;
-
 import transparent.core.Module;
 import transparent.core.ProductID;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
 
 /**
  * An abstract interface for data persistence.
@@ -20,7 +20,7 @@ public interface Database
 	 */
 	public boolean addProductIds(Module module, String... moduleProductIds);
 
-	public Results<ProductID> getProductIds(Module module);
+	public Iterator<ProductID> getProductIds(Module module);
 
 	@SuppressWarnings("unchecked") /* needed to suppress varargs warning */
 	public boolean addProductInfo(Module module,
@@ -30,17 +30,16 @@ public interface Database
 	public String getMetadata(String key);
 	public boolean setMetadata(String key, String value);
 
-	public Results<String> query(String[] select, ProductID[] rowIds,
-			String[] whereClause, String[] whereArgs, String sortBy);
+    public Results query(ProductID[] rowIds, String[] properties);
 
 	/* TODO: add API for deleting (both metadata and non-metadata) */
 
     public void close();
 
-    public interface Results<T> {
-    	public T get();
+    public interface Results {
+    	public String getString(int columnIndex);
 
-    	public T getField(int columnIndex);
+        public long getLong(int columnIndex);
 
         public boolean hasNext();
 
