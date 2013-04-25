@@ -13,8 +13,6 @@ import java.util.AbstractMap.SimpleEntry;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
-import transparent.core.database.Database.Results;
-
 public class ModuleThread implements Runnable, Interruptable
 {
 	private static final byte MODULE_RESPONSE = 0;
@@ -45,7 +43,7 @@ public class ModuleThread implements Runnable, Interruptable
 	private boolean alive;
 	private boolean dummy;
 	private Process process;
-	private Results<ProductID> requestedProductIds;
+	private Iterator<ProductID> requestedProductIds;
 	private String userAgent;
 	
 	public ModuleThread(Module module, boolean dummy)
@@ -246,7 +244,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.requestType = requestType;
 	}
 	
-	public void setRequestedProductIds(Results<ProductID> productIds) {
+	public void setRequestedProductIds(Iterator<ProductID> productIds) {
 		this.requestedProductIds = productIds;
 	}
 
@@ -298,8 +296,8 @@ public class ModuleThread implements Runnable, Interruptable
 			{
 				/* indicate the product ID we are requesting */
 				if (requestType == Core.PRODUCT_INFO_REQUEST && responded) {
-					if (requestedProductIds.next()) {
-						requestedProductId = requestedProductIds.get();
+					if (requestedProductIds.hasNext()) {
+						requestedProductId = requestedProductIds.next();
 						String moduleProductId = requestedProductId.getModuleProductId();
 						out.writeShort(moduleProductId.length());
 						out.write(moduleProductId.getBytes(UTF8));
