@@ -19,7 +19,7 @@ public class ModuleThread implements Runnable, Interruptable
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 	private static final byte MODULE_HTTP_POST_REQUEST = 2;
 	private static final byte MODULE_SET_USER_AGENT = 3;
-	
+
 	private static final int DOWNLOAD_OK = 0;
 	private static final int DOWNLOAD_ABORTED = 1;
 
@@ -34,10 +34,10 @@ public class ModuleThread implements Runnable, Interruptable
 
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
-	
+
 	private static final String DEFAULT_USER_AGENT =
 			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
-	
+
 	private final Module module;
 	private byte requestType;
 	private boolean alive;
@@ -45,7 +45,7 @@ public class ModuleThread implements Runnable, Interruptable
 	private Process process;
 	private Iterator<ProductID> requestedProductIds;
 	private String userAgent;
-	
+
 	public ModuleThread(Module module, boolean dummy)
 	{
 		this.module = module;
@@ -54,11 +54,11 @@ public class ModuleThread implements Runnable, Interruptable
 		this.dummy = dummy;
 		this.userAgent = DEFAULT_USER_AGENT;
 	}
-	
+
 	public void stop() {
 		this.alive = false;
 	}
-	
+
 	private void downloadPage(String contentType,
 			InputStream stream, DataOutputStream dest, boolean blocked)
 					throws IOException
@@ -68,7 +68,7 @@ public class ModuleThread implements Runnable, Interruptable
 			throw new IOException("Content type header field too long.");
 		dest.writeShort(contentType.length());
 		dest.writeBytes(contentType);
-		
+
 		int total = 0;
 		if (blocked) {
 			/* download the page in blocks, sending each to the module */
@@ -106,11 +106,11 @@ public class ModuleThread implements Runnable, Interruptable
 			dest.writeByte(DOWNLOAD_ABORTED);
 			module.logDownloadAborted();
 		}
-		
+
 		dest.flush();
 		stream.close();
 	}
-	
+
 	private void httpGetRequest(
 			String url, DataOutputStream dest, boolean blocked, long prevRequest)
 	{
@@ -121,7 +121,7 @@ public class ModuleThread implements Runnable, Interruptable
 					Thread.sleep(towait / 1000000);
 				} catch (InterruptedException e) { }
 			}
-			
+
 			module.logHttpGetRequest(url);
 			URLConnection http = new URL(url).openConnection();
 			http.setRequestProperty("User-Agent", userAgent);
@@ -131,7 +131,7 @@ public class ModuleThread implements Runnable, Interruptable
 					"Could not download from URL '" + url + "'.");
 		}
 	}
-	
+
 	private void httpPostRequest(String url, byte[] post,
 			DataOutputStream dest, boolean blocked, long prevRequest)
 	{
@@ -150,7 +150,7 @@ public class ModuleThread implements Runnable, Interruptable
 						"Unrecognized network protocol.");
 				return;
 			}
-			
+
 			HttpURLConnection http = (HttpURLConnection) connection;
 			http.setRequestProperty("User-Agent", userAgent);
 			http.setDoInput(true);
@@ -158,11 +158,11 @@ public class ModuleThread implements Runnable, Interruptable
 			http.setUseCaches(false);
 			http.setRequestMethod("POST");
 			http.connect();
-			
+
 			http.getOutputStream().write(post);
 			http.getOutputStream().flush();
 			http.getOutputStream().close();
-			
+
 			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
 		} catch (Exception e) {
 			module.logError("ModuleThread", "httpPostRequest",
@@ -171,7 +171,7 @@ public class ModuleThread implements Runnable, Interruptable
 			return;
 		}
 	}
-	
+
 	private void getProductListResponse(
 			Module module, DataInputStream in) throws IOException
 	{
@@ -196,7 +196,7 @@ public class ModuleThread implements Runnable, Interruptable
 					"Error occurred while adding product IDs.");
 		}
 	}
-	
+
 	private void getProductInfoResponse(Module module,
 			ProductID productId, DataInputStream in) throws IOException
 	{
@@ -219,7 +219,10 @@ public class ModuleThread implements Runnable, Interruptable
 			data = new byte[length];
 			in.readFully(data);
 			String value = new String(data, UTF8);
-			
+
+			if (key.equals("name"))
+				Core.addToIndex(value, productId);
+
 			keyValues[i] = new SimpleEntry<String, String>(key, value);
 		}
 
@@ -229,7 +232,7 @@ public class ModuleThread implements Runnable, Interruptable
 					"Error occurred while adding product information.");
 		}
 	}
-	
+
 	private void cleanup(Process process, StreamPipe pipe, Thread piper)
 	{
 		pipe.stop();
@@ -239,11 +242,11 @@ public class ModuleThread implements Runnable, Interruptable
 			piper.join();
 		} catch (InterruptedException e) { }
 	}
-	
+
 	public void setRequestType(byte requestType) {
 		this.requestType = requestType;
 	}
-	
+
 	public void setRequestedProductIds(Iterator<ProductID> productIds) {
 		this.requestedProductIds = productIds;
 	}
@@ -260,7 +263,7 @@ public class ModuleThread implements Runnable, Interruptable
 		} catch (IllegalThreadStateException e) { }
 		return !alive;
 	}
-	
+
 	@Override
 	public void run()
 	{
@@ -273,7 +276,7 @@ public class ModuleThread implements Runnable, Interruptable
 				return;
 			}
 		}
-		
+
 		process = Core.getSandbox().run(module);
 		DataOutputStream out = new DataOutputStream(process.getOutputStream());
 		DataInputStream in = new DataInputStream(new InterruptableInputStream(
@@ -291,7 +294,7 @@ public class ModuleThread implements Runnable, Interruptable
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(requestType);
-		
+
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */
@@ -308,7 +311,7 @@ public class ModuleThread implements Runnable, Interruptable
 					responded = false;
 				}
 				out.flush();
-				
+
 				/* read input from the module */
 				switch (in.readUnsignedByte()) {
 				case MODULE_SET_USER_AGENT:
@@ -324,7 +327,7 @@ public class ModuleThread implements Runnable, Interruptable
 						module.logUserAgentChange(this.userAgent);
 					}
 					break;
-					
+
 				case MODULE_HTTP_GET_REQUEST:
 					if (module.isRemote()) {
 						module.logError("ModuleThread", "run",
@@ -350,7 +353,7 @@ public class ModuleThread implements Runnable, Interruptable
 						byte[] data = new byte[length];
 						in.readFully(data);
 						String url = new String(data, ASCII);
-						
+
 						/* read the POST data */
 						length = in.readInt();
 						data = new byte[length];

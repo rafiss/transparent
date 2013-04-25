@@ -1,12 +1,18 @@
 package transparent.core;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,7 +20,28 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.util.Version;
 import org.fusesource.jansi.AnsiConsole;
+import org.simpleframework.http.core.ContainerServer;
+import org.simpleframework.transport.connect.Connection;
+import org.simpleframework.transport.connect.SocketConnection;
 
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
@@ -32,7 +59,12 @@ public class Core
 	private static final String QUEUED_TASKS = "queued";
 	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
+	private static final String PRODUCT_NAME_FIELD = "name";
+	private static final String PRODUCT_ID_FIELD = "id";
+	private static final String ROW_ID_FIELD = "row";
 	private static final int THREAD_POOL_SIZE = 64;
+	private static final int SEARCH_LIMIT = 256;
+	private static final int HTTP_SERVER_PORT = 16317;
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
 
 	private static final Sandbox sandbox = new NoSandbox();
@@ -58,6 +90,15 @@ public class Core
 	/* represents the list encoding of tasks in the database */
 	private static ArrayList<Task> queuedList = new ArrayList<Task>();
 	private static ArrayList<Task> runningList = new ArrayList<Task>();
+
+	/* for product name search indexing */
+	private static IndexWriter indexWriter = null;
+	private static IndexSearcher searcher = null;
+	private static QueryParser parser = null;
+	private static int indexCounter = 0;
+	private static final int INDEX_PERIOD = 1024;
+
+	public static InetAddress FRONTEND_ADDRESS = null;
 
 	public static String toUnsignedString(long value)
 	{
@@ -107,6 +148,67 @@ public class Core
 			}
 		}
 		Console.flush();
+	}
+
+	public static void execute(Runnable task) {
+		dispatcher.execute(task);
+	}
+
+	public static void addToIndex(String productName, ProductID id)
+	{
+		if (indexWriter == null)
+			return;
+
+		Document doc = new Document();
+		TextField nameField = new TextField(
+				PRODUCT_NAME_FIELD, productName, Field.Store.YES);
+		TextField productIdField = new TextField(
+				PRODUCT_ID_FIELD, id.getModuleProductId(), Field.Store.YES);
+		StoredField rowField = new StoredField(
+				ROW_ID_FIELD, id.getRowId());
+
+		doc.add(nameField);
+		doc.add(productIdField);
+		doc.add(rowField);
+
+		try {
+			indexWriter.addDocument(doc);
+		} catch (IOException e) {
+			Console.printError("Core", "addToIndex", "Error adding "
+					+ "product name to search index.", e.getMessage());
+		}
+
+		/* periodically refresh our index reader */
+		indexCounter++;
+		indexCounter = 0;
+		if (indexCounter % INDEX_PERIOD == 0) {
+			try {
+				searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+			} catch (IOException e) {
+				Console.printError("Core", "addToIndex", "Error refreshing "
+						+ " search index.", e.getMessage());
+			}
+		}
+	}
+
+	public static Iterator<ProductID> searchProductName(String term)
+	{
+		Query query = null;
+		try {
+			query = parser.parse(term);
+		} catch (ParseException e) {
+			Console.printError("Core", "searchProductName",
+					"Unable to parse search query.", e.getMessage());
+			return null;
+		}
+
+		try {
+			return new SearchIterator(query);
+		} catch (IOException e) {
+			Console.printError("Core", "searchProductName",
+					"Error occurred during search.", e.getMessage());
+			return null;
+		}
 	}
 
 	public static boolean loadModules()
@@ -521,6 +623,44 @@ public class Core
 		/* load random number generator seed */
         loadSeed();
 
+        /* load search index for product names */
+        Analyzer analyzer = new StandardAnalyzer(Version.LUCENE_42);
+        IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42, analyzer);
+        Directory directory = null;
+        try {
+        	File index = new File("index");
+        	if (!index.exists()) {
+        		if (!index.mkdir()) {
+        			Console.printError("Core", "main",
+        					"Unable to create directory 'index'.");
+        		} else {
+        			directory = FSDirectory.open(index);
+        	        indexWriter = new IndexWriter(directory, config);
+        	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+        		}
+        	} else if (!index.isDirectory()) {
+    			Console.printError("Core", "main",
+    					"A file named 'index' already exists.");
+        	} else {
+        		directory = FSDirectory.open(index);
+    	        indexWriter = new IndexWriter(directory, config);
+        		DirectoryReader reader = DirectoryReader.open(indexWriter, false);
+    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+        	}
+        } catch (IOException e) {
+        	Console.printError("Core", "main", "Unable to open "
+        			+ "directory 'index'. Using memory index...", e.getMessage());
+        	try {
+        		Directory indexDirectory = new RAMDirectory();
+                indexWriter = new IndexWriter(indexDirectory, config);
+    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+        	} catch (IOException e2) {
+            	Console.printError("Core", "main", "Unable to "
+            			+ "create memory index.", e2.getMessage());
+        	}
+        }
+        parser = new QueryParser(Version.LUCENE_42, PRODUCT_NAME_FIELD, analyzer);
+
         /* load the script engine */
         boolean consoleReady = Console.initConsole();
         if (!consoleReady)
@@ -550,6 +690,24 @@ public class Core
         	}
         }
 
+        /* find the front-end server */
+        try {
+        	FRONTEND_ADDRESS = InetAddress.getByName("54.244.112.184");
+        } catch (UnknownHostException e) {
+        	Console.printError("Core", "main", "Cannot find front-end server."
+        			+ " Queries will not be processed.");
+        }
+
+        /* start the back-end HTTP server */
+        Connection connection = null;
+        try {
+        	connection = new SocketConnection(new ContainerServer(new Server()));
+        	connection.connect(new InetSocketAddress(HTTP_SERVER_PORT));
+        } catch (IOException e) {
+        	Console.printError("Core", "main", "Cannot start HTTP server."
+        			+ " Queries will not be processed.");
+        }
+
 		/* start the main loop */
 		if (consoleReady)
 			Console.runConsole();
@@ -568,5 +726,81 @@ public class Core
 			tasksLock.unlock();
 		}
 		dispatcher.shutdown();
+
+		/* shutdown the HTTP server */
+		try {
+			if (connection != null)
+				connection.close();
+		} catch (IOException e) {
+			Console.printError("Core", "main", "Unable "
+					+ "to shutdown HTTP server.", e.getMessage());
+		}
+
+		/* close the search index */
+		try {
+			if (indexWriter != null)
+				indexWriter.close();
+			if (directory != null)
+				directory.close();
+		} catch (IOException e) {
+			Console.printError("Core", "main", "Unable "
+					+ "to close search index.", e.getMessage());
+		}
+	}
+
+	private static class SearchIterator implements Iterator<ProductID>
+	{
+		private ScoreDoc[] results;
+		private Query query;
+		private int index;
+
+		public SearchIterator(Query query) throws IOException {
+			this.query = query;
+			this.index = 0;
+
+			this.results = searcher.search(query, SEARCH_LIMIT).scoreDocs;
+			if (results.length == 0)
+				results = null;
+		}
+
+		@Override
+		public boolean hasNext() {
+			return (results != null);
+		}
+
+		@Override
+		public ProductID next() {
+			if (results == null)
+				throw new NoSuchElementException();
+
+			ProductID product = null;
+			try {
+				Document doc = searcher.doc(results[index].doc);
+				String moduleProductId = doc.getField(PRODUCT_ID_FIELD).stringValue();
+				int row = doc.getField(ROW_ID_FIELD).numericValue().intValue();
+				product = new ProductID(row, moduleProductId);
+			} catch (IOException e) { }
+
+			index++;
+			if (index == results.length) {
+				try {
+					results = searcher.searchAfter(
+							results[index - 1], query, SEARCH_LIMIT).scoreDocs;
+				} catch (IOException e) {
+					results = null;
+				}
+
+				index = 0;
+				if (results.length == 0)
+					results = null;
+			}
+
+			return product;
+		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
 	}
 }
