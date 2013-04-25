@@ -3,6 +3,7 @@ package transparent.core.database;
 import transparent.core.Console;
 import transparent.core.Module;
 import transparent.core.ProductID;
+import transparent.core.database.Database.Results;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -83,7 +84,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public Iterator<ProductID> getProductIds(Module module) {
+    public Results<ProductID> getProductIds(Module module) {
         PreparedStatement statement = null;
         try {
             String[] columns = new String[] { "module_id" };
@@ -92,7 +93,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                                                                         null,
                                                                         columns));
             statement.setLong(1, module.getId());
-            return new ResultSetIterator(module, statement.executeQuery());
+            return new MariaDBProducts(module, statement.executeQuery());
         } catch (SQLException e) {
             module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
             return null;
@@ -555,11 +556,11 @@ public class MariaDBDriver implements transparent.core.database.Database {
         System.err.println(numInserts + " inserts took " + ((System.nanoTime() - start) / 1e6) +
                                    "ms");
 
-        Iterator<ProductID> productIDIterator = database.getProductIds(testModule);
+        Results<ProductID> productIDIterator = database.getProductIds(testModule);
 
         start = System.nanoTime();
-        while (productIDIterator.hasNext()) {
-            ProductID productID = productIDIterator.next();
+        while (productIDIterator.next()) {
+            ProductID productID = productIDIterator.get();
             //Core.println(productID.getModuleProductId() + " " + productID.getRowId());
 
             AbstractMap.SimpleEntry<String, String> entry = new AbstractMap.SimpleEntry("foo", "bar");
@@ -581,44 +582,102 @@ public class MariaDBDriver implements transparent.core.database.Database {
         database.setMetadata("key1", "value2");
         assert database.getMetadata("key1").equals("value2");
     }
+
+	@Override
+	public Results<String> query(String[] select, ProductID[] rowIds,
+			String[] whereClause, String[] whereArgs, String sortBy)
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
 }
 
-class ResultSetIterator implements Iterator<ProductID> {
-
-    private final ResultSet resultSet;
+class MariaDBResults implements Results<String> {
     private final Module owner;
+	private final ResultSet resultSet;
 
-    public ResultSetIterator(Module owner, ResultSet resultSet) {
-        this.owner = owner;
-        this.resultSet = resultSet;
-    }
+	public MariaDBResults(Module owner, ResultSet resultSet) {
+		this.owner = owner;
+		this.resultSet = resultSet;
+	}
+
+	@Override
+	public String get() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public String getField(int columnIndex) {
+		try {
+			return resultSet.getString(columnIndex);
+		} catch (SQLException e) {
+			owner.logError("MariaDBResults", "getField", "", e.getMessage());
+			return null;
+		}
+	}
 
     @Override
     public boolean hasNext() {
         try {
             return !resultSet.isLast();
         } catch (SQLException e) {
-            owner.logError("ResultSetIterator", "hasNext", "", e.getMessage());
+            owner.logError("MariaDBResults", "hasNext", "", e.getMessage());
             return false;
         }
     }
 
     @Override
-    public ProductID next() {
+    public boolean next() {
         try {
-            if (resultSet.next()) {
-                return new ProductID(resultSet.getInt(1), resultSet.getString(2));
-            } else {
-                return null;
-            }
+            return resultSet.next();
         } catch (SQLException e) {
-            owner.logError("ResultSetIterator", "next", "", e.getMessage());
-            return null;
+            owner.logError("MariaDBResults", "next", "", e.getMessage());
+            return false;
+        }
+    }
+}
+
+class MariaDBProducts implements Results<ProductID> {
+    private final Module owner;
+	private final ResultSet resultSet;
+
+	public MariaDBProducts(Module owner, ResultSet resultSet) {
+		this.owner = owner;
+		this.resultSet = resultSet;
+	}
+
+	@Override
+	public ProductID get() {
+		try {
+			return new ProductID(resultSet.getInt(1), resultSet.getString(2));
+		} catch (SQLException e) {
+			owner.logError("MariaDBResults", "getField", "", e.getMessage());
+			return null;
+		}
+	}
+
+	@Override
+	public ProductID getField(int columnIndex) {
+		throw new UnsupportedOperationException();
+	}
+
+    @Override
+    public boolean hasNext() {
+        try {
+            return !resultSet.isLast();
+        } catch (SQLException e) {
+            owner.logError("MariaDBResults", "hasNext", "", e.getMessage());
+            return false;
         }
     }
 
     @Override
-    public void remove() {
-        throw new UnsupportedOperationException("Cannot remove from ResultSet.");
+    public boolean next() {
+        try {
+            return resultSet.next();
+        } catch (SQLException e) {
+            owner.logError("MariaDBResults", "next", "", e.getMessage());
+            return false;
+        }
     }
 }

@@ -20,7 +20,7 @@ public interface Database
 	 */
 	public boolean addProductIds(Module module, String... moduleProductIds);
 
-	public Iterator<ProductID> getProductIds(Module module);
+	public Results<ProductID> getProductIds(Module module);
 
 	@SuppressWarnings("unchecked") /* needed to suppress varargs warning */
 	public boolean addProductInfo(Module module,
@@ -30,9 +30,20 @@ public interface Database
 	public String getMetadata(String key);
 	public boolean setMetadata(String key, String value);
 
-	/* TODO: add API for querying (what should it return?) */
+	public Results<String> query(String[] select, ProductID[] rowIds,
+			String[] whereClause, String[] whereArgs, String sortBy);
 
 	/* TODO: add API for deleting (both metadata and non-metadata) */
 
     public void close();
+
+    public interface Results<T> {
+    	public T get();
+
+    	public T getField(int columnIndex);
+
+        public boolean hasNext();
+
+        public boolean next();
+    }
 }
