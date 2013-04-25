@@ -56,12 +56,15 @@ def search(request):
         payload = {'select': ['name', 'image', 'price', 'model'],
                 'where': {'name': '=' + query},
                 'page': page,
-                'limit': '500'}
+                'limit': 500}
         resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
         results = json.loads(resp.read())
         results = results[:15]
         for i in range(len(results)):
-            results[i] = {'name': results[i][0], 'image': results[i][1], 'price': results[i][2], 'model': results[i][3]}
+            new = {}
+            for j in range(len(payload['select'])):
+                new[payload['select'][j]] = results[i][j]
+            results[i] = new
         products = []
         for i in range(0, len(results), 3):
             products.append(results[i:i+3])
@@ -69,15 +72,14 @@ def search(request):
     else:
         return HttpResponseRedirect('/')
 
-def product(request):
-    if 'q' in request.GET and request.GET['q']:
-        query = request.GET['q']
-        payload = {'select': ['name', 'image', 'price', 'model'],
-                'where': {'name': '=' + query}}
-        resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
-        results = json.loads(resp.read())
-        product = {'name': results[0][0], 'image': results[0][1], 'price': results[0][2], 'model': results[0][3]}
-        return render(request, "product.html", {'product': product})
-    else:
-        return HttpResponseRedirect(request.get_full_path())
+def product(request, model):
+    name = request.GET['q']
+    payload = {'select': ['name', 'image', 'price', 'model'],
+            'where': {'name': '=' + name[0] + '*', 'model': '=' + model}}
+    resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
+    results = json.loads(resp.read())
+    product = {}
+    for j in range(len(payload['select'])):
+        product[payload['select'][j]] = results[0][j]
+    return render(request, "product.html", {'product': product})
 
