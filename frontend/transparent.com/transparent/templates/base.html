@@ -46,19 +46,19 @@
                 
                 {% if user.is_authenticated %}
                     <p>Welcome {{ user.username }}!</p>
-                    <form class="navbar-form pull-right" method="post" action="logout/">
+                    <form class="navbar-form pull-right" method="post" action="/logout/">
                     {% csrf_token %}
                     <input type="submit" class="btn" value="Logout">
                     </form>
                 {% else %}
                   	<!-- Register form -->
                     <!-- For now, just takes you to a different page -->
-                    <form class="navbar-form pull-right" action="register/">
+                    <form class="navbar-form pull-right" action="/register/">
                     <input type="submit" class="btn" value="Register">
                     </form>
                     
                     <!-- Login form -->
-                    <form class="navbar-form pull-right" method="post" action="login/">
+                    <form class="navbar-form pull-right" method="post" action="/login/">
                     {% csrf_token %}
                     <input class="span2" type="text" name="username" placeholder="User name">
                     <input class="span2" type="password" name="password" placeholder="Password">
