@@ -55,7 +55,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.userAgent = DEFAULT_USER_AGENT;
 	}
 	
-	private void stop() {
+	public void stop() {
 		this.alive = false;
 	}
 	
@@ -80,7 +80,6 @@ public class ModuleThread implements Runnable, Interruptable
 					total += read;
 					if (total > MAX_DOWNLOAD_SIZE)
 						break;
-					module.logDownloadProgress(total);
 					dest.writeShort(read);
 					dest.write(buf, 0, read);
 				}
@@ -92,8 +91,6 @@ public class ModuleThread implements Runnable, Interruptable
 			int read = stream.read();
 			total = read;
 			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
-				if (total > 0)
-					module.logDownloadProgress(total);
 				page.write(read);
 				read = stream.read();
 				total += read;
@@ -237,10 +234,10 @@ public class ModuleThread implements Runnable, Interruptable
 	{
 		pipe.stop();
 		piper.interrupt();
+		process.destroy();
 		try {
 			piper.join();
 		} catch (InterruptedException e) { }
-		process.destroy();
 	}
 	
 	public void setRequestType(byte requestType) {
@@ -288,7 +285,9 @@ public class ModuleThread implements Runnable, Interruptable
 		StreamPipe pipe = new StreamPipe(error, module.getLogStream());
 		Thread piper = new Thread(pipe);
 		piper.start();
-		
+
+		boolean responded = true;
+		ProductID requestedProductId = null;
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(requestType);
@@ -296,8 +295,7 @@ public class ModuleThread implements Runnable, Interruptable
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */
-				ProductID requestedProductId = null;
-				if (requestType == Core.PRODUCT_INFO_REQUEST) {
+				if (requestType == Core.PRODUCT_INFO_REQUEST && responded) {
 					if (requestedProductIds.hasNext()) {
 						requestedProductId = requestedProductIds.next();
 						String moduleProductId = requestedProductId.getModuleProductId();
@@ -307,6 +305,7 @@ public class ModuleThread implements Runnable, Interruptable
 						out.writeShort(0);
 						break;
 					}
+					responded = false;
 				}
 				out.flush();
 				
@@ -367,6 +366,7 @@ public class ModuleThread implements Runnable, Interruptable
 						getProductListResponse(module, in);
 					else if (requestType == Core.PRODUCT_INFO_REQUEST)
 						getProductInfoResponse(module, requestedProductId, in);
+					responded = true;
 					break;
 
 				default:

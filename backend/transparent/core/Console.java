@@ -1,15 +1,23 @@
 package transparent.core;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.fusesource.jansi.Ansi;
+import org.fusesource.jansi.Ansi.Erase;
 import org.fusesource.jansi.AnsiConsole;
 import org.fusesource.jansi.Ansi.Color;
 
@@ -22,10 +30,13 @@ public class Console
 	private static Command root = new Command("",
 			new ModulesCommand(),
 			new TasksCommand(),
-			new ExitCommand());
+			new HistoryCommand(),
+			new ExitCommand(),
+			new MigrateCommand());
 
 	private static ReentrantLock consoleLock = new ReentrantLock();
 	private static int nestedLock = 0;
+	private static boolean isReading = false;
 
 	private static final String PROMPT = "$ ";
 
@@ -33,10 +44,16 @@ public class Console
 	private static final String BOLD = new Ansi().bold().toString();
 	private static final String UNBOLD = new Ansi().boldOff().toString();
 	private static final String RED = new Ansi().fg(Color.RED).toString();
+	private static final String BLUE = new Ansi().fg(Color.BLUE).toString();
 	private static final String GRAY = new Ansi().fgBright(Color.BLACK).toString();
 	private static final String DEFAULT = new Ansi().fg(Color.DEFAULT).toString();
+	private static final String ERASE = new Ansi().eraseLine(Erase.ALL).toString();
 
 	private static List<Token> tokens = new ArrayList<Token>();
+	
+	private static ConsoleReader in = null;
+	private static final ConsoleCompletor completor = new ConsoleCompletor();
+	private static AtomicBoolean historyEnabled = new AtomicBoolean(true);
 
 	public static Boolean parseBoolean(String token)
 	{
@@ -46,9 +63,11 @@ public class Console
 			return false;
 
 		String lower = token.toLowerCase();
-		if (lower.equals("true") || lower.equals("on") || lower.equals("yes"))
+		if (lower.equals("true") || lower.equals("on")
+				|| lower.equals("yes") || lower.equals("y"))
 			return true;
-		else if (lower.equals("false") || lower.equals("off") || lower.equals("no"))
+		else if (lower.equals("false") || lower.equals("off")
+				|| lower.equals("no") || lower.equals("n"))
 			return false;
 		
 		return null;
@@ -87,7 +106,16 @@ public class Console
 	public static void println(String s)
 	{
 		lockConsole();
+		if (isReading && in != null) {
+			AnsiConsole.out.print(ERASE);
+			AnsiConsole.out.print(new Ansi().cursorLeft(
+					in.getCursorBuffer().cursor + PROMPT.length()));
+		}
 		AnsiConsole.out.println(s);
+		try {
+			if (isReading && in != null)
+				in.restoreLine();
+		} catch (IOException e) { }
 		unlockConsole();
 	}
 
@@ -101,32 +129,49 @@ public class Console
 	public static void printWarning(String className,
 			String methodName, String message)
 	{
-		lockConsole();
-		AnsiConsole.out.print(BOLD);
-		AnsiConsole.out.print(className + '.' + methodName + " WARNING: ");
-		AnsiConsole.out.print(UNBOLD);
-		AnsiConsole.out.println(message);
-		unlockConsole();
+		commandWarning(className + '.' + methodName, message);
 	}
 
 	public static void printError(String className,
 			String methodName, String message)
 	{
-		lockConsole();
-		AnsiConsole.out.print(RED);
-		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(DEFAULT);
-		AnsiConsole.out.println(message);
-		unlockConsole();
+		commandError(className + '.' + methodName, message);
 	}
 
 	public static void printError(String className,
 			String methodName, String message, String exception)
 	{
+		commandError(className + '.' + methodName, message, exception);
+	}
+
+	private static void commandWarning(String command, String message)
+	{
 		lockConsole();
-		AnsiConsole.out.print(RED);
-		AnsiConsole.out.print(className + '.' + methodName + " ERROR: ");
-		AnsiConsole.out.print(DEFAULT);
+		AnsiConsole.out.print(BOLD);
+		AnsiConsole.out.print(command + " WARNING: ");
+		AnsiConsole.out.print(UNBOLD);
+		AnsiConsole.out.print(message);
+		AnsiConsole.out.println();
+		unlockConsole();
+	}
+
+	private static void commandError(String command, String message)
+	{
+		lockConsole();
+		AnsiConsole.out.print(RED + BOLD);
+		AnsiConsole.out.print(command + " ERROR: ");
+		AnsiConsole.out.print(UNBOLD + DEFAULT);
+		AnsiConsole.out.print(message);
+		AnsiConsole.out.println();
+		unlockConsole();
+	}
+
+	private static void commandError(String command, String message, String exception)
+	{
+		lockConsole();
+		AnsiConsole.out.print(RED + BOLD);
+		AnsiConsole.out.print(command + " ERROR: ");
+		AnsiConsole.out.print(UNBOLD + DEFAULT);
 		AnsiConsole.out.print(message);
 		if (exception != null) {
 			if (message.length() > 0)
@@ -224,7 +269,7 @@ public class Console
 				printError("Console", "parseCommand", "Unrecognized lexer state.");
 			}
 		}
-		
+
 		if (pointer == null)
 			pointer = new Cursor(tokens.size(), token.length());
 
@@ -234,51 +279,75 @@ public class Console
 		return pointer;
 	}
 
-	private static void printTasks(Collection<Task> tasks, String suffix)
+	private static void printTasks(
+			Collection<Task> tasks, boolean isRunning)
 	{
-		Console.lockConsole();
-		println(tasks.size() + suffix);
 		for (Task task : tasks) {
 			String module = "<null>";
 			if (task.getModule() != null)
 				module = task.getModule().getIdString() + " ("
 						+ task.getModule().getModuleName() + ")";
 
-			println("Task type: " + task.getType().toString()
-					+ ", module: " + module
-					+ ", scheduled execution: " + new Date(task.getTime())
-					+ ", is running: " + Core.getRunningTasks().contains(task)
-					+ ", reschedules: " + task.reschedules()
-					+ ", dummy: " + task.isDummy());
+			print(BLUE + BOLD + "[" + task.getId() + "]" + UNBOLD + DEFAULT);
+			println(" Task type: " + task.getType().toString());
+			println(GRAY + "  module: " + DEFAULT + module);
+			println(GRAY + "  scheduled execution: " + DEFAULT + new Date(task.getTime()));
+			println(GRAY + "  is running: " + DEFAULT + isRunning);
+			println(GRAY + "  reschedules: " + DEFAULT + task.reschedules());
+			println(GRAY + "  dummy: " + DEFAULT + task.isDummy());
 		}
-		Console.unlockConsole();
 	}
-	
+
 	public static boolean parseCommand(String line)
 	{
 		lexCommand(line, line.length(), tokens);
-		
+
 		if (tokens.size() > 0) {
     		if (tokens.get(0).getToken().equals("exit"))
     			return false;
-    		root.run(tokens, 0);
+    		try {
+    			root.run(tokens, 0);
+    		} catch (Exception e) {
+    			printError("Console", "parseCommand", "", e.getMessage());
+    		}
+
+    		in.setUseHistory(historyEnabled.get());
+    		if (in.getCompletors().isEmpty())
+    			in.addCompletor(completor);
+    		if (consoleLock.isHeldByCurrentThread())
+    			consoleLock.unlock();
 		}
     	tokens.clear();
     	return true;
 	}
 
-	public static void startConsole()
+	public static boolean initConsole()
 	{
 		try {
-			ConsoleReader in = new ConsoleReader();
-			in.addCompletor(new ConsoleCompleter());
-			
+			lockConsole();
+			in = new ConsoleReader();
+			in.addCompletor(completor);
+
 			CandidateListCompletionHandler handler = new CandidateListCompletionHandler();
 			handler.setAlwaysIncludeNewline(false);
 			in.setCompletionHandler(handler);
-			
+			unlockConsole();
+
+			return true;
+		} catch (IOException e) {
+			printError("Core", "initConsole", "", e.getMessage());
+			return false;
+		}
+	}
+
+	public static void runConsole()
+	{
+		try {
 	        while (true) {
+	        	isReading = true;
 	    		String input = in.readLine(BOLD + PROMPT + UNBOLD);
+	        	isReading = false;
+
 	    		if (!parseCommand(input))
 	    			break;
 	        }
@@ -287,7 +356,7 @@ public class Console
 		}
 	}
 
-	private static class ConsoleCompleter implements Completor
+	private static class ConsoleCompletor implements Completor
 	{
 		private int complete(Command command, List<Token> tokens,
 				Cursor cursor, int tokenIndex, List<String> completions)
@@ -369,13 +438,13 @@ public class Console
 			Console.lockConsole();
     		println(Core.getModuleCount() + " module(s).");
     		for (Module module : Core.getModules()) {
-    			println("Module id: " + module.getIdString()
-    					+ ", name: " + module.getModuleName()
-    					+ ", source: " + module.getSourceName()
-    					+ ", remote: " + module.isRemote()
-    					+ ", blockedDownloading: " + module.blockedDownload()
-    					+ ", logging: " + module.isLoggingActivity()
-    					+ ", is saved: " + (module.getPersistentIndex() != -1));
+    			println(BOLD + "Module id: " + module.getIdString() + UNBOLD);
+    			println(GRAY + "  name: " + DEFAULT + module.getModuleName());
+    			println(GRAY + "  source: " + DEFAULT + module.getSourceName());
+    			println(GRAY + "  is remote: " + DEFAULT + module.isRemote());
+    			println(GRAY + "  blocked downloading: " + DEFAULT + module.blockedDownload());
+    			println(GRAY + "  active logging: " + DEFAULT + module.isLoggingActivity());
+    			println(GRAY + "  is saved: " + DEFAULT + (module.getPersistentIndex() != -1));
     		}
 			Console.unlockConsole();
 		}
@@ -395,6 +464,44 @@ public class Console
 					+ " [path] [is remote] [use blocked downloading]");
 		}
 
+		private void addModule(String name, String source,
+				String path, boolean remote, boolean blocked)
+		{
+			long id = Core.random();
+			Console.lockConsole();
+			if (!force) {
+				Console.println(BOLD + "Module id: " + Core.toUnsignedString(id) + UNBOLD);
+				Console.println(GRAY + "  name: " + DEFAULT + name);
+				Console.println(GRAY + "  source: " + DEFAULT + source);
+				Console.println(GRAY + "  path: " + DEFAULT + path);
+				Console.println(GRAY + "  is remote: " + DEFAULT + remote);
+				Console.println(GRAY + "  use blocked downloading: " + DEFAULT + blocked);
+			}
+
+			try {
+				Boolean response = true;
+
+				if (!force) {
+					in.setUseHistory(false);
+					response = parseBoolean(in.readLine("Add this module? "));
+					while (response == null) {
+						Console.println("Must specify a boolean parameter.");
+						response = parseBoolean(in.readLine("Add this module? "));
+					}
+				}
+				if (response) {
+					Module module = Module.load(id, name, source, path, remote, blocked);
+					if (module != null && Core.addModule(module))
+						Console.println("Module '" + name + "' added. "
+								+ "Use 'modules save' to push changes to database.");
+				}
+			} catch (IOException e) {
+				return;
+			} finally {
+				Console.unlockConsole();
+			}
+		}
+
 		@Override
 		public void run(List<Token> args, int index)
 		{
@@ -402,13 +509,13 @@ public class Console
 				/* parse the arguments */
 				if (args.size() < 5) {
 					Console.lockConsole();
-					Console.println("Too few arguments.");
+					commandError("modules add", "Too few arguments.");
 					usage();
 					Console.unlockConsole();
 					return;
 				} else if (args.size() > 7) {
 					Console.lockConsole();
-					Console.println("Too many arguments.");
+					commandError("modules add", "Too many arguments.");
 					usage();
 					Console.unlockConsole();
 					return;
@@ -419,12 +526,12 @@ public class Console
 				String path = args.get(4).getToken();
 
 				Boolean remote = false;
-				if (args.size() > 6)
-					remote = Console.parseBoolean(args.get(5).getToken());
+				if (args.size() > 5)
+					remote = parseBoolean(args.get(5).getToken());
 
 				Boolean blocked = true;
-				if (args.size() > 7)
-					remote = Console.parseBoolean(args.get(6).getToken());
+				if (args.size() > 6)
+					blocked = parseBoolean(args.get(6).getToken());
 
 				if (remote == null || blocked == null) {
 					Console.println("[is remote] and [use blocked downloading]"
@@ -432,39 +539,34 @@ public class Console
 					return;
 				}
 
-				long id = Core.random();
-				Console.lockConsole();
-				if (!force) {
-					Console.println("Module id: " + Core.toUnsignedString(id));
-					Console.println("  name: " + name);
-					Console.println("  source: " + source);
-					Console.println("  path: " + path);
-					Console.println("  is remote: " + remote);
-					Console.println("  use blocked downloading: " + blocked);
-				}
-
-				try {
-					char response = 'y';
-					if (!force) {
-						Console.print("Add this module? (y/n) ");
-						Console.flush();
-						response = (char) System.in.read();
-						Console.println();
-					}
-					if (response == 'y' || response == 'Y') {
-						Module module = Module.load(id, name, source, path, remote, blocked);
-						if (module != null
-								&& Core.addModule(module)
-								&& Core.saveModules())
-							Console.println("Module '" + name + "' saved to database.");
-					}
-				} catch (IOException e) {
-					return;
-				} finally {
-					Console.unlockConsole();
-				}
+				addModule(name, source, path, remote, blocked);
 			} else {
-				/* TODO: implement this */
+				try {
+					in.setUseHistory(false);
+					String name = in.readLine("Enter module name: ");
+					String source = in.readLine("Enter module source: ");
+					String path = in.readLine("Enter path: ");
+
+					Boolean remote = parseBoolean(
+							in.readLine("Is the module remote? "));
+					while (remote == null) {
+						Console.println("Must specify a boolean parameter.");
+						remote = parseBoolean(
+								in.readLine("Is the module remote? "));
+					}
+
+					Boolean blocked = parseBoolean(
+							in.readLine("Use blocked downloading? "));
+					while (blocked == null) {
+						Console.println("Must specify a boolean parameter.");
+						blocked = parseBoolean(
+								in.readLine("Use blocked downloading? "));
+					}
+
+					addModule(name, source, path, remote, blocked);
+				} catch (IOException e) {
+					commandError("modules add", "", e.getMessage());
+				}
 			}
 		}
 	}
@@ -476,7 +578,7 @@ public class Console
 		}
 
 		private void usage() {
-			Console.println("usage: modules get [id] [name|source|path|remote|blocked|log]");
+			println("usage: modules get [id] [name|source|path|remote|blocked|activelog]");
 		}
 
 		@Override
@@ -484,8 +586,7 @@ public class Console
 		{
 			if (args.size() != 4) {
 				lockConsole();
-				Console.println(RED + BOLD + "modules get ERROR:" + UNBOLD + DEFAULT
-						+ " Incorrect number of arguments.");
+				commandError("modules set", "Incorrect number of arguments.");
 				usage();
 				unlockConsole();
 				return;
@@ -495,25 +596,28 @@ public class Console
 			try {
 				id = new BigInteger(args.get(2).getToken()).longValue();
 			} catch (NumberFormatException e) {
-				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-						+ " Unable to parse module id.");
+				commandError("modules set", "Unable to parse module id.");
 				return;
 			}
 
 			Module module = Core.getModule(id);
+			if (module == null) {
+				commandError("modules set", "No module found with specified id.");
+				return;
+			}
 			String key = args.get(3).getToken();
 			if (key.equals("name"))
-				Console.println(module.getModuleName());
+				println(module.getModuleName());
 			else if (key.equals("source"))
-				Console.println(module.getSourceName());
+				println(module.getSourceName());
 			else if (key.equals("path"))
-				Console.println(module.getPath());
+				println(module.getPath());
 			else if (key.equals("remote")) {
-				Console.println(Boolean.toString(module.isRemote()));
+				println(Boolean.toString(module.isRemote()));
 			} else if (key.equals("blocked")) {
-				Console.println(Boolean.toString(module.blockedDownload()));
-			} else if (key.equals("log")) {
-				Console.println(Boolean.toString(module.isLoggingActivity()));
+				println(Boolean.toString(module.blockedDownload()));
+			} else if (key.equals("activelog")) {
+				println(Boolean.toString(module.isLoggingActivity()));
 			}
 		}
 	}
@@ -525,7 +629,8 @@ public class Console
 		}
 
 		private void usage() {
-			Console.println("usage: modules set [id] [name|source|path|remote|blocked|log] [value]");
+			println("usage: modules set [id] [name|source"
+					+ "|path|remote|blocked|activelog] [value]");
 		}
 
 		@Override
@@ -533,8 +638,7 @@ public class Console
 		{
 			if (args.size() != 5) {
 				lockConsole();
-				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-						+ " Incorrect number of arguments.");
+				commandError("modules set", "Incorrect number of arguments.");
 				usage();
 				unlockConsole();
 				return;
@@ -544,12 +648,15 @@ public class Console
 			try {
 				id = new BigInteger(args.get(2).getToken()).longValue();
 			} catch (NumberFormatException e) {
-				Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-						+ " Unable to parse module id.");
+				commandError("modules set", "Unable to parse module id.");
 				return;
 			}
 
 			Module module = Core.getModule(id);
+			if (module == null) {
+				commandError("modules set", "No module found with specified id.");
+				return;
+			}
 			String key = args.get(3).getToken();
 			String value = args.get(4).getToken();
 			if (key.equals("name"))
@@ -563,24 +670,21 @@ public class Console
 				if (parsed != null)
 					module.setRemote(parsed);
 				else {
-					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-							+ " Unable to parse boolean parameter.");
+					commandError("modules set", "Unable to parse boolean parameter.");
 				}
 			} else if (key.equals("blocked")) {
 				Boolean parsed = parseBoolean(value);
 				if (parsed != null)
 					module.setBlockedDownload(parsed);
 				else {
-					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-							+ " Unable to parse boolean parameter.");
+					commandError("modules set", "Unable to parse boolean parameter.");
 				}
-			} else if (key.equals("log")) {
+			} else if (key.equals("activelog")) {
 				Boolean parsed = parseBoolean(value);
 				if (parsed != null)
 					module.setLoggingActivity(parsed);
 				else {
-					Console.println(RED + BOLD + "modules set ERROR:" + UNBOLD + DEFAULT
-							+ " Unable to parse boolean parameter.");
+					commandError("modules set", "Unable to parse boolean parameter.");
 				}
 			}
 		}
@@ -596,10 +700,9 @@ public class Console
 		public void run(List<Token> args, int index)
 		{
 			if (Core.saveModules())
-				Console.println("Successfully saved " + Core.getModuleCount() + " modules.");
+				println("Successfully saved " + Core.getModuleCount() + " modules.");
 			else
-				Console.println(RED + BOLD + "modules save ERROR:" + UNBOLD + DEFAULT
-						+ " Error occurred while saving modules.");
+				commandError("modules save", "Error occurred while saving modules.");
 		}
 	}
 
@@ -608,11 +711,38 @@ public class Console
 		public RemoveModuleCommand() {
 			super("remove");
 		}
+		
+		private void usage() {
+			println("usage: modules remove [id]");
+		}
 
 		@Override
 		public void run(List<Token> args, int index)
 		{
-			/* TODO: implement this */
+			if (args.size() != 3) {
+				lockConsole();
+				commandError("modules remove", "Incorrect number of arguments.");
+				usage();
+				unlockConsole();
+				return;
+			}
+
+			long id;
+			try {
+				id = new BigInteger(args.get(2).getToken()).longValue();
+			} catch (NumberFormatException e) {
+				commandError("modules remove", "Unable to parse module id.");
+				return;
+			}
+
+			Module module = Core.getModule(id);
+			if (module == null) {
+				commandError("modules remove", "No module found with specified id.");
+				return;
+			}
+
+			if (!Core.removeModule(module))
+				commandError("modules remove", "Could not remove module.");
 		}
 	}
 
@@ -626,8 +756,7 @@ public class Console
 		public void run(List<Token> args, int index)
 		{
 			if (!Core.loadModules())
-				Console.println(RED + BOLD + "modules load ERROR:" + UNBOLD
-					+ DEFAULT + " Error occurred while loading modules.");
+				commandError("modules load", "Error occurred while loading modules.");
 		}
 	}
 
@@ -635,8 +764,13 @@ public class Console
 	{
 		public TasksCommand() {
 			super("tasks",
+					new LoadTasksCommand(),
+					new SaveTasksCommand(),
 					new QueuedTasksCommand(),
-					new RunningTasksCommand());
+					new RunningTasksCommand(),
+					new AddTaskCommand(true),
+					new AddTaskCommand(false),
+					new RemoveTaskCommand());
 		}
 
 		@Override
@@ -647,14 +781,46 @@ public class Console
 				return;
 			}
 
-			ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : Core.getQueuedTasks())
-    			jobs.add(task);
-    		for (Task task : Core.getRunningTasks())
-    			jobs.add(task);
+			List<Task> queued = Core.getQueuedTasks();
+			List<Task> running = Core.getRunningTasks();
+    		Collections.sort(queued);
+    		Collections.sort(running);
 
-    		Collections.sort(jobs);
-    		printTasks(jobs, " total task(s).");
+    		Console.lockConsole();
+			println((queued.size() + running.size()) + " total task(s).");
+    		printTasks(queued, false);
+    		printTasks(running, true);
+    		Console.unlockConsole();
+		}
+	}
+
+	private static class LoadTasksCommand extends Command
+	{
+		public LoadTasksCommand() {
+			super("load");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (!Core.loadQueue())
+				commandError("tasks load", "Error occurred while loading tasks.");
+		}
+	}
+
+	private static class SaveTasksCommand extends Command
+	{
+		public SaveTasksCommand() {
+			super("save");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (Core.saveQueue())
+				println("Successfully saved " + Core.getTaskCount() + " tasks.");
+			else
+				commandError("tasks save", "Error occurred while saving tasks.");
 		}
 	}
 
@@ -667,12 +833,13 @@ public class Console
 		@Override
 		public void run(List<Token> args, int index)
 		{
-    		ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : Core.getQueuedTasks())
-    			jobs.add(task);
+			List<Task> queued = Core.getQueuedTasks();
+    		Collections.sort(queued);
 
-    		Collections.sort(jobs);
-    		printTasks(jobs, " task(s) queued.");
+    		Console.lockConsole();
+			println(queued.size() + " task(s) queued.");
+    		printTasks(queued, false);
+    		Console.unlockConsole();
 		}
 	}
 
@@ -685,12 +852,373 @@ public class Console
 		@Override
 		public void run(List<Token> args, int index)
 		{
-			ArrayList<Task> jobs = new ArrayList<Task>();
-    		for (Task task : Core.getRunningTasks())
-    			jobs.add(task);
+			List<Task> running = Core.getRunningTasks();
+    		Collections.sort(running);
 
-    		Collections.sort(jobs);
-    		printTasks(jobs, " task(s) running.");
+    		Console.lockConsole();
+			println(running.size() + " task(s) running.");
+    		printTasks(running, true);
+    		Console.unlockConsole();
+		}
+	}
+
+	private static class AddTaskCommand extends Command
+	{
+		private final boolean force;
+
+		public AddTaskCommand(boolean force) {
+			super(force ? "forceadd" : "add");
+			this.force = force;
+		}
+
+		private void usage() {
+			Console.println("usage: tasks add [parse type] [module id]"
+					+ " [start time] [reschedules] [dummy]");
+			Console.println("  [parse type] can either be 'info', 'list', or 'image'.");
+			Console.println("  [start time] must be an integer indicating milliseconds from now.");
+			Console.println("  [dummy] indicates whether information is written to the database.");
+			Console.println("  By default, reschedules is false and dummy is true.");
+		}
+
+		private void addTask(TaskType type, Module module,
+				long time, boolean reschedules, boolean dummy)
+		{
+			Console.lockConsole();
+			if (!force) {
+				Console.println(BOLD + "Task type: " + type.toString() + UNBOLD);
+				Console.println(GRAY + "  module id: " + DEFAULT + module.getIdString());
+				Console.println(GRAY + "  module name: " + DEFAULT + module.getModuleName());
+				Console.println(GRAY + "  time: " + DEFAULT + new Date(time).toString());
+				Console.println(GRAY + "  reschedules: " + DEFAULT + reschedules);
+				Console.println(GRAY + "  is dummy: " + DEFAULT + dummy);
+			}
+
+			try {
+				Boolean response = true;
+
+				if (!force) {
+					response = parseBoolean(in.readLine("Add this task? "));
+					in.setUseHistory(false);
+					while (response == null) {
+						Console.println("Must specify a boolean parameter.");
+						response = parseBoolean(in.readLine("Add this task? "));
+					}
+				}
+				if (response) {
+					Task task = new Task(type, module, time, reschedules, dummy);
+					if (task != null) {
+						Core.queueTask(task);
+						Console.println("Task queued. "
+								+ "Use 'tasks save' to push changes to database.");
+					}
+				}
+			} catch (IOException e) {
+				return;
+			} finally {
+				Console.unlockConsole();
+			}
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() > 2) {
+				if (args.size() < 5) {
+					lockConsole();
+					commandError("tasks add", "Too few arguments.");
+					usage();
+					unlockConsole();
+					return;
+				}
+
+				String typeString = args.get(2).getToken().toLowerCase();
+				TaskType type;
+				if (typeString.equals("list")) {
+					type = TaskType.PRODUCT_LIST_PARSE;
+				} else if (typeString.equals("info")) {
+					type = TaskType.PRODUCT_INFO_PARSE;
+				} else if (typeString.equals("image")) {
+					type = TaskType.IMAGE_FETCH;
+				} else {
+					lockConsole();
+					commandError("tasks add", "Unable to parse task type.");
+					usage();
+					unlockConsole();
+					return;
+				}
+
+				long id;
+				try {
+					id = new BigInteger(args.get(3).getToken()).longValue();
+				} catch (NumberFormatException e) {
+					commandError("tasks add", "Unable to parse time.");
+					return;
+				}
+
+				Module module = Core.getModule(id);
+				if (module == null) {
+					commandError("tasks add", "No module found with specified id.");
+					return;
+				}
+
+				int time;
+				try {
+					time = Integer.parseInt(args.get(4).getToken());
+				} catch (NumberFormatException e) {
+					commandError("tasks add", "Unable to parse module id.");
+					return;
+				}
+
+				Boolean reschedules = false;
+				if (args.size() > 5)
+					reschedules = parseBoolean(args.get(5).getToken());
+
+				Boolean dummy = true;
+				if (args.size() > 6)
+					dummy = parseBoolean(args.get(6).getToken());
+
+				if (reschedules == null || dummy == null) {
+					Console.println("[is remote] and [use blocked downloading]"
+							+ " must be boolean arguments.");
+					return;
+				}
+
+				addTask(type, module, System.currentTimeMillis()
+						+ time, reschedules, dummy);
+			} else {
+				try {
+					in.setUseHistory(false);
+					String typeString = in.readLine("Enter task type: (list|info|image) ").toLowerCase();
+					TaskType type;
+					if (typeString.equals("list")) {
+						type = TaskType.PRODUCT_LIST_PARSE;
+					} else if (typeString.equals("info")) {
+						type = TaskType.PRODUCT_INFO_PARSE;
+					} else if (typeString.equals("image")) {
+						type = TaskType.IMAGE_FETCH;
+					} else {
+						lockConsole();
+						commandError("tasks add", "Unable to parse task type.");
+						usage();
+						unlockConsole();
+						return;
+					}					
+
+					long id;
+					try {
+						id = new BigInteger(in.readLine("Enter module id: ")).longValue();
+					} catch (NumberFormatException e) {
+						commandError("tasks add", "Unable to parse module id.");
+						return;
+					}
+
+					Module module = Core.getModule(id);
+					if (module == null) {
+						commandError("tasks add", "No module found with specified id.");
+						return;
+					}
+
+					int time;
+					try {
+						time = Integer.parseInt(in.readLine(
+								"Enter scheduled time (in ms from now): "));
+					} catch (NumberFormatException e) {
+						commandError("tasks add", "Unable to time.");
+						return;
+					}
+
+					Boolean reschedules = parseBoolean(in.readLine(
+							"Does this task automatically reschedule? "));
+					while (reschedules == null) {
+						Console.println("Must specify a boolean parameter.");
+						reschedules = parseBoolean(in.readLine(
+								"Does this task automatically reschedule? "));
+					}
+
+					Boolean dummy = parseBoolean(in.readLine(
+							"Disable writing to the database? "));
+					while (dummy == null) {
+						Console.println("Must specify a boolean parameter.");
+						dummy = parseBoolean(in.readLine(
+								"Disable writing to the database? "));
+					}
+
+					addTask(type, module, System.currentTimeMillis()
+							+ time, reschedules, dummy);
+				} catch (IOException e) {
+					commandError("modules add", "", e.getMessage());
+				}
+			}
+		}
+	}
+
+	private static class RemoveTaskCommand extends Command
+	{
+		public RemoveTaskCommand() {
+			super("remove");
+		}
+		
+		private void usage() {
+			println("usage: tasks remove [id]");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() != 3) {
+				lockConsole();
+				commandError("tasks remove", "Incorrect number of arguments.");
+				usage();
+				unlockConsole();
+				return;
+			}
+
+			int id;
+			try {
+				id = Integer.parseInt(args.get(2).getToken());
+			} catch (NumberFormatException e) {
+				commandError("tasks remove", "Unable to parse task id.");
+				return;
+			}
+
+			Task task = Task.getTask(id);
+			if (task == null) {
+				commandError("tasks remove", "No task found with specified id.");
+				return;
+			}
+
+			Core.stopTask(task, true);
+		}
+	}
+
+	private static class HistoryCommand extends Command
+	{
+		public HistoryCommand() {
+			super("history");
+		}
+
+		private void usage() {
+			println("usage: history on [optional:file]");
+			println("       history off");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			if (args.size() < 2) {
+				commandError("history", "Too few arguments.");
+				usage();
+				return;
+			}
+
+			Boolean on = parseBoolean(args.get(1).getToken());
+			if (on == null) {
+				commandError("history", "Unable to parse boolean parameter.");
+				return;
+			}
+
+			if (on) {
+				if (args.size() == 3) {
+					String filename = args.get(2).getToken();
+					File file = new File(filename);
+					if (!file.exists()) {
+						try {
+							if (!file.createNewFile()) {
+								commandError("history",
+										"Cannot create file '" + filename + "'.");
+								return;
+							}
+						} catch (IOException e) {
+							commandError("history", "", e.getMessage());
+							return;
+						}
+					} else if (!file.canRead() || !file.canWrite()) {
+						commandError("history", "No read/write access"
+								+ " to given file '" + filename + "'.");
+						return;
+					}
+
+					try {
+						in.getHistory().setHistoryFile(file);
+					} catch (IOException e) {
+						commandError("history", "", e.getMessage());
+						return;
+					}
+				} else if (args.size() > 3) {
+					commandError("history", "Too many arguments.");
+					usage();
+					return;
+				}
+
+				/* only turn on history if there are no errors */
+				historyEnabled.set(true);
+				in.setUseHistory(true);
+			} else {
+				historyEnabled.set(false);
+				in.setUseHistory(false);
+			}
+		}
+	}
+
+	private static class MigrateCommand extends Command
+	{
+		public MigrateCommand() {
+			super("migrate");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			HashSet<String> strings = new HashSet<String>();
+			try {
+				Reader r = new InputStreamReader(
+						new BufferedInputStream(new FileInputStream("Entity.sql")));
+				boolean QUOTE_STATE = false;
+				StringBuilder b = new StringBuilder();
+				
+				boolean done = false;
+				while (!done) {
+					int c = r.read();
+					
+					switch (c) {
+					case -1:
+						if (QUOTE_STATE)
+							System.err.println("Should not end in the quote state...");
+						done = true;
+						break;
+					case '\'':
+						if (QUOTE_STATE) {
+							strings.add(b.toString());
+							b = new StringBuilder();
+						}
+						QUOTE_STATE = !QUOTE_STATE;
+						break;
+					
+					default:
+						if (QUOTE_STATE)
+							b.append((char) c);
+					}
+				}
+				r.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+
+			/* find the newegg module */
+			Module newegg = null;
+			for (Module m : Core.getModules()) {
+				if (m.getModuleName().equals("Newegg Parser"))
+					newegg = m;
+			}
+			if (newegg == null) {
+				commandError("migrate", "Could not find module 'Newegg Parser'.");
+				return;
+			}
+			String[] strarr = new String[strings.size()];
+			strarr = strings.toArray(strarr);
+			if (Core.getDatabase() != null)
+				Core.getDatabase().addProductIds(newegg, strarr);
 		}
 	}
 

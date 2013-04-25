@@ -1,21 +1,12 @@
 package transparent.core;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.Callable;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -32,26 +23,24 @@ public class Core
 {
 	public static final byte PRODUCT_LIST_REQUEST = 0;
 	public static final byte PRODUCT_INFO_REQUEST = 1;
-	
+
 	public static final String NEWLINE = System.getProperty("line.separator");
-	
+
 	private static final String SEED_KEY = "seed";
 	private static final String MODULE_COUNT = "modules.count";
-	private static final String CONSOLE_FLAG = "--console";
+	private static final String RUNNING_TASKS = "running";
+	private static final String QUEUED_TASKS = "queued";
 	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
-	
+
 	private static final Sandbox sandbox = new NoSandbox();
 	private static Database database;
 
 	private static ScheduledExecutorService dispatcher =
 			Executors.newScheduledThreadPool(THREAD_POOL_SIZE);
-	private static Set<Task> queuedJobs =
-			Collections.newSetFromMap(new ConcurrentHashMap<Task, Boolean>());
-	private static Set<Task> runningJobs =
-			Collections.newSetFromMap(new ConcurrentHashMap<Task, Boolean>());
+	private static ReentrantLock tasksLock = new ReentrantLock();
 	
 	private static long seed = 0;
 
@@ -62,20 +51,20 @@ public class Core
 	private static ReentrantLock modulesLock = new ReentrantLock();
 	private static ConcurrentHashMap<Long, Module> modules =
 			new ConcurrentHashMap<Long, Module>();
-	
+
 	/* represents the list encoding of modules in the database */
-	private static HashMap<Module, Integer> indexModuleMap =
-			new HashMap<Module, Integer>();
-	private static HashMap<Integer, Module> moduleIndexMap =
-			new HashMap<Integer, Module>();
 	private static ArrayList<Module> moduleList = new ArrayList<Module>();
-	
+
+	/* represents the list encoding of tasks in the database */
+	private static ArrayList<Task> queuedList = new ArrayList<Task>();
+	private static ArrayList<Task> runningList = new ArrayList<Task>();
+
 	public static String toUnsignedString(long value)
 	{
         if (value >= 0) return String.valueOf(value);
         return BigInteger.valueOf(value).add(B64).toString();
 	}
-	
+
 	/**
 	 * Bit-shift random number generator with period 2^64 - 1.
 	 * @see http://www.javamex.com/tutorials/random_numbers/xorshift.shtml
@@ -89,7 +78,7 @@ public class Core
 			Console.printWarning("Core", "random", "Cannot save new seed.");
 		return seed;
 	}
-	
+
 	private static void loadSeed()
 	{
 		if (database == null) {
@@ -119,7 +108,7 @@ public class Core
 		}
 		Console.flush();
 	}
-	
+
 	public static boolean loadModules()
 	{
 		if (database == null) {
@@ -146,6 +135,7 @@ public class Core
 			}
 
 			Console.println("Found " + moduleCount + " modules.");
+			moduleList.ensureCapacity(moduleCount);
 			for (int i = 0; i < moduleCount; i++) {
 				Module module = Module.load(database, i);
 				if (module == null) {
@@ -156,10 +146,16 @@ public class Core
 
 				Console.println("Loaded module '" + module.getModuleName()
 						+ "' (id: " + module.getIdString() + ")");
-				modules.put(module.getId(), module);
+				Module old = modules.put(module.getId(), module);
+				if (old != null) {
+					Console.printError("Core", "loadModules",
+							"Module with id " + old.getIdString()
+							+ " (name: '" + old.getModuleName() + "')"
+							+ " already exists. Skipping...");
+					modules.put(module.getId(), old);
+					continue;
+				}
 				moduleList.add(module);
-				indexModuleMap.put(module, i);
-				moduleIndexMap.put(i, module);
 			}
 		} finally {
 			modulesLock.unlock();
@@ -168,7 +164,7 @@ public class Core
 		Console.println("Done loading modules.");
 		return true;
 	}
-	
+
 	public static boolean addModule(Module module)
 	{
 		modulesLock.lock();
@@ -181,30 +177,34 @@ public class Core
 						+ "(name: '" + old.getModuleName() + "')");
 				return false;
 			} else {
-				moduleIndexMap.put(moduleIndexMap.size(), module);
-				indexModuleMap.put(module, indexModuleMap.size());
+				moduleList.add(module);
 				return true;
 			}
 		} finally {
 			modulesLock.unlock();
 		}
 	}
-	
+
 	public static boolean removeModule(Module module)
 	{
 		modulesLock.lock();
 		try {
-			if (modules.remove(module.getId()) == null) {
+			int index = module.getIndex();
+			if (modules.remove(module.getId()) == null || index == -1) {
 				Console.printWarning("Core", "removeModule",
 						"Specified module does not exist.");
 				return false;
 			}
-			int index = indexModuleMap.remove(module);
 
 			/* move the last module into the removed module's place */
-			Module last = moduleIndexMap.remove(moduleIndexMap.size() - 1);
-			moduleIndexMap.put(index, last);
-			indexModuleMap.put(last, index);
+			if (moduleList.isEmpty())
+				return true;
+			Module last = moduleList.remove(moduleList.size() - 1);
+			module.setIndex(-1);
+			if (index != moduleList.size()) {
+				moduleList.set(index, last);
+				last.setIndex(index);
+			}
 			return true;
 		} finally {
 			modulesLock.unlock();
@@ -216,28 +216,20 @@ public class Core
 		modulesLock.lock();
 		try {
 			boolean success = true;
-			for (Entry<Integer, Module> pair : moduleIndexMap.entrySet()) {
-				int index = pair.getKey();
-				Module module = pair.getValue();
-				if (index < moduleList.size()) {
-					Module current = moduleList.get(index);
-					if (!current.deepEquals(module) && !module.save(database, index)) {
-						Console.printError("Core", "saveModules", "Unable to save module '"
-								+ module.getModuleName() + "' (id: " + module.getIdString()
-								+ ") at position " + index + ".");
-						success = false;
-					} else {
-						moduleList.set(index, module);
-					}
+			for (int index = 0; index < moduleList.size(); index++) {
+				Module module = moduleList.get(index);
+				if ((module.getIndex() == -1
+						|| module.getPersistentIndex() != module.getIndex())
+						&& !module.save(database, index))
+				{
+					Console.printError("Core", "saveModules", "Unable to save module '"
+							+ module.getModuleName() + "' (id: " + module.getIdString()
+							+ ") at position " + index + ".");
+					moduleList.set(index, null);
+					module.setIndex(-1);
+					success = false;
 				} else {
-					if (!module.save(database, index)) {
-						Console.printError("Core", "saveModules", "Unable to save module '"
-								+ module.getModuleName() + "' (id: " + module.getIdString()
-								+ ") at position " + index + ".");
-						success = false;
-					} else {
-						moduleList.add(module);
-					}
+					moduleList.set(index, module);
 				}
 			}
 
@@ -251,104 +243,258 @@ public class Core
 		}
 	}
 
-	private static ArrayList<Task> loadQueue(String queue)
+	private static boolean loadQueue(String queue, ArrayList<Task> list)
 	{
-		int taskCount = Integer.parseInt(
-				database.getMetadata(queue + ".count"));
-		
-		ArrayList<Task> tasks = new ArrayList<Task>();
-		for (int i = 0; i < taskCount; i++) {
-			String job = database.getMetadata(queue + "." + i);
-			Task task = Task.load(job);
-			if (task == null) {
-				Console.printError("Core", "loadQueue",
-						"Unable to parse task at index " + i + ".");
-				continue;
+		int taskCount;
+		try {
+			String taskCountString =
+					database.getMetadata(queue + ".count");
+			if (taskCountString == null) {
+				Console.printError("Core", "loadQueue", "No tasks stored.");
+				return false;
 			}
-			tasks.add(task);
-		}
-		return tasks;
-	}
-	
-	private static boolean loadQueue()
-	{
-		try
-		{
-			for (Task task : loadQueue("queued"))
-				queuedJobs.add(task);
-			for (Task task : loadQueue("running"))
-				queuedJobs.add(task);
-			return true;
-		} catch (RuntimeException e) {
-			Console.printError("Core", "loadQueue", "Unable to load task queue.");
+			taskCount = Integer.parseInt(taskCountString);
+		} catch (NumberFormatException e) {
+			Console.printError("Core", "loadQueue", "Unable to parse task count.");
 			return false;
 		}
+
+		list.ensureCapacity(taskCount);
+		for (int i = 0; i < taskCount; i++) {
+			if (list.size() > i && list.get(i) != null) {
+				Console.printError("Core", "loadQueue",
+						"A task already exists at index " + i + ".");
+				continue;
+			}
+			Task task = Task.load(database, queue, i);
+			list.add(task);
+		}
+		return true;
+	}
+
+	private static boolean saveQueue(
+			boolean isRunning, ArrayList<Task> list)
+	{
+		String queue = getQueueName(isRunning);
+
+		boolean success = true;
+		for (int index = 0; index < list.size(); index++) {
+			Task task = list.get(index);
+			if ((task.getIndex() == -1 || task.isRunning() != isRunning
+					|| task.getPersistentIndex() != task.getIndex())
+					&& !task.save(database, isRunning, index))
+			{
+				Module module = task.getModule();
+				Console.printError("Core", "saveQueue", "Unable to save task (module name: '"
+						+ module.getModuleName() + "', id: " + module.getIdString()
+						+ ") at position " + index + ".");
+				task.setIndex(-1);
+				list.set(index, null);
+				success = false;
+			} else {
+				list.set(index, task);
+			}
+		}
+
+		if (database == null)
+			success = false;
+		else success &= database.setMetadata(
+				queue + ".count", Integer.toString(list.size()));
+		return success;
+	}
+
+	public static boolean loadQueue()
+	{
+		if (database == null) {
+			Console.printError("Core", "loadQueue",
+					"No database available. No tasks loaded.");
+			return false;
+		}
+
+		tasksLock.lock();
+		try {
+			boolean success = (loadQueue("running", runningList)
+					&& loadQueue("queued", queuedList));
+
+	        /* dispatch all tasks in the queue */
+			for (Task task : runningList) {
+				task.setRunning(true);
+				dispatchTask(task);
+			}
+			for (Task task : queuedList)
+				dispatchTask(task);
+
+			return success;
+		} finally {
+			tasksLock.unlock();
+		}
+	}
+
+	public static boolean saveQueue()
+	{
+		if (database == null) {
+			Console.printError("Core", "loadQueue",
+					"No database available. No tasks loaded.");
+			return false;
+		}
+
+		tasksLock.lock();
+		try {
+			return (saveQueue(true, runningList)
+					&& saveQueue(false, queuedList));
+		} finally {
+			tasksLock.unlock();
+		}
 	}
 	
+	public static String getQueueName(boolean isRunning) {
+		return (isRunning ? RUNNING_TASKS : QUEUED_TASKS);
+	}
+
 	public static Module getModule(long moduleId) {
 		return modules.get(moduleId);
 	}
-	
-	public static Iterable<Module> getModules()
+
+	public static List<Module> getModules()
 	{
 		/* to ensure we get a thread-safe snapshot of the current modules */
 		modulesLock.lock();
 		try {
-			Iterable<Module> toreturn = new ArrayList<Module>(modules.values());
-			return toreturn;
+			return new ArrayList<Module>(modules.values());
 		} finally {
 			modulesLock.unlock();
 		}
 	}
-	
+
 	public static int getModuleCount() {
 		return modules.size();
 	}
-	
-	public static Set<Task> getQueuedTasks() {
-		return queuedJobs;
+
+	public static int getTaskCount()
+	{
+		modulesLock.lock();
+		try {
+			return queuedList.size() + runningList.size();
+		} finally {
+			modulesLock.unlock();
+		}
 	}
-	
-	public static Set<Task> getRunningTasks() {
-		return runningJobs;
+
+	public static List<Task> getQueuedTasks() {
+		/* to ensure we get a thread-safe snapshot of the queued tasks */
+		tasksLock.lock();
+		try {
+			return new ArrayList<Task>(queuedList);
+		} finally {
+			tasksLock.unlock();
+		}
 	}
-	
+
+	public static List<Task> getRunningTasks() {
+		/* to ensure we get a thread-safe snapshot of the running tasks */
+		tasksLock.lock();
+		try {
+			return new ArrayList<Task>(runningList);
+		} finally {
+			tasksLock.unlock();
+		}
+	}
+
 	public static Database getDatabase() {
 		return database;
 	}
-	
+
 	public static Sandbox getSandbox() {
 		return sandbox;
 	}
-	
-	public static void startTask(Task task) {
-		queuedJobs.remove(task);
-		runningJobs.add(task);
+
+	public static void queueTask(Task task)
+	{
+		if (task.isRunning() || task.getIndex() != -1)
+			return;
+
+		tasksLock.lock();
+		try {
+			task.setRunning(false);
+			task.setIndex(queuedList.size());
+			queuedList.add(task);
+			dispatchTask(task);
+		} finally {
+			tasksLock.unlock();
+		}
 	}
-	
-	public static void stopTask(Task task) {
-		runningJobs.remove(task);
+
+	public static void startTask(Task task)
+	{
+		if (task.isRunning())
+			return;
+
+		tasksLock.lock();
+		try {
+			int index = task.getIndex();
+			if (index < 0 || index >= queuedList.size())
+				return;
+			queuedList.remove(index);
+			task.setRunning(true);
+			task.setIndex(runningList.size());
+			runningList.add(task);
+			if (!saveQueue())
+				Console.printError("Core", "startTask", "Unable to save tasks.");
+		} finally {
+			tasksLock.unlock();
+		}
 	}
-	
-	public static void queueTask(Task task) {
-		queuedJobs.add(task);
-		dispatchTask(task);
+
+	private static void removeTask(ArrayList<Task> tasks, Task task)
+	{
+		int index = task.getIndex();
+		if (index < 0 || index >= tasks.size())
+			return;
+		tasks.remove(index);
+		task.setRunning(false);
+
+		/* move the last module into the removed module's place */
+		if (tasks.isEmpty())
+			return;
+		Task last = tasks.remove(tasks.size() - 1);
+		task.setIndex(-1);
+		if (index != tasks.size()) {
+			tasks.set(index, last);
+			last.setIndex(index);
+		}
 	}
-	
+
+	public static void stopTask(Task task, boolean cancelRescheduling)
+	{
+		tasksLock.lock();
+		try {
+			if (task.isRunning())
+				removeTask(runningList, task);
+			else removeTask(queuedList, task);
+			Task.removeTask(task.getId());
+
+			/* interrupt the thread if it is running */
+			ScheduledFuture<Object> thread = task.getFuture();
+			task.stop(cancelRescheduling);
+			thread.cancel(true);
+		} finally {
+			tasksLock.unlock();
+		}
+	}
+
 	private static void dispatchTask(Task task) {
 		long delta = task.getTime() - System.currentTimeMillis();
 		ScheduledFuture<Object> future =
 				dispatcher.schedule(task, Math.max(delta, 0), TimeUnit.MILLISECONDS);
 		task.setFuture(future);
 	}
-	
+
 	public static void main(String[] args)
 	{
 		AnsiConsole.systemInstall();
-		
+
 		/* parse argument flags */
 		String script = DEFAULT_SCRIPT;
-		boolean console = false;
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].equals(SCRIPT_FLAG)) {
 				if (i + 1 < args.length) {
@@ -357,8 +503,6 @@ public class Core
 				} else {
 					Console.printError("Core", "main", "Unspecified script filepath.");
 				}
-			} else if (args[i].equals(CONSOLE_FLAG)) {
-				console = true;
 			} else if (args[i].equals(HELP_FLAG)) {
 				/* TODO: implement this */
 			} else {
@@ -366,18 +510,24 @@ public class Core
 						"Unrecognized flag '" + args[i] + "'.");
 			}
 		}
-		
+
         try {
             database = new MariaDBDriver();
         } catch (Exception e) {
-        	Console.printError("Core", "main", "Cannot connect to database.", e.getMessage());
+        	Console.printError("Core", "main", "Cannot "
+        			+ "connect to database.", e.getMessage());
         }
 
 		/* load random number generator seed */
         loadSeed();
 
+        /* load the script engine */
+        boolean consoleReady = Console.initConsole();
+        if (!consoleReady)
+        	Console.printError("Core", "main", "Unable to initialize script engine.");
+
 		/* run the user-specified script */
-        if (script != null) {
+        if (consoleReady && script != null) {
         	BufferedReader reader = null;
         	try {
 	        	reader = new BufferedReader(new FileReader(script));
@@ -400,160 +550,23 @@ public class Core
         	}
         }
 
-        /* dispatch all tasks in the queue */
-		if (!console) {
-			for (Task task : queuedJobs)
-				dispatchTask(task);
-		}
-        
 		/* start the main loop */
-		Console.startConsole();
-	}
-}
+		if (consoleReady)
+			Console.runConsole();
 
-enum TaskType {
-	PRODUCT_LIST_PARSE,
-	PRODUCT_INFO_PARSE,
-	IMAGE_FETCH
-}
-
-class Task implements Comparable<Task>, Callable<Object>
-{
-	private final TaskType type;
-	private final Module module;
-	private ScheduledFuture<Object> future;
-	private long time;
-	private boolean reschedules;
-	private boolean dummy;
-	
-	public Task(TaskType type, Module module,
-			long time, boolean reschedules, boolean dummy)
-	{
-		this.type = type;
-		this.module = module;
-		this.time = time;
-		this.reschedules = reschedules;
-		this.dummy = dummy;
-	}
-	
-	public TaskType getType() {
-		return type;
-	}
-	
-	public Module getModule() {
-		return module;
-	}
-	
-	public void setFuture(ScheduledFuture<Object> future) {
-		this.future = future;
-	}
-	
-	public ScheduledFuture<Object> getFuture() {
-		return future;
-	}
-	
-	public long getTime() {
-		return time;
-	}
-	
-	public boolean reschedules() {
-		return this.reschedules;
-	}
-	
-	public boolean isDummy() {
-		return this.dummy;
-	}
-	
-	public static Task load(String data)
-	{
-		String[] tokens = data.split("\\.");
-		if (tokens.length != 5) {
-			Console.printError("Task", "load", "Unable to parse string.");
-			return null;
+		/* tell all tasks to end */
+		tasksLock.lock();
+		try {
+			for (Task task : runningList) {
+				if (task != null) {
+					task.stop(true);
+					if (task.getFuture() != null)
+						task.getFuture().cancel(true);
+				}
+			}
+		} finally {
+			tasksLock.unlock();
 		}
-		
-		TaskType type;
-		if (tokens[0].equals("0"))
-			type = TaskType.PRODUCT_LIST_PARSE;
-		else if (tokens[0].equals("1"))
-			type = TaskType.PRODUCT_INFO_PARSE;
-		else if (tokens[0].equals("2"))
-			type = TaskType.IMAGE_FETCH;
-		else {
-			Console.printError("Task", "load", "Unable to parse task type.");
-			return null;
-		}
-		
-		long id = Long.parseLong(tokens[1]);
-		long time = Long.parseLong(tokens[2]);
-		boolean reschedules = !tokens[3].equals("0");
-		boolean dummy = !tokens[4].equals("0");
-		
-		return new Task(type, Core.getModule(id), time, reschedules, dummy);
-	}
-	
-	public String save()
-	{
-		String typeString;
-		switch (type) {
-		case PRODUCT_LIST_PARSE:
-			typeString = "0";
-			break;
-		case PRODUCT_INFO_PARSE:
-			typeString = "1";
-			break;
-		case IMAGE_FETCH:
-			typeString = "2";
-			break;
-		default:
-			Console.printError("Task", "save", "Unrecognized type.");
-			return null;
-		}
-		
-		String reschedulesString = reschedules ? "1" : "0";
-		String dummyString = dummy ? "1" : "0";
-		return typeString + "." + module.getIdString() + "." + time
-				+ "." + reschedulesString + "." + dummyString;
-	}
-
-	@Override
-	public int compareTo(Task o) {
-		if (time < o.time)
-			return -1;
-		else if (time > o.time)
-			return 1;
-		else return 0;
-	}
-
-	@Override
-	public Object call() throws Exception
-	{
-		/* notify the core that this task has started */
-		Core.startTask(this);
-		
-		ModuleThread wrapper;
-		switch (type) {
-		case PRODUCT_LIST_PARSE:
-			wrapper = new ModuleThread(module, dummy);
-			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
-			wrapper.run();
-			Core.stopTask(this);
-			return null;
-		case PRODUCT_INFO_PARSE:
-			wrapper = new ModuleThread(module, dummy);
-			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
-			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
-			wrapper.run();
-			Core.stopTask(this);
-			return null;
-		case IMAGE_FETCH:
-			Console.printError("Task", "call", "Image fetching not implemented.");
-			Core.stopTask(this);
-			return null;
-		default:
-			Console.printError("Task", "call", "Unrecognized task type.");
-			Core.stopTask(this);
-			return null;
-		}
+		dispatcher.shutdown();
 	}
 }
