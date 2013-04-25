@@ -7,10 +7,12 @@
   <div class="btn-group btn-group-vertical">
             <!-- INCLUDE LOGO SOURCE HERE instead of "..." --            <!-- Search bar form -->
         <div class="input-append">
-        <!-- We want to replace the placeholder string with the string that was just searched. -->
-            <input class="span5" id="appendedInputButton" type="text" placeholder="What you just searched yo!">
-            <button class="btn btn-primary" type="button">Search</button>
-         </div>
+        <form action="/search/">
+            <input class="span5" id="appendedInputButton" placeholder="{{ query }}" type="text" name="q">
+            <input type="hidden" type="text" name="p" value="1">
+            <input class="btn btn-primary" type="submit" value="Search">
+        </form>
+        </div>
     </div>
     
 <!-- Display results of search -->

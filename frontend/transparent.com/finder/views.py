@@ -65,7 +65,7 @@ def search(request):
         products = []
         for i in range(0, len(results), 3):
             products.append(results[i:i+3])
-        return render(request, "search.html", {'products': products})
+        return render(request, "search.html", {'products': products, 'query': query})
     else:
         return HttpResponseRedirect('/')
 
