@@ -1,13 +1,138 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
 <head>
-    <title>{% block title %}{% endblock %}</title>
+<meta charset="utf-8">
+<!-- TemplateBeginEditable name="doctitle" -->
+<title>Transparent: An Open Price Tracking Platform</title>
+<!-- TemplateEndEditable -->
+<!-- TemplateBeginEditable name="head" -->
+<!-- TemplateEndEditable -->
+<style type="text/css">
+
+/* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
+@import url("/css/bootstrap.css");
+
+.container {
+	margin-top: 8%;
+	width: 90%;
+}
+
+.content {
+	float: left;
+	width:70%;
+}
+
+.sidebarLeft {
+	float:left;
+	width: 15%;	
+
+}
+.sidebarRight {
+	float:left;
+	width: 15%;	
+}
+
+</style>
+
 </head>
+
 <body>
-    {% block content %}{% endblock %}
-    {% block footer %}
-    <hr>
-    <p>Thanks for visiting my site.</p>
-    {% endblock %}
+<!-- ------------------ HEADER ----------------- -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+      		<!-- Logo at top right of screen. Should link to home page -->
+            <a class="brand" href="/"> Transparent</a>
+            <div class="nav-collapse collapse">
+                
+                {% if user.is_authenticated %}
+                    <p>Welcome {{ user.username }}!</p>
+                    <form class="navbar-form pull-right" method="post" action="/logout/">
+                    {% csrf_token %}
+                    <input type="submit" class="btn" value="Logout">
+                    </form>
+                {% else %}
+                  	<!-- Register form -->
+                    <!-- For now, just takes you to a different page -->
+                    <form class="navbar-form pull-right" action="/register/">
+                    <input type="submit" class="btn" value="Register">
+                    </form>
+                    
+                    <!-- Login form -->
+                    <form class="navbar-form pull-right" method="post" action="/login/">
+                    {% csrf_token %}
+                    <input class="span2" type="text" name="username" placeholder="User name">
+                    <input class="span2" type="password" name="password" placeholder="Password">
+                    <input type="submit" class="btn" value="Login">
+                    </form>
+                {% endif %}
+
+          </div>
+        </div>
+</div>
+
+<!-- ------------------ ACTUAL CONTENT ------------------ -->
+<div class="container">
+	<!-- Contains different product categories -->
+    <div class="sidebarLeft">
+      <div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">Hardware</button>
+            <button class="btn btn-block">Category 2</button>
+            <button class="btn btn-block">Category 3</button>
+            <button class="btn btn-block">Category 4</button>
+            <button class="btn btn-block">Category 5</button>
+        </div>
+    </div>
+    
+    {% block content %}
+    {% endblock content %}
+
+    {% if user.is_authenticated %}
+    <!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+    <div class="sidebarRight">
+        <div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">My Tracker</button>
+            <button class="btn btn-block">My Modules</button>
+            <button class="btn btn-block">My Settings</button>
+            <br>
+          	<button class="btn btn-block">Submit Module</button>
+       </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ------------------ FOOTER ------------------ -->
+
+	<div class="navbar navbar-inverse navbar-fixed-bottom">
+      <div class="navbar-inner" >
+            <ul class="nav" >
+              <li><a href="/about">About</a></li>
+              <li><a href="/howItWorks">How it works</a></li>
+              <li><a href="/modules">Modules</a></li>
+            </ul>
+          </div><!--/.nav-collapse -->
+    </div>
+
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="/js/jquery.js"></script>
+    <script src="/js/bootstrap.js"></script>
+    
+    <!--
+    <script src="/js/bootstrap-transition.js"></script>
+    <script src="/js/bootstrap-alert.js"></script>
+    <script src="/js/bootstrap-modal.js"></script>
+    <script src="/js/bootstrap-dropdown.js"></script>
+    <script src="/js/bootstrap-scrollspy.js"></script>
+    <script src="/js/bootstrap-tab.js"></script>
+    <script src="/js/bootstrap-tooltip.js"></script>
+    <script src="/js/bootstrap-popover.js"></script>
+    <script src="/js/bootstrap-button.js"></script>
+    <script src="/js/bootstrap-collapse.js"></script>
+    <script src="/js/bootstrap-carousel.js"></script>
+    <script src="/js/bootstrap-typeahead.js"></script>
+    -->
+    
 </body>
 </html>
