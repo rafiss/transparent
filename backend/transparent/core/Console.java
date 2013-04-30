@@ -1240,8 +1240,12 @@ public class Console
 				String query = "raid";
 				if (args.size() > 1)
 					query = args.get(1).getToken();
-				
-				URLConnection connection = new URL("http://140.180.186.131:16317").openConnection();
+
+				String limit = "15";
+				if (args.size() > 2)
+					limit = args.get(2).getToken();
+
+				URLConnection connection = new URL("http://localhost:16317" /*"http://140.180.186.131:16317"*/).openConnection();
 				HttpURLConnection http = (HttpURLConnection) connection;
 				http.setDoInput(true);
 				http.setDoOutput(true);
@@ -1250,8 +1254,9 @@ public class Console
 				http.connect();
 	
 				http.getOutputStream().write(
-						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\"],"
-						+ " \"where\":{\"name\":\"=" + query + "\"}}").getBytes());
+						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\",\"name\"],"
+						+ " \"where\":{\"name\":\"=" + query + "\"},"
+						+ " \"limit\":" + limit + "}").getBytes());
 				http.getOutputStream().flush();
 				http.getOutputStream().close();
 

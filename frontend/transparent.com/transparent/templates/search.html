@@ -30,7 +30,7 @@
         {% for product in row %}
     	<li class="span4">
         	<div class="thumbnail">
-        	    <a href="/product/?q=memory"><img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0" /></a>
+        	    <a href="/product/{{ product.model }}/?q={{ product.name }}"><img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0" /></a>
             	<div class="caption">
             	<h4>{{ product.name }}</h4>    
                 <ul style="list-style:none;">

@@ -41,19 +41,22 @@ public class Server implements Container
 
 		@Override
 		public void run() {
+			PrintStream body = null;
 			try {
-				PrintStream body = response.getPrintStream();
+				body = response.getPrintStream();
 				response.setValue("Content-Type", "text/plain");
 
 				Object object = parser.parse(request.getContent());
 				if (!(object instanceof JSONObject)) {
 					body.close();
+					body.println(error("Root structure must be a map."));
 					return;
 				}
 
 				JSONObject map = (JSONObject) object;
 				Object selectObject = map.get("select");
 				if (!(selectObject instanceof JSONArray)) {
+					body.println(error("'select' key must map to a list of strings."));
 					body.close();
 					return;
 				}
@@ -62,6 +65,7 @@ public class Server implements Container
 				String[] select = new String[selectList.size()];
 				for (int i = 0; i < selectList.size(); i++) {
 					if (!(selectList.get(i) instanceof String)) {
+						body.println(error("'select' key must map to a list of strings."));
 						body.close();
 						return;
 					}
@@ -74,6 +78,7 @@ public class Server implements Container
 				Condition name = null;
 				if (whereObject != null) {
 					if (!(whereObject instanceof JSONObject)) {
+						body.println(error("'where' key must map to a map of string pairs."));
 						body.close();
 						return;
 					}
@@ -84,17 +89,21 @@ public class Server implements Container
 					for (Entry<String, Object> pair : whereMap.entrySet()) {
 						String key = pair.getKey();
 						if (!(pair.getValue() instanceof String)) {
+							body.println(error("Key in the 'where' entry must be string."));
 							body.close();
 							return;
 						}
 
 						String value = (String) pair.getValue();
 						if (value.length() == 0) {
+							body.println(error("Value in the 'where' entry"
+									+ " must have non-zero length."));
 							body.close();
 							return;
 						}
 						Relation relation = parse(value.charAt(0));
 						if (relation == null) {
+							body.println(error("Unable to parse relation operator"));
 							body.close();
 							return;
 						}
@@ -112,6 +121,7 @@ public class Server implements Container
 				Object sortObject = map.get("sort");
 				if (sortObject != null) {
 					if (!(sortObject instanceof String)) {
+						body.println(error("'sort' key must map to a string."));
 						body.close();
 						return;
 					}
@@ -122,7 +132,12 @@ public class Server implements Container
 				int page = -1;
 				Object pageObject = map.get("page");
 				if (pageObject != null) {
-					if (!(pageObject instanceof String)) {
+					if (pageObject instanceof Integer) {
+						page = (int) pageObject;
+					} else if (pageObject instanceof String) {
+						page = Integer.parseInt((String) pageObject);
+					} else {
+						body.println(error("'page' key must map to an integer or string."));
 						body.close();
 						return;
 					}
@@ -133,20 +148,29 @@ public class Server implements Container
 				int limit = -1;
 				Object limitObject = map.get("limit");
 				if (limitObject != null) {
-					if (!(limitObject instanceof String)) {
+					if (limitObject instanceof Integer) {
+						limit = (int) limitObject;
+					} else if (limitObject instanceof String) {
+						limit = Integer.parseInt((String) limitObject);
+					} else {
+						body.println(error("'limit' key must map to an integer or string."));
 						body.close();
 						return;
 					}
-
-					limit = Integer.parseInt((String) limitObject);
 				}
 
 				JSONArray results = query(select, name, where, sort, page, limit);
-				if (results != null) {
+				if (results != null)
 					body.println(results.toJSONString());
+				else
+					body.println(error("Internal error occurred during query."));
+				body.close();
+			} catch (Exception e) {
+				if (body != null) {
+					body.println(error("Exception thrown: " + e.getMessage()));
 					body.close();
 				}
-			} catch (Exception e) { }
+			}
 		}
 	}
 
@@ -204,6 +228,8 @@ public class Server implements Container
 						/* push the last row into our list of results */
 						if (!discard) {
 							json.add(row);
+							if (json.size() == limit)
+								return json;
 							row = new JSONArray();
 							row.ensureCapacity(select.length);
 						}
