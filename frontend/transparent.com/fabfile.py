@@ -9,7 +9,8 @@ def ec2():
 def deploy():
     with cd('transparent'):
         run('git pull')
-    run('cp -r transparent/frontend/transparent.com/* ' +env.project_root)
+    run('cp -r transparent/frontend/transparent.com/* ' + env.project_root)
+    run('sudo service httpd restart')
 
 def deploy_db():
     with cd(env.project_root):
