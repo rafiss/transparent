@@ -4,6 +4,9 @@ CREATE DATABASE IF NOT EXISTS transparent;
 GRANT SELECT, INSERT, UPDATE, DELETE ON transparent.* TO 'darius'@'localhost';
 GRANT EXECUTE ON PROCEDURE transparent.AddProductId TO 'darius'@'localhost';
 GRANT EXECUTE ON PROCEDURE transparent.InsertNewAttribute TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.QueryWithAttributes TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE transparent.QueryWithIndexes TO 'darius'@'localhost';
+
 
 CREATE TABLE IF NOT EXISTS transparent.Metadata (
     `meta_key` TEXT,
@@ -12,24 +15,24 @@ CREATE TABLE IF NOT EXISTS transparent.Metadata (
 
 CREATE TABLE IF NOT EXISTS transparent.Entity (
     `entity_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-    `name` TEXT,
-	`module_id` BIGINT NOT NULL
+    `name` TEXT, INDEX(`name`(10)),
+	`module_id` BIGINT NOT NULL, INDEX(`module_id`)
 );
 
 CREATE TABLE IF NOT EXISTS transparent.PropertyType (
     `property_type_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-    `property_name` TEXT
+    `property_name` TEXT, INDEX(`property_name`(10))
 );
 
 CREATE TABLE IF NOT EXISTS transparent.Property (
     `property_id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-    `entity_id` INT NOT NULL,
-    `property_type_id` INT NOT NULL
+    `entity_id` INT NOT NULL, INDEX(`entity_id`),
+    `property_type_id` INT NOT NULL, INDEX(`property_type_id`)
 );
 
 CREATE TABLE IF NOT EXISTS transparent.Trait (
     `property_id` INT PRIMARY KEY NOT NULL,
-    `value` TEXT
+    `value` TEXT, INDEX(`value`(10))
 );
 
 CREATE OR REPLACE VIEW transparent.vModel AS
@@ -87,7 +90,6 @@ CREATE PROCEDURE transparent.AddProductId(
     SQL SECURITY INVOKER
 BEGIN
     DECLARE generatedEntityId INT;
-    DECLARE fieldName TEXT DEFAULT 'module_id';
 
 	SELECT entity_id from Entity WHERE
 		name=moduleProductId AND
@@ -95,6 +97,80 @@ BEGIN
 
     IF generatedEntityId IS NULL THEN
         INSERT INTO Entity VALUES(NULL, moduleProductId, moduleIdLong);
+    END IF;
+END//
+
+CREATE PROCEDURE transparent.QueryWithAttributes(
+    IN whereClause TEXT,
+    IN whereArg TEXT,
+    IN sortClause TEXT,
+    IN sortAsc BOOLEAN,
+    IN startRow INT,
+    IN numRows INT)
+    SQL SECURITY INVOKER
+BEGIN
+    IF sortAsc IS TRUE THEN
+        SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
+            FROM vModel AS v1
+            INNER JOIN vModel AS v2
+                ON v1.EntityID=v2.EntityID
+                AND v2.PropertyName=whereClause
+                AND v2.TraitValue=whereArg
+            INNER JOIN vModel AS v3
+                ON v1.EntityID=v3.EntityID
+                AND v3.PropertyName=sortClause
+        ORDER BY v3.TraitValue ASC
+        LIMIT startRow, numRows;
+    ELSE
+        SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
+            FROM vModel AS v1
+            INNER JOIN vModel AS v2
+                ON v1.EntityID=v2.EntityID
+                AND v2.PropertyName=whereClause
+                AND v2.TraitValue=whereArg
+            INNER JOIN vModel AS v3
+                ON v1.EntityID=v3.EntityID
+                AND v3.PropertyName=sortClause
+        ORDER BY v3.TraitValue DESC
+        LIMIT startRow, numRows;
+    END IF;
+END//
+
+CREATE PROCEDURE transparent.QueryWithIndexes(
+    IN whereClause TEXT,
+    IN whereArg TEXT,
+    IN sortClause TEXT,
+    IN sortAsc INT,
+    IN startRow INT,
+    IN numRows INT)
+    SQL SECURITY INVOKER
+BEGIN
+    IF sortAsc IS TRUE THEN
+        SELECT v1.EntityID
+            FROM vModel AS v1
+            INNER JOIN vModel AS v2
+                ON v1.EntityID=v2.EntityID
+                AND v2.PropertyName=whereClause
+                AND v2.TraitValue=whereArg
+            INNER JOIN vModel AS v3
+                ON v1.EntityID=v3.EntityID
+                AND v3.PropertyName=sortClause
+        GROUP BY v1.EntityID
+        ORDER BY v3.TraitValue ASC
+        LIMIT startRow, numRows;
+    ELSE
+        SELECT v1.EntityID
+            FROM vModel AS v1
+            INNER JOIN vModel AS v2
+                ON v1.EntityID=v2.EntityID
+                AND v2.PropertyName=whereClause
+                AND v2.TraitValue=whereArg
+            INNER JOIN vModel AS v3
+                ON v1.EntityID=v3.EntityID
+                AND v3.PropertyName=sortClause
+        GROUP BY v1.EntityID
+        ORDER BY v3.TraitValue DESC
+        LIMIT startRow, numRows;
     END IF;
 END//
 
