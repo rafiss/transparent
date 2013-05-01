@@ -1,4 +1,4 @@
-from fabric.api import env, run
+from fabric.api import env, run, cd
 
 def ec2():
     env.hosts = ['rafiss.com:55323']
