@@ -14,6 +14,9 @@ backend/bin/
 # Python files
 *.py[cod]
 
+# Static site dir (should be populated by ./manage.py collectstatic)
+frontend/transparent.com/transparent/static/
+
 # C extensions
 *.so
 

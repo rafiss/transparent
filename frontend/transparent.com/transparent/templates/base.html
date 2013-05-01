@@ -7,10 +7,12 @@
 <!-- TemplateEndEditable -->
 <!-- TemplateBeginEditable name="head" -->
 <!-- TemplateEndEditable -->
+
+{% load staticfiles %}
 <style type="text/css">
 
 /* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
-@import url("/css/bootstrap.css");
+@import url("{% static "css/bootstrap.css" %}");
 
 .container {
 	margin-top: 8%;
@@ -116,8 +118,8 @@
     <!-- Le javascript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="/js/jquery.js"></script>
-    <script src="/js/bootstrap.js"></script>
+    <script src="{% static "js/jquery.js" %}"></script>
+    <script src="{% static "js/bootstrap.js" %}"></script>
     
     <!--
     <script src="/js/bootstrap-transition.js"></script>
