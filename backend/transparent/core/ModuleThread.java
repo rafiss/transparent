@@ -1,5 +1,7 @@
 package transparent.core;
 
+import transparent.core.database.Database;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -247,7 +249,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.requestType = requestType;
 	}
 
-	public void setRequestedProductIds(Iterator<ProductID> productIds) {
+	public void setRequestedProductIds(Database.ResultsIterator<ProductID> productIds) {
 		this.requestedProductIds = productIds;
 	}
 

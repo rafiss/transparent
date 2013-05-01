@@ -14,7 +14,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.AbstractMap;
-import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -23,12 +22,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
     private static final String CFG_FILE = "transparent/core/database/transparent.cfg";
 
     private static final String MODULE_ID = "module_id";
-
     private static final String METADATA_TABLE = "Metadata";
     private static final String ENTITY_TABLE = "Entity";
-    private static final String PROPERTY_TYPE_TABLE = "PropertyType";
-    private static final String PROPERTY_TABLE = "Property";
-    private static final String TRAIT_TABLE = "Trait";
     private static final String MODEL_NAME = "vModel";
 
     private final Connection connection;
@@ -85,7 +80,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public Iterator<ProductID> getProductIds(Module module) {
+    public ResultSetIterator getProductIds(Module module) {
         PreparedStatement statement = null;
         try {
             statement = buildSelectStatement(ENTITY_TABLE,
@@ -258,6 +253,69 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
 
         return null;
+    }
+
+    /**
+     * Query the database with the given parameters and return a Results object.
+     * <br />
+     * <br />
+     * <b>NOTE: Only the first WHERE clause is applied.</b>
+     *
+     * @param whereClause Fields names to apply
+     * @param whereArgs   Values for the given fields
+     * @param sortBy      Value to sort by
+     * @param sortAsc     True if sort ascending, false if sort descending
+     * @param startRow    The index in the query result to first return
+     * @param numRows     The number of rows to return
+     * @param onlyIndexes True if only distinct EntityIDs are to be returned
+     * @return Results returned from the database
+     */
+    @Override
+    public Results query(String[] whereClause, String[] whereArgs, String sortBy, boolean sortAsc,
+                         Integer startRow, Integer numRows, boolean onlyIndexes) {
+        CallableStatement statement = null;
+        String query = null;
+
+        if (onlyIndexes) {
+            query = "{ CALL transparent.QueryWithIndexes(?, ?, ?, ?, ?, ?) }";
+        } else {
+            query = "{ CALL transparent.QueryWithAttributes(?, ?, ?, ?, ?, ?) }";
+        }
+
+        try {
+            statement = connection.prepareCall(query);
+
+            statement.setString(1, whereClause[0]);
+            statement.setString(2, whereArgs[0]);
+            statement.setString(3, sortBy);
+            statement.setBoolean(4, sortAsc);
+
+            if (startRow == null) {
+                statement.setInt(5, 1);
+            } else {
+                statement.setInt(5, startRow);
+            }
+
+            if (numRows == null) {
+                statement.setInt(6, 1 << 64 - 1);
+            } else {
+                statement.setInt(6, numRows);
+            }
+
+            return new MariaDBResults(null, statement.executeQuery());
+
+        } catch (Exception e) {
+            Console.printError("MariaDBDriver", "queryWithAttributes", "", e.getMessage());
+            return null;
+        } finally {
+            try {
+                if (statement != null) {
+                    statement.close();
+                }
+            } catch (SQLException e) {
+                Console.printError("MariaDBDriver", "queryWithAttributes", "", e.getMessage());
+            }
+        }
     }
 
     private PreparedStatement buildInsertStatement(String tableName,
@@ -453,7 +511,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
         System.err.println(numInserts + " inserts took " + ((System.nanoTime() - start) / 1e6) +
                                    "ms");
 
-        Iterator<ProductID> productIDIterator = database.getProductIds(testModule);
+        ResultsIterator<ProductID> productIDIterator = database.getProductIds(testModule);
 
         start = System.nanoTime();
         while (productIDIterator.hasNext()) {
@@ -474,13 +532,39 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
 
         Results search = database.query(new ProductID[] { new ProductID(2, null),
-                                                          new ProductID(3, null) },
+                new ProductID(3, null) },
                                         new String[] { "foo", "something" });
 
         while (search.next()) {
             System.out.println(search.getLong(1) + " " + search.getString(2));
         }
 
+        search = database.query(new String[] { "foo" },
+                                new String[] { "bar" },
+                                "something",
+                                false,
+                                null,
+                                5,
+                                false);
+
+        while (search.next()) {
+            System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t\t\t" + search
+                    .getString(3));
+        }
+
+        System.err.println("First query complete.");
+
+        search = database.query(new String[] { "foo" },
+                                new String[] { "bar" },
+                                "something",
+                                false,
+                                1,
+                                3,
+                                true);
+
+        while (search.next()) {
+            System.out.println(search.getLong(1));
+        }
 
         database.setMetadata("key1", "value1");
         assert database.getMetadata("key1").equals("value1");
@@ -504,10 +588,10 @@ class MariaDBResults implements Results {
         try {
             return resultSet.getString(columnIndex);
         } catch (SQLException e) {
-        	if (owner == null)
-        		Console.printError("MariaDBResults", "getString", "", e.getMessage());
-        	else
-        		owner.logError("MariaDBResults", "getString", "", e.getMessage());
+            if (owner == null)
+                Console.printError("MariaDBResults", "getString", "", e.getMessage());
+            else
+                owner.logError("MariaDBResults", "getString", "", e.getMessage());
             return null;
         }
     }
@@ -517,10 +601,10 @@ class MariaDBResults implements Results {
         try {
             return resultSet.getLong(columnIndex);
         } catch (SQLException e) {
-        	if (owner == null)
-        		Console.printError("MariaDBResults", "getLong", "", e.getMessage());
-        	else
-        		owner.logError("MariaDBResults", "getLong", "", e.getMessage());
+            if (owner == null)
+                Console.printError("MariaDBResults", "getLong", "", e.getMessage());
+            else
+                owner.logError("MariaDBResults", "getLong", "", e.getMessage());
             return 0;
         }
     }
@@ -530,10 +614,10 @@ class MariaDBResults implements Results {
         try {
             return !resultSet.isLast();
         } catch (SQLException e) {
-        	if (owner == null)
-        		Console.printError("MariaDBResults", "hasNext", "", e.getMessage());
-        	else
-        		owner.logError("MariaDBResults", "hasNext", "", e.getMessage());
+            if (owner == null)
+                Console.printError("MariaDBResults", "hasNext", "", e.getMessage());
+            else
+                owner.logError("MariaDBResults", "hasNext", "", e.getMessage());
             return false;
         }
     }
@@ -543,16 +627,16 @@ class MariaDBResults implements Results {
         try {
             return resultSet.next();
         } catch (SQLException e) {
-        	if (owner == null)
-        		Console.printError("MariaDBResults", "next", "", e.getMessage());
-        	else
-        		owner.logError("MariaDBResults", "next", "", e.getMessage());
+            if (owner == null)
+                Console.printError("MariaDBResults", "next", "", e.getMessage());
+            else
+                owner.logError("MariaDBResults", "next", "", e.getMessage());
             return false;
         }
     }
 }
 
-class ResultSetIterator implements Iterator<ProductID> {
+class ResultSetIterator implements Database.ResultsIterator<ProductID> {
 
     private final ResultSet resultSet;
     private final Module owner;
@@ -589,5 +673,15 @@ class ResultSetIterator implements Iterator<ProductID> {
     @Override
     public void remove() {
         throw new UnsupportedOperationException("Cannot remove from ResultSet.");
+    }
+
+    @Override
+    public boolean seekRelative(int position) {
+        try {
+            return resultSet.relative(position);
+        } catch (SQLException e) {
+            owner.logError("ResultSetIterator", "seekRelative", "", e.getMessage());
+            return false;
+        }
     }
 }
