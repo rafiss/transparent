@@ -8,7 +8,7 @@
             <!-- INCLUDE LOGO SOURCE HERE instead of "..." --            <!-- Search bar form -->
         <div class="input-append">
         <form action="/search/">
-            <input class="span5" id="appendedInputButton" placeholder="{{ query }}" type="text" name="q">
+            <input class="span5" id="appendedInputButton" value="{{ query }}" type="text" name="q">
             <input type="hidden" type="text" name="p" value="1">
             <input class="btn btn-primary" type="submit" value="Search">
         </form>
@@ -30,7 +30,7 @@
         {% for product in row %}
     	<li class="span4">
         	<div class="thumbnail">
-        	    <a href="/product/{{ product.model }}/?q={{ product.name }}"><img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0" /></a>
+        	    <a href="/product/{{ product.gid }}/"><img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0" /></a>
             	<div class="caption">
             	<h4>{{ product.name }}</h4>    
                 <ul style="list-style:none;">

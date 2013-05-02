@@ -8,6 +8,7 @@ from django.shortcuts import render
 import json, urllib2
 
 BACKEND_URL = 'http://140.180.186.131:16317'
+PAGE_SIZE = 15
 
 def hello(request):
     return HttpResponse("Hello world")
@@ -35,14 +36,15 @@ def login(request):
     username = request.POST.get('username', '')
     password = request.POST.get('password', '')
     user = auth.authenticate(username=username, password=password)
+    referer = request.META.get('HTTP_REFERER', '/')
     if user is not None and user.is_active:
         # Correct password, and the user is marked "active"
         auth.login(request, user)
         # Redirect to a success page.
-        return HttpResponseRedirect("/")
+        return HttpResponseRedirect(referer)
     else:
         # Show an error page
-        return HttpResponseRedirect("/")
+        return HttpResponseRedirect(referer)
 
 def logout(request):
     auth.logout(request)
@@ -53,11 +55,12 @@ def search(request):
     page = request.GET.get('p', '1')
     if 'q' in request.GET and request.GET['q']:
         query = request.GET['q']
-        payload = {'select': ['name', 'image', 'price', 'model'],
+        payload = {'select': ['name', 'image', 'price', 'gid'],
                 'where': {'name': '=' + query},
                 'page': page,
+                'page_size': PAGE_SIZE,
                 'limit': 500}
-        resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
+        resp = urllib2.urlopen(BACKEND_URL + '/search/', json.dumps(payload))
         results = json.loads(resp.read())
         results = results[:15]
         for i in range(len(results)):
@@ -77,7 +80,7 @@ def product(request, model):
     payload = {'select': ['name', 'image', 'price', 'model'],
             'where': {'name': '=' + name[0] + '*', 'model': '=' + model},
             'limit': 1}
-    resp = urllib2.urlopen(BACKEND_URL, json.dumps(payload))
+    resp = urllib2.urlopen(BACKEND_URL + '/product/', json.dumps(payload))
     results = json.loads(resp.read())
     product = {}
     for j in range(len(payload['select'])):
@@ -98,4 +101,13 @@ def settings(request):
 
 def selected_modules(request):
     return render(request, "selected_modules.html", {})
+
+def tracked_items(request):
+    return render(request, "tracked_items.html", {})
+
+def submit(request):
+    if request.method == 'GET':
+        return render(request, "submit.html", {})
+    else:
+        return render(request, "submit.html", {})
 

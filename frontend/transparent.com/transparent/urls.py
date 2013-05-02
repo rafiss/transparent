@@ -23,6 +23,8 @@ urlpatterns = patterns('',
     (r'^modules/$', views.modules),
 	(r'^settings/$', views.settings),
 	(r'^selected_modules/$', views.selected_modules),
+	(r'^tracked_items/$', views.tracked_items),
+	(r'^submit/$', views.submit),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),

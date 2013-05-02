@@ -19,7 +19,7 @@
 </head>
 
 <body>
-<!-- ------------------ HEADER ----------------- -->
+<!--------------------HEADER ---------------->
 <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
       		<!-- Logo at top right of screen. Should link to home page -->
@@ -72,12 +72,14 @@
     	<div class="sidebarRight">
         	<div class="well">
             	<ul class="nav nav-list">
-              	  <li><a href="/tracked_items.html"> <i class="icon-shopping-cart"> </i> Tracked Items</a></li>
+              	  <li><a href="{% url 'finder.views.tracked_items' %}"> <i class="icon-shopping-cart"> </i> Tracked Items</a></li>
               	  <li><a href="{% url 'finder.views.selected_modules' %}"> <i class="icon-list-alt"> </i> Selected Modules</a></li>
               	  <li><a href="{% url 'finder.views.settings' %}"> <i class="icon-cog"> </i> Settings</a></li>
             	  </ul>
         	</div>
-        	<button class="btn btn-success btn-block">Submit New Module</button>
+        	<form method="get" action="/submit/">
+            	<button type="submit" class="btn btn-success btn-block">Submit New Module</button>
+        	</form>
    		</div>
     	{% endif %}
 	</div>
