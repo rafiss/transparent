@@ -1,4 +1,8 @@
-{% extends "base.html" %}
+{% extends "leftbase.html" %}
+
+{% block title %}
+<title>Transparent: An Open Price Tracking Platform</title>
+{% endblock %}
 
 {% block content %}
 {% load staticfiles %}
@@ -8,19 +12,19 @@
     <div class="btn-group btn-group-vertical">
             <!-- INCLUDE LOGO SOURCE HERE instead of "..." -->
 
-            <a href="/"><img src="{% static "img/logo-placeholder.jpg" %}" width="512" height="94" class="img-rounded"></a>
+            <a href="/"><img src="{% static "img/logo.png" %}" width="512" height="94" class="img"></a>
             <br>
             <br>
             
         <!-- Search bar form -->
         <div class="input-append">
-        <form action="/search/">
-            <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. GTX 670, Intel 3770K, ...)" type="text" name="q">
-            <input type="hidden" type="text" name="p" value="1">
-            <input class="btn btn-primary" type="submit" value="Search">
-        </form>
+            <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. CoolerMaster, Intel 3770K, ...)" type="text" autofocus>
+            <!-- <button class="btn btn-info" type="submit">Search</button> -->
+			<input type="hidden" type="text" name="p" value="1">
+ 			<input class="btn btn-info" type="submit" value="Search">
     	</div>
     </div>	
 </div>
+
 
 {% endblock %}

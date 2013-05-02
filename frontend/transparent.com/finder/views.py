@@ -84,3 +84,18 @@ def product(request, model):
         product[payload['select'][j]] = results[0][j]
     return render(request, "product.html", {'product': product})
 
+def about(request):
+    return render(request, "about.html", {})
+
+def how_it_works(request):
+    return render(request, "how_it_works.html", {})
+
+def modules(request):
+    return render(request, "modules.html", {})
+
+def settings(request):
+    return render(request, "settings.html", {})
+
+def selected_modules(request):
+    return render(request, "selected_modules.html", {})
+

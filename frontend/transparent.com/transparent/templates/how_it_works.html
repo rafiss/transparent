@@ -1,0 +1,57 @@
+{% extends "rightbase.html" %}
+
+{% block title %}
+<title>How it Works</title>
+{% endblock %}
+
+{% block content %}
+{% load staticfiles %}
+
+<div class="centered-content">
+    
+    	<!-- TEXT START -->
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Features -->
+                <h3>Transparent.How_it_Works</h3>
+                <div class="text-header">
+                	Product Search
+                </div>
+                <br>
+                <div class="text-left">
+            		<p>Transparent searches through a number of different retail sites for the current lowest product prices. The searchable retailers are determined by the availability of a website parsing module for that retailer. During searches, the user can select which retailers to search through and the parsing algorithms to employ by selecting which modules to use.</p>
+                </div>
+                <br>
+                <br>
+                <div class="text-header">
+                	Price Tracking
+                </div>
+                <br>
+                <div class="text-left">
+            		<p>The <a href="/product.html">product page</a> for each item lists the current lowest price and the various attributes of the product. It also contains a price history graph to inform the user about the item's price trends. The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
+                </div>
+                <br>
+                <br>
+                <div class="text-header">
+                	Local Search Modules
+                </div>
+                <br>
+                <div class="text-left">
+            		<p>One type of module available to the user is all modules that are stored on the application's backend server. Each such module is accompanied by documentation on the module <a href="/module.html">description page</a>. The implementation of these modules can also be viewed from the same page.</p>
+                </div>
+                <br>
+                <br>
+                <div class="text-header">
+                	Remote Search Modules
+                </div>
+                <br>
+                <div class="text-left">
+            		<p>If the user would rather not reveal the implementation of their parser, they have the option of running their module on their own computer and simply delivering the parsed data to transparent for storage and search.</p>
+                </div>
+            </div>
+        </div>
+        
+</div> <!-- End of Contents-->
+
+{% endblock %}
+
