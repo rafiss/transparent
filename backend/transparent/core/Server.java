@@ -47,7 +47,18 @@ public class Server implements Container
 
 		private void parseModules(PrintStream body) throws IOException, ParseException
 		{
-			Object object = parser.parse(request.getContent());
+			String content = request.getContent();
+			if (!content.isEmpty()) {
+				JSONObject result = new JSONObject();
+				for (Module module : Core.getModules()) {
+					JSONObject subresult = moduleInfo(module);
+					result.put(module.getIdString(), subresult);
+				}
+				body.println(result.toJSONString());
+				return;
+			}
+
+			Object object = parser.parse(content);
 			if (!(object instanceof JSONObject)) {
 				body.println(error("Root structure must be a map."));
 				body.close();
@@ -255,17 +266,24 @@ public class Server implements Container
 		}
 	}
 
+	private static JSONObject moduleInfo(Module module)
+	{
+		if (module == null)
+			return null;
+
+		JSONObject map = new JSONObject();
+		map.put("name", module.getModuleName());
+		map.put("source", module.getSourceName());
+		return map;
+	}
+
 	private static JSONObject moduleInfo(String moduleId)
 	{
-		try {
-			Module module = Core.getModule(new BigInteger(moduleId).longValue());
-			if (module == null)
-				return null;
+		if (moduleId == null)
+			return null;
 
-			JSONObject map = new JSONObject();
-			map.put("name", module.getModuleName());
-			map.put("source", module.getSourceName());
-			return map;
+		try {
+			return moduleInfo(Core.getModule(new BigInteger(moduleId).longValue()));
 		} catch (NumberFormatException e) {
 			return null;
 		}
