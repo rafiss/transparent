@@ -63,7 +63,7 @@ def search(request):
 
         payload = {'select': ['name', 'image', 'price', 'gid'],
                 'where': {'name': '=' + query},
-                'modules': modules
+                'modules': modules,
                 'page': page,
                 'page_size': PAGE_SIZE,
                 'limit': 500}

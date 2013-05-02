@@ -5,57 +5,64 @@
 {% endblock %}
 
 {% block content %}
-{% load staticfiles %}
 
-	<div class="centered-content">
-    
-    	<!-- TEXT START -->
-        <div class="row-fluid">
-        	<div class="span12">
-                <!-- Introduction -->
-                <h3>My_Modules</h3>
-                <table width="90%" border="0">
-					<tr style="background-color:#E0E0E0;">
-                    <td>
-                    	<b>Module Name</b>
-					</td>
-                    <td>
-                        <b>Rating</b>
-					</td>
-                    <td>
-						<b>Source</b>
-					</td>
-                    <td>
-						<b>Date of Submission</b>
-					</td>
-                    </tr>
-                    <tr>
-					<td style="width:15%;">
-                    	<!-- Iterate through products being tracked -->
-						<a href="/module_info.html">module1</a><br> 
-						<a href="/module_info.html">module2</a><br>
-						<a href="/module_info.html">module3</a></td>
-					<td style="width:10%;">
-                    	<!-- Iterate through product prices -->
-						4.5<br> 
-						3.5<br>
-						3.0</td>
-                	<td style="width:17.5%;">
-                    	<!-- Iterate through product price trends (maybe change in price since last login?) -->
-						Newegg<br> 
-						Amazon<br>
-						Microparts USA</td>
-                    <td style="width:17.5%;">
-                    	<!-- Iterate through product price trends (maybe change in price since last login?) -->
-						Oct 07, 2012<br> 
-						Jan 27, 2013<br>
-						Feb 14, 2013</td>
-					</tr>
-				</table>
-            </div>
-        </div>  <!-- End of row. Max of 3 items per row. --> 
-    
-    </div> <!-- End of Contents-->
+<div class="content">
+    <div class="btn-group btn-group-vertical">
+        <h2 class="">This page is under construction</h2>
+    </div>	
+</div>
+
+<div class="centered-content">
+
+	<!-- TEXT START -->
+    <div class="row-fluid">
+    	<div class="span12">
+            <!-- Introduction -->
+            <h3>My_Modules</h3>
+            <table width="90%" border="0">
+				<tr style="background-color:#E0E0E0;">
+                <td>
+                	<b>Module Name</b>
+				</td>
+                <td>
+                    <b>Rating</b>
+				</td>
+                <td>
+					<b>Source</b>
+				</td>
+                <td>
+					<b>Date of Submission</b>
+				</td>
+                </tr>
+                <tr>
+				<td style="width:15%;">
+                	<!-- Iterate through products being tracked -->
+					<a href="/modules">module1</a><br> 
+					{% comment %}
+					<a href="/module_info.html">module2</a><br>
+					<a href="/module_info.html">module3</a></td>
+					{% endcomment %}
+				<td style="width:10%;">
+                	<!-- Iterate through product prices -->
+					4.5<br> 
+					3.5<br>
+					3.0</td>
+            	<td style="width:17.5%;">
+                	<!-- Iterate through product price trends (maybe change in price since last login?) -->
+					Newegg<br> 
+					Amazon<br>
+					Microparts USA</td>
+                <td style="width:17.5%;">
+                	<!-- Iterate through product price trends (maybe change in price since last login?) -->
+					Oct 07, 2012<br> 
+					Jan 27, 2013<br>
+					Feb 14, 2013</td>
+				</tr>
+			</table>
+        </div>
+    </div>  <!-- End of row. Max of 3 items per row. --> 
+
+</div> <!-- End of Contents-->
 
 {% endblock %}
 
