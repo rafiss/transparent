@@ -311,6 +311,7 @@ public class Server implements Container
 			String[] propertiesArray = new String[properties.size()];
 			propertiesArray = properties.toArray(propertiesArray);
 
+
 			int conditionsSatisfied = 0;
 			int currentPage = 1;
 			HashMap<String, JSONArray> json = new HashMap<String, JSONArray>();
@@ -339,7 +340,7 @@ public class Server implements Container
 					long id = dbresults.getLong(1);
 					if (id != prevId) {
 						/* push the last row into our list of results */
-						if (!discard && conditionsSatisfied == conditions.size()) {
+						if (!discard && conditionsSatisfied >= conditions.size()) {
 							if (json.containsKey(gid))
 								mergeRows(json.get(gid), row);
 							else
@@ -452,6 +453,11 @@ public class Server implements Container
 
 		public Relation getRelation() {
 			return relation;
+		}
+
+		@Override
+		public String toString() {
+			return key + " " + relation + " " + value;
 		}
 
 		public boolean evaluate(String input) {
