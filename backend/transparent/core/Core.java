@@ -219,7 +219,7 @@ public class Core
 
 		try {
 			Sort sort = new Sort();
-			if (sortby.equals("price"))
+			if (sortby != null && sortby.equals("price"))
 				sort = new Sort(new SortField(PRICE_FIELD, SortField.Type.INT, descending));
 			return new SearchIterator(query, sort);
 		} catch (IOException e) {

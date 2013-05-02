@@ -182,7 +182,7 @@ public class Server implements Container
 				sort = (String) sortObject;
 			}
 
-			int page = -1;
+			int page = 1;
 			Object pageObject = map.get("page");
 			if (pageObject != null) {
 				if (pageObject instanceof Integer) {
