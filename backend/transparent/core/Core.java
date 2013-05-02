@@ -98,8 +98,6 @@ public class Core
 	private static IndexWriter indexWriter = null;
 	private static IndexSearcher searcher = null;
 	private static StandardQueryParser parser = null;
-	private static int indexCounter = 0;
-	private static final int INDEX_PERIOD = 1024;
 
 	public static InetAddress FRONTEND_ADDRESS = null;
 
@@ -178,18 +176,7 @@ public class Core
 			indexWriter.addDocument(doc);
 		} catch (IOException e) {
 			Console.printError("Core", "addToIndex", "Error adding "
-					+ "product name to search index.", e.getMessage());
-		}
-
-		/* periodically refresh our index reader */
-		indexCounter++;
-		if (indexCounter % INDEX_PERIOD == 0) {
-			try {
-				searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
-			} catch (IOException e) {
-				Console.printError("Core", "addToIndex", "Error refreshing "
-						+ " search index.", e.getMessage());
-			}
+					+ "product name to search index.", e);
 		}
 	}
 
@@ -216,7 +203,7 @@ public class Core
 				query = parser.parse(sanitize(term), PRODUCT_NAME_FIELD);
 			} catch (QueryNodeException e2) {
 				Console.printError("Core", "searchProductName",
-						"Unable to parse search query.", e2.getMessage());
+						"Unable to parse search query.", e2);
 				return null;
 			}
 		}
@@ -225,7 +212,7 @@ public class Core
 			return new SearchIterator(query);
 		} catch (IOException e) {
 			Console.printError("Core", "searchProductName",
-					"Error occurred during search.", e.getMessage());
+					"Error occurred during search.", e);
 			return null;
 		}
 	}
@@ -388,7 +375,8 @@ public class Core
 				continue;
 			}
 			Task task = Task.load(database, queue, i);
-			list.add(task);
+			if (task != null)
+				list.add(task);
 		}
 		return true;
 	}
@@ -401,9 +389,7 @@ public class Core
 		boolean success = true;
 		for (int index = 0; index < list.size(); index++) {
 			Task task = list.get(index);
-			if ((task.getIndex() == -1 || task.isRunning() != isRunning
-					|| task.getPersistentIndex() != task.getIndex())
-					&& !task.save(database, isRunning, index))
+			if (!task.save(database, isRunning, index))
 			{
 				Module module = task.getModule();
 				Console.printError("Core", "saveQueue", "Unable to save task (module name: '"
@@ -636,7 +622,7 @@ public class Core
             database = new MariaDBDriver();
         } catch (Exception e) {
         	Console.printError("Core", "main", "Cannot "
-        			+ "connect to database.", e.getMessage());
+        			+ "connect to database.", e);
         }
 
 		/* load random number generator seed */
@@ -667,14 +653,14 @@ public class Core
         	}
         } catch (IOException e) {
         	Console.printError("Core", "main", "Unable to open "
-        			+ "directory 'index'. Using memory index...", e.getMessage());
+        			+ "directory 'index'. Using memory index...", e);
         	try {
         		Directory indexDirectory = new RAMDirectory();
                 indexWriter = new IndexWriter(indexDirectory, config);
     	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
         	} catch (IOException e2) {
             	Console.printError("Core", "main", "Unable to "
-            			+ "create memory index.", e2.getMessage());
+            			+ "create memory index.", e2);
         	}
         }
         parser = new StandardQueryParser(analyzer);
@@ -700,7 +686,7 @@ public class Core
         				+ script + "' not found.");
         	} catch (IOException e) {
         		Console.printError("Core", "main", "Error occured"
-        				+ " while reading script.", e.getMessage());
+        				+ " while reading script.", e);
         	} finally {
         		try {
 	        		if (reader != null)
@@ -728,6 +714,8 @@ public class Core
         }
 
 		/* start the main loop */
+        dispatcher.scheduleWithFixedDelay(
+        		new BackgroundWorker(), 10, 10, TimeUnit.SECONDS);
 		if (consoleReady)
 			Console.runConsole();
 
@@ -752,7 +740,7 @@ public class Core
 				connection.close();
 		} catch (IOException e) {
 			Console.printError("Core", "main", "Unable "
-					+ "to shutdown HTTP server.", e.getMessage());
+					+ "to shutdown HTTP server.", e);
 		}
 
 		/* close the search index */
@@ -763,7 +751,7 @@ public class Core
 				directory.close();
 		} catch (IOException e) {
 			Console.printError("Core", "main", "Unable "
-					+ "to close search index.", e.getMessage());
+					+ "to close search index.", e);
 		}
 	}
 
@@ -821,5 +809,22 @@ public class Core
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
+	}
+	
+	private static class BackgroundWorker implements Runnable
+	{
+		@Override
+		public void run()
+		{
+			try {
+				if (indexWriter != null)
+					searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
+			} catch (IOException e) {
+				Console.printError("Core", "addToIndex", "Error refreshing "
+						+ " search index.", e);
+			}
+
+			saveQueue();
+		}	
 	}
 }

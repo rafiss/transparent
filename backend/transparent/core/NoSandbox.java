@@ -12,7 +12,7 @@ public class NoSandbox implements Sandbox
 			return Runtime.getRuntime().exec(command);
 		} catch (IOException e) {
 			module.logError("NoSandbox", "run", " Error executing command '"
-					+ command + "'.", e.getMessage());
+					+ command + "'.", e);
 			return null;
 		}
 	}

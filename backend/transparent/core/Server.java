@@ -1,5 +1,6 @@
 package transparent.core;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.Map.Entry;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.parser.JSONParser;
+import net.minidev.json.parser.ParseException;
 
 import org.simpleframework.http.Request;
 import org.simpleframework.http.Response;
@@ -38,6 +40,128 @@ public class Server implements Container
 			map.put("error", message);
 			return map;
 		}
+		
+		private void parseSearch(PrintStream body) throws IOException, ParseException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.close();
+				body.println(error("Root structure must be a map."));
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Object selectObject = map.get("select");
+			if (!(selectObject instanceof JSONArray)) {
+				body.println(error("'select' key must map to a list of strings."));
+				body.close();
+				return;
+			}
+
+			JSONArray selectList = (JSONArray) selectObject;
+			String[] select = new String[selectList.size()];
+			for (int i = 0; i < selectList.size(); i++) {
+				if (!(selectList.get(i) instanceof String)) {
+					body.println(error("'select' key must map to a list of strings."));
+					body.close();
+					return;
+				}
+
+				select[i] = (String) selectList.get(i);
+			}
+
+			Object whereObject = map.get("where");
+			Condition[] where = new Condition[0];
+			Condition name = null;
+			if (whereObject != null) {
+				if (!(whereObject instanceof JSONObject)) {
+					body.println(error("'where' key must map to a map of string pairs."));
+					body.close();
+					return;
+				}
+
+				int i = 0;
+				JSONObject whereMap = (JSONObject) whereObject;
+				where = new Condition[whereMap.size()];
+				for (Entry<String, Object> pair : whereMap.entrySet()) {
+					String key = pair.getKey();
+					if (!(pair.getValue() instanceof String)) {
+						body.println(error("Key in the 'where' entry must be string."));
+						body.close();
+						return;
+					}
+
+					String value = (String) pair.getValue();
+					if (value.length() == 0) {
+						body.println(error("Value in the 'where' entry"
+								+ " must have non-zero length."));
+						body.close();
+						return;
+					}
+					Relation relation = parse(value.charAt(0));
+					if (relation == null) {
+						body.println(error("Unable to parse relation operator"));
+						body.close();
+						return;
+					}
+
+					if (key.equals("name")) {
+						name = new Condition(key, relation, value.substring(1));
+						where[i] = null;
+					} else
+						where[i] = new Condition(key, relation, value.substring(1));
+					i++;
+				}
+			}
+
+			String sort = null;
+			Object sortObject = map.get("sort");
+			if (sortObject != null) {
+				if (!(sortObject instanceof String)) {
+					body.println(error("'sort' key must map to a string."));
+					body.close();
+					return;
+				}
+
+				sort = (String) sortObject;
+			}
+
+			int page = -1;
+			Object pageObject = map.get("page");
+			if (pageObject != null) {
+				if (pageObject instanceof Integer) {
+					page = (int) pageObject;
+				} else if (pageObject instanceof String) {
+					page = Integer.parseInt((String) pageObject);
+				} else {
+					body.println(error("'page' key must map to an integer or string."));
+					body.close();
+					return;
+				}
+
+				page = Integer.parseInt((String) pageObject);
+			}
+
+			int limit = -1;
+			Object limitObject = map.get("limit");
+			if (limitObject != null) {
+				if (limitObject instanceof Integer) {
+					limit = (int) limitObject;
+				} else if (limitObject instanceof String) {
+					limit = Integer.parseInt((String) limitObject);
+				} else {
+					body.println(error("'limit' key must map to an integer or string."));
+					body.close();
+					return;
+				}
+			}
+
+			JSONArray results = query(select, name, where, sort, page, limit);
+			if (results != null)
+				body.println(results.toJSONString());
+			else
+				body.println(error("Internal error occurred during query."));
+		}
 
 		@Override
 		public void run() {
@@ -45,129 +169,20 @@ public class Server implements Container
 			try {
 				body = response.getPrintStream();
 				response.setValue("Content-Type", "text/plain");
-
-				Object object = parser.parse(request.getContent());
-				if (!(object instanceof JSONObject)) {
-					body.close();
-					body.println(error("Root structure must be a map."));
-					return;
-				}
-
-				JSONObject map = (JSONObject) object;
-				Object selectObject = map.get("select");
-				if (!(selectObject instanceof JSONArray)) {
-					body.println(error("'select' key must map to a list of strings."));
-					body.close();
-					return;
-				}
-
-				JSONArray selectList = (JSONArray) selectObject;
-				String[] select = new String[selectList.size()];
-				for (int i = 0; i < selectList.size(); i++) {
-					if (!(selectList.get(i) instanceof String)) {
-						body.println(error("'select' key must map to a list of strings."));
-						body.close();
-						return;
-					}
-
-					select[i] = (String) selectList.get(i);
-				}
-
-				Object whereObject = map.get("where");
-				Condition[] where = new Condition[0];
-				Condition name = null;
-				if (whereObject != null) {
-					if (!(whereObject instanceof JSONObject)) {
-						body.println(error("'where' key must map to a map of string pairs."));
-						body.close();
-						return;
-					}
-
-					int i = 0;
-					JSONObject whereMap = (JSONObject) whereObject;
-					where = new Condition[whereMap.size()];
-					for (Entry<String, Object> pair : whereMap.entrySet()) {
-						String key = pair.getKey();
-						if (!(pair.getValue() instanceof String)) {
-							body.println(error("Key in the 'where' entry must be string."));
-							body.close();
-							return;
-						}
-
-						String value = (String) pair.getValue();
-						if (value.length() == 0) {
-							body.println(error("Value in the 'where' entry"
-									+ " must have non-zero length."));
-							body.close();
-							return;
-						}
-						Relation relation = parse(value.charAt(0));
-						if (relation == null) {
-							body.println(error("Unable to parse relation operator"));
-							body.close();
-							return;
-						}
-
-						if (key.equals("name")) {
-							name = new Condition(key, relation, value.substring(1));
-							where[i] = null;
-						} else
-							where[i] = new Condition(key, relation, value.substring(1));
-						i++;
-					}
-				}
-
-				String sort = null;
-				Object sortObject = map.get("sort");
-				if (sortObject != null) {
-					if (!(sortObject instanceof String)) {
-						body.println(error("'sort' key must map to a string."));
-						body.close();
-						return;
-					}
-
-					sort = (String) sortObject;
-				}
-
-				int page = -1;
-				Object pageObject = map.get("page");
-				if (pageObject != null) {
-					if (pageObject instanceof Integer) {
-						page = (int) pageObject;
-					} else if (pageObject instanceof String) {
-						page = Integer.parseInt((String) pageObject);
-					} else {
-						body.println(error("'page' key must map to an integer or string."));
-						body.close();
-						return;
-					}
-
-					page = Integer.parseInt((String) pageObject);
-				}
-
-				int limit = -1;
-				Object limitObject = map.get("limit");
-				if (limitObject != null) {
-					if (limitObject instanceof Integer) {
-						limit = (int) limitObject;
-					} else if (limitObject instanceof String) {
-						limit = Integer.parseInt((String) limitObject);
-					} else {
-						body.println(error("'limit' key must map to an integer or string."));
-						body.close();
-						return;
-					}
-				}
-
-				JSONArray results = query(select, name, where, sort, page, limit);
-				if (results != null)
-					body.println(results.toJSONString());
+				String url = request.getPath().toString();
+				if (url.equals("/search"))
+					parseSearch(body);
+				else if (url.equals("/product"))
+					parseProductQuery(body);
+				else if (url.equals("/modules"))
+					parseModules(body);
 				else
-					body.println(error("Internal error occurred during query."));
+					body.println(error("Page not found."));
 				body.close();
 			} catch (Exception e) {
 				if (body != null) {
-					body.println(error("Exception thrown: " + e.getMessage()));
+					body.println(error(e.getClass().getSimpleName()
+							+ " thrown. " + e.getMessage()));
 					body.close();
 				}
 			}
@@ -201,6 +216,7 @@ public class Server implements Container
 			String[] propertiesArray = new String[properties.size()];
 			propertiesArray = properties.toArray(propertiesArray);
 
+			int conditionsSatisfied = 0;
 			JSONArray json = new JSONArray();
 			ArrayList<ProductID> rowIds = new ArrayList<ProductID>();
 			while ((json.size() < limit || limit < 0) && results.hasNext())
@@ -226,7 +242,7 @@ public class Server implements Container
 					long id = dbresults.getLong(1);
 					if (id != prevId) {
 						/* push the last row into our list of results */
-						if (!discard) {
+						if (!discard && conditionsSatisfied == conditions.size()) {
 							json.add(row);
 							if (json.size() == limit)
 								return json;
@@ -237,6 +253,7 @@ public class Server implements Container
 						while (row.size() < select.length)
 							row.add(null);
 
+						conditionsSatisfied = 0;
 						prevId = id;
 						discard = false;
 					} else if (discard)
@@ -250,6 +267,7 @@ public class Server implements Container
 						discard = true;
 						continue;
 					}
+					conditionsSatisfied++;
 
 					/* add this value to our current row */
 					Integer index = selectMap.get(key);

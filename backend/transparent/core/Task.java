@@ -5,6 +5,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
 
 import transparent.core.database.Database;
 
@@ -23,6 +24,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 	private long time;
 	private boolean reschedules;
 	private boolean dummy;
+	private String state;
 
 	/* this id is transient and is regenerated every time the task is loaded */
 	private int id;
@@ -45,6 +47,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 		this.reschedules = reschedules;
 		this.dummy = dummy;
 		this.id = ID_COUNTER.getAndIncrement();
+		this.state = "";
 		tasks.put(id, this);
 	}
 
@@ -111,10 +114,16 @@ public class Task implements Comparable<Task>, Callable<Object>
 		this.running = running;
 	}
 
+	public String getState() {
+		if (wrapper != null)
+			state = wrapper.getState();
+		return this.state;
+	}
+
 	private static Task load(String data)
 	{
 		String[] tokens = data.split("\\.");
-		if (tokens.length != 5) {
+		if (tokens.length != 5 && tokens.length != 6) {
 			Console.printError("Task", "load", "Unable to parse string.");
 			return null;
 		}
@@ -136,7 +145,10 @@ public class Task implements Comparable<Task>, Callable<Object>
 		boolean reschedules = !tokens[3].equals("0");
 		boolean dummy = !tokens[4].equals("0");
 
-		return new Task(type, Core.getModule(id), time, reschedules, dummy);
+		Task task = new Task(type, Core.getModule(id), time, reschedules, dummy);
+		if (tokens.length > 5)
+			task.state = unescape(tokens[5]);
+		return task;
 	}
 
 	public static Task load(Database database, String queue, int index)
@@ -174,13 +186,15 @@ public class Task implements Comparable<Task>, Callable<Object>
 		String reschedulesString = reschedules ? "1" : "0";
 		String dummyString = dummy ? "1" : "0";
 		return typeString + "." + module.getIdString() + "." + time
-				+ "." + reschedulesString + "." + dummyString;
+				+ "." + reschedulesString + "." + dummyString + "." + escape(state);
 	}
 
 	public boolean save(Database database, boolean isRunning, int index)
 	{
 		String queue = Core.getQueueName(isRunning);
 
+		if (wrapper != null)
+			state = wrapper.getState();
 		String data = save();
 		if (data != null && database.setMetadata(queue + "." + index, data)) {
 			this.persistentIndex = index;
@@ -215,6 +229,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 		switch (type) {
 		case PRODUCT_LIST_PARSE:
 			wrapper = new ModuleThread(module, dummy);
+			wrapper.setState(state);
 			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
 			wrapper.run();
 			Core.stopTask(this, false);
@@ -227,6 +242,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 			return null;
 		case PRODUCT_INFO_PARSE:
 			wrapper = new ModuleThread(module, dummy);
+			wrapper.setState(state);
 			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
 			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
 			wrapper.run();
@@ -253,5 +269,48 @@ public class Task implements Comparable<Task>, Callable<Object>
 			Core.stopTask(this, true);
 			return null;
 		}
+	}
+
+	private static String escape(String s) {
+		StringBuilder builder = new StringBuilder();
+		for (int i = 0; i < s.length(); i++) {
+			switch (s.charAt(i)) {
+			case '.':
+				builder.append("\\d");
+				break;
+			case '\\':
+				builder.append("\\\\");
+				break;
+			default:
+				builder.append(s.charAt(i));
+			}
+		}
+		return builder.toString();
+	}
+
+	private static String unescape(String s) {
+		StringBuilder builder = new StringBuilder();
+		boolean escape = false;
+		for (int i = 0; i < s.length(); i++) {
+			switch (s.charAt(i)) {
+			case '\\':
+				if (escape) {
+					builder.append('\\');
+					escape = false;
+				} else
+					escape = true;
+				break;
+			case 'd':
+				if (escape) {
+					builder.append('.');
+					escape = false;
+				} else
+					builder.append(s.charAt(i));
+				break;
+			default:
+				builder.append(s.charAt(i));
+			}
+		}
+		return builder.toString();
 	}
 }

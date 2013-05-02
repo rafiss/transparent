@@ -188,7 +188,7 @@ public class Module
 	}
 	
 	public void logError(String className, String methodName,
-			String message, String exception)
+			String message, Exception exception)
 	{
 		log.println(className + '.' + methodName + " ERROR: "
 				+ message + " Exception thrown: " + exception);
@@ -302,7 +302,7 @@ public class Module
 		} catch (IOException e) {
 			Console.printError("Module", "load", "Unable to initialize output log."
 					+ " Logging is disabled for this module. (name = " + name
-					+ ", id = " + Core.toUnsignedString(id) + ")", e.getMessage());
+					+ ", id = " + Core.toUnsignedString(id) + ")", e);
 			log = new PrintStream(new NullOutputStream());
 		}
 
@@ -330,7 +330,7 @@ public class Module
 			if (remoteString.equals("0"))
 				remote = false;
 		} catch (RuntimeException e) {
-			Console.printError("Module", "load", "Error loading module id.", e.getMessage());
+			Console.printError("Module", "load", "Error loading module id.", e);
 			return null;
 		}
 

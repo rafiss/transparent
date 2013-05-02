@@ -65,7 +65,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             return true;
         } catch (SQLException e) {
             e.printStackTrace();
-            module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
+            module.logError("MariaDBDriver", "addProductIds", "", e);
             return true;
         } finally {
             try {
@@ -74,7 +74,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                 }
             } catch (SQLException e) {
-                module.logError("MariaDBDriver", "addProductIds", "", e.getMessage());
+                module.logError("MariaDBDriver", "addProductIds", "", e);
             }
         }
     }
@@ -94,14 +94,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
             return new ResultSetIterator(module, statement.executeQuery());
         } catch (SQLException e) {
             e.printStackTrace();
-            module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
+            module.logError("MariaDBDriver", "getProductIds", "", e);
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                    module.logError("MariaDBDriver", "getProductIds", "", e.getMessage());
+                    module.logError("MariaDBDriver", "getProductIds", "", e);
                 }
             }
         }
@@ -139,7 +139,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
             connection.commit();
         } catch (SQLException e) {
-            module.logError("MariaDBDriver", "addProductInfo", "", e.getMessage());
+            module.logError("MariaDBDriver", "addProductInfo", "", e);
             return false;
         } finally {
             try {
@@ -148,7 +148,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                 }
             } catch (SQLException e) {
-                module.logError("MariaDBDriver", "addProductInfo", "", e.getMessage());
+                module.logError("MariaDBDriver", "addProductInfo", "", e);
             }
         }
 
@@ -175,14 +175,14 @@ public class MariaDBDriver implements transparent.core.database.Database {
                 return null;
             }
         } catch (SQLException e) {
-            Console.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+            Console.printError("MariaDBDriver", "getMetadata", "", e);
             return null;
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                    Console.printError("MariaDBDriver", "getMetadata", "", e.getMessage());
+                    Console.printError("MariaDBDriver", "getMetadata", "", e);
                 }
             }
         }
@@ -210,7 +210,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             connection.commit();
             return true;
         } catch (SQLException e) {
-            Console.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+            Console.printError("MariaDBDriver", "setMetadata", "", e);
             return false;
         } finally {
             if (statement != null) {
@@ -218,7 +218,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                     connection.setAutoCommit(true);
                 } catch (SQLException e) {
-                    Console.printError("MariaDBDriver", "setMetadata", "", e.getMessage());
+                    Console.printError("MariaDBDriver", "setMetadata", "", e);
                 }
             }
         }
@@ -229,7 +229,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
         try {
             connection.close();
         } catch (SQLException e) {
-            Console.printError("MariaDBDriver", "close", "", e.getMessage());
+            Console.printError("MariaDBDriver", "close", "", e);
         }
     }
 
@@ -241,13 +241,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
             statement = buildQueryStatement(rowIds, properties);
             return new MariaDBResults(null, statement.executeQuery());
         } catch (SQLException e) {
-            Console.printError("MariaDBDriver", "query", "", e.getMessage());
+            Console.printError("MariaDBDriver", "query", "", e);
         } finally {
             if (statement != null) {
                 try {
                     statement.close();
                 } catch (SQLException e) {
-                    Console.printError("MariaDBDriver", "query", "", e.getMessage());
+                    Console.printError("MariaDBDriver", "query", "", e);
                 }
             }
         }
@@ -305,7 +305,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
             return new MariaDBResults(null, statement.executeQuery());
 
         } catch (Exception e) {
-            Console.printError("MariaDBDriver", "queryWithAttributes", "", e.getMessage());
+            Console.printError("MariaDBDriver", "queryWithAttributes", "", e);
             return null;
         } finally {
             try {
@@ -313,7 +313,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
                     statement.close();
                 }
             } catch (SQLException e) {
-                Console.printError("MariaDBDriver", "queryWithAttributes", "", e.getMessage());
+                Console.printError("MariaDBDriver", "queryWithAttributes", "", e);
             }
         }
     }
@@ -589,9 +589,9 @@ class MariaDBResults implements Results {
             return resultSet.getString(columnIndex);
         } catch (SQLException e) {
             if (owner == null)
-                Console.printError("MariaDBResults", "getString", "", e.getMessage());
+                Console.printError("MariaDBResults", "getString", "", e);
             else
-                owner.logError("MariaDBResults", "getString", "", e.getMessage());
+                owner.logError("MariaDBResults", "getString", "", e);
             return null;
         }
     }
@@ -602,9 +602,9 @@ class MariaDBResults implements Results {
             return resultSet.getLong(columnIndex);
         } catch (SQLException e) {
             if (owner == null)
-                Console.printError("MariaDBResults", "getLong", "", e.getMessage());
+                Console.printError("MariaDBResults", "getLong", "", e);
             else
-                owner.logError("MariaDBResults", "getLong", "", e.getMessage());
+                owner.logError("MariaDBResults", "getLong", "", e);
             return 0;
         }
     }
@@ -615,9 +615,9 @@ class MariaDBResults implements Results {
             return !resultSet.isLast();
         } catch (SQLException e) {
             if (owner == null)
-                Console.printError("MariaDBResults", "hasNext", "", e.getMessage());
+                Console.printError("MariaDBResults", "hasNext", "", e);
             else
-                owner.logError("MariaDBResults", "hasNext", "", e.getMessage());
+                owner.logError("MariaDBResults", "hasNext", "", e);
             return false;
         }
     }
@@ -628,9 +628,9 @@ class MariaDBResults implements Results {
             return resultSet.next();
         } catch (SQLException e) {
             if (owner == null)
-                Console.printError("MariaDBResults", "next", "", e.getMessage());
+                Console.printError("MariaDBResults", "next", "", e);
             else
-                owner.logError("MariaDBResults", "next", "", e.getMessage());
+                owner.logError("MariaDBResults", "next", "", e);
             return false;
         }
     }
@@ -651,7 +651,7 @@ class ResultSetIterator implements Database.ResultsIterator<ProductID> {
         try {
             return !resultSet.isLast();
         } catch (SQLException e) {
-            owner.logError("ResultSetIterator", "hasNext", "", e.getMessage());
+            owner.logError("ResultSetIterator", "hasNext", "", e);
             return false;
         }
     }
@@ -665,7 +665,7 @@ class ResultSetIterator implements Database.ResultsIterator<ProductID> {
                 return null;
             }
         } catch (SQLException e) {
-            owner.logError("ResultSetIterator", "next", "", e.getMessage());
+            owner.logError("ResultSetIterator", "next", "", e);
             return null;
         }
     }
@@ -680,7 +680,7 @@ class ResultSetIterator implements Database.ResultsIterator<ProductID> {
         try {
             return resultSet.relative(position);
         } catch (SQLException e) {
-            owner.logError("ResultSetIterator", "seekRelative", "", e.getMessage());
+            owner.logError("ResultSetIterator", "seekRelative", "", e);
             return false;
         }
     }

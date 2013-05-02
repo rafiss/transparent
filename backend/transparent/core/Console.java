@@ -144,7 +144,7 @@ public class Console
 	}
 
 	public static void printError(String className,
-			String methodName, String message, String exception)
+			String methodName, String message, Exception exception)
 	{
 		commandError(className + '.' + methodName, message, exception);
 	}
@@ -171,7 +171,7 @@ public class Console
 		unlockConsole();
 	}
 
-	private static void commandError(String command, String message, String exception)
+	private static void commandError(String command, String message, Exception exception)
 	{
 		lockConsole();
 		AnsiConsole.out.print(RED + BOLD);
@@ -181,10 +181,13 @@ public class Console
 		if (exception != null) {
 			if (message.length() > 0)
 				AnsiConsole.out.print(' ');
-			AnsiConsole.out.print("Exception thrown. ");
-			AnsiConsole.out.print(GRAY);
-			AnsiConsole.out.print(exception);
-			AnsiConsole.out.print(DEFAULT);
+			AnsiConsole.out.print(exception.getClass().getSimpleName() + " thrown. ");
+			String exceptionMessage = exception.getMessage();
+			if (exceptionMessage != null) {
+				AnsiConsole.out.print(GRAY);
+				AnsiConsole.out.print(exceptionMessage);
+				AnsiConsole.out.print(DEFAULT);
+			}
 		}
 		AnsiConsole.out.println();
 		unlockConsole();
@@ -300,6 +303,7 @@ public class Console
 			println(GRAY + "  is running: " + DEFAULT + isRunning);
 			println(GRAY + "  reschedules: " + DEFAULT + task.reschedules());
 			println(GRAY + "  dummy: " + DEFAULT + task.isDummy());
+			println(GRAY + "  state: " + DEFAULT + task.getState());
 		}
 	}
 
@@ -313,7 +317,7 @@ public class Console
     		try {
     			root.run(tokens, 0);
     		} catch (Exception e) {
-    			printError("Console", "parseCommand", "", e.getMessage());
+    			printError("Console", "parseCommand", "", e);
     		}
 
     		in.setUseHistory(historyEnabled.get());
@@ -340,7 +344,7 @@ public class Console
 
 			return true;
 		} catch (IOException e) {
-			printError("Core", "initConsole", "", e.getMessage());
+			printError("Core", "initConsole", "", e);
 			return false;
 		}
 	}
@@ -357,7 +361,7 @@ public class Console
 	    			break;
 	        }
 		} catch (IOException e) {
-			printError("Core", "startConsole", "", e.getMessage());
+			printError("Core", "startConsole", "", e);
 		}
 	}
 
@@ -570,7 +574,7 @@ public class Console
 
 					addModule(name, source, path, remote, blocked);
 				} catch (IOException e) {
-					commandError("modules add", "", e.getMessage());
+					commandError("modules add", "", e);
 				}
 			}
 		}
@@ -1051,7 +1055,7 @@ public class Console
 					addTask(type, module, System.currentTimeMillis()
 							+ time, reschedules, dummy);
 				} catch (IOException e) {
-					commandError("modules add", "", e.getMessage());
+					commandError("modules add", "", e);
 				}
 			}
 		}
@@ -1134,7 +1138,7 @@ public class Console
 								return;
 							}
 						} catch (IOException e) {
-							commandError("history", "", e.getMessage());
+							commandError("history", "", e);
 							return;
 						}
 					} else if (!file.canRead() || !file.canWrite()) {
@@ -1146,7 +1150,7 @@ public class Console
 					try {
 						in.getHistory().setHistoryFile(file);
 					} catch (IOException e) {
-						commandError("history", "", e.getMessage());
+						commandError("history", "", e);
 						return;
 					}
 				} else if (args.size() > 3) {
@@ -1245,7 +1249,7 @@ public class Console
 				if (args.size() > 2)
 					limit = args.get(2).getToken();
 
-				URLConnection connection = new URL("http://localhost:16317" /*"http://140.180.186.131:16317"*/).openConnection();
+				URLConnection connection = new URL("http://localhost:16317/search" /*"http://140.180.186.131:16317"*/).openConnection();
 				HttpURLConnection http = (HttpURLConnection) connection;
 				http.setDoInput(true);
 				http.setDoOutput(true);
@@ -1255,7 +1259,7 @@ public class Console
 	
 				http.getOutputStream().write(
 						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\",\"name\"],"
-						+ " \"where\":{\"name\":\"=" + query + "\"},"
+						+ " \"where\":{\"name\":\"=" + query + "\",model:\"=SRCSATAWB\"},"
 						+ " \"limit\":" + limit + "}").getBytes());
 				http.getOutputStream().flush();
 				http.getOutputStream().close();
@@ -1269,7 +1273,7 @@ public class Console
 
 				input.close();
 			} catch (IOException e) {
-				Console.commandError("testserver", "", e.getMessage());
+				Console.commandError("testserver", "", e);
 			}
 		}
 	}

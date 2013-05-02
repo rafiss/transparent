@@ -1,6 +1,7 @@
 package transparent.core;
 
-import transparent.core.database.Database;
+import transparent.core.database.Database.Results;
+import transparent.core.database.Database.ResultsIterator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -12,7 +13,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.Iterator;
 import java.util.Map.Entry;
 
 public class ModuleThread implements Runnable, Interruptable
@@ -45,8 +45,9 @@ public class ModuleThread implements Runnable, Interruptable
 	private boolean alive;
 	private boolean dummy;
 	private Process process;
-	private Iterator<ProductID> requestedProductIds;
+	private ResultsIterator<ProductID> requestedProductIds;
 	private String userAgent;
+	private String state;
 
 	public ModuleThread(Module module, boolean dummy)
 	{
@@ -55,6 +56,7 @@ public class ModuleThread implements Runnable, Interruptable
 		this.alive = true;
 		this.dummy = dummy;
 		this.userAgent = DEFAULT_USER_AGENT;
+		this.state = "";
 	}
 
 	public void stop() {
@@ -177,6 +179,11 @@ public class ModuleThread implements Runnable, Interruptable
 	private void getProductListResponse(
 			Module module, DataInputStream in) throws IOException
 	{
+		int length = in.readUnsignedShort();
+		byte[] data = new byte[length];
+		in.readFully(data);
+		state = new String(data, UTF8);
+
 		int count = in.readUnsignedShort();
 		if (count < 0 || count > MAX_BATCH_SIZE) {
 			module.logError("ModuleThread", "getProductListResponse",
@@ -186,8 +193,8 @@ public class ModuleThread implements Runnable, Interruptable
 
 		String[] productIds = new String[count];
 		for (int i = 0; i < count; i++) {
-			int length = in.readUnsignedShort();
-			byte[] data = new byte[length];
+			length = in.readUnsignedShort();
+			data = new byte[length];
 			in.readFully(data);
 			productIds[i] = new String(data, UTF8);
 		}
@@ -210,7 +217,9 @@ public class ModuleThread implements Runnable, Interruptable
 		}
 
 		@SuppressWarnings("unchecked")
-		Entry<String, String>[] keyValues = new Entry[count];
+		Entry<String, String>[] keyValues = new Entry[count + 1];
+		String brand = null;
+		String model = null;
 		for (int i = 0; i < count; i++) {
 			int length = in.readUnsignedShort();
 			byte[] data = new byte[length];
@@ -224,8 +233,44 @@ public class ModuleThread implements Runnable, Interruptable
 
 			if (key.equals("name"))
 				Core.addToIndex(value, productId);
+			else if (key.equals("brand"))
+				brand = value;
+			else if (key.equals("model"))
+				model = value;
 
 			keyValues[i] = new SimpleEntry<String, String>(key, value);
+		}
+
+		if (brand == null || model == null)
+			return;
+		long prevId = -1;
+		boolean found = false;
+		String gid = null;
+		String[] where = { "model" };
+		String[] args = { model };
+		Results results = Core.getDatabase().query(where, args, "model", true, null, null, false);
+		while (results.next()) {
+			long id = results.getLong(0);
+			if (id != prevId) {
+				if (found && gid != null) {
+					keyValues[count] = new SimpleEntry<String, String>("gid", gid);
+					break;
+				}
+				gid = null;
+				prevId = id;
+			}
+
+			String key = results.getString(1);
+			String value = results.getString(2);
+			if (key.equals("brand") &&
+					value.toLowerCase().trim().equals(brand.toLowerCase().trim()))
+				found = true;
+			else if (key.equals("gid"))
+				gid = value;
+		}
+		if (!found) {
+			keyValues[count] = new SimpleEntry<String, String>(
+					"gid", Core.toUnsignedString(Core.random()));
 		}
 
 		if (dummy) return;
@@ -249,8 +294,16 @@ public class ModuleThread implements Runnable, Interruptable
 		this.requestType = requestType;
 	}
 
-	public void setRequestedProductIds(Database.ResultsIterator<ProductID> productIds) {
+	public void setRequestedProductIds(ResultsIterator<ProductID> productIds) {
 		this.requestedProductIds = productIds;
+	}
+
+	public void setState(String state) {
+		this.state = state;
+	}
+
+	public String getState() {
+		return this.state;
 	}
 
 	@Override
@@ -291,11 +344,19 @@ public class ModuleThread implements Runnable, Interruptable
 		Thread piper = new Thread(pipe);
 		piper.start();
 
+		int position = 0;
 		boolean responded = true;
 		ProductID requestedProductId = null;
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
 			out.writeByte(requestType);
+			if (requestType == Core.PRODUCT_LIST_REQUEST) {
+				out.writeShort(state.length());
+				out.write(state.getBytes(UTF8));
+			} else if (state.length() > 0) {
+				position = Integer.parseInt(state);
+				requestedProductIds.seekRelative(position);
+			}
 
 			while (alive)
 			{
@@ -369,8 +430,11 @@ public class ModuleThread implements Runnable, Interruptable
 				case MODULE_RESPONSE:
 					if (requestType == Core.PRODUCT_LIST_REQUEST)
 						getProductListResponse(module, in);
-					else if (requestType == Core.PRODUCT_INFO_REQUEST)
+					else if (requestType == Core.PRODUCT_INFO_REQUEST) {
 						getProductInfoResponse(module, requestedProductId, in);
+						state = String.valueOf(position);
+						position++;
+					}
 					responded = true;
 					break;
 

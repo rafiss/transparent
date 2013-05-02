@@ -58,6 +58,8 @@ public class NeweggParser
 
 	private static final String PRODUCT_URL =
 			"http://www.ows.newegg.com/Products.egg/";
+	private static final String FULL_PRODUCT_URL =
+			"http://www.newegg.com/Product/Product.aspx?Item=";
 	private static final String PRODUCT_URL_SUFFIX = "/Specification";
 
 	private static final HashSet<Object> STORE_DESCRIPTIONS =
@@ -189,10 +191,39 @@ public class NeweggParser
 
 		return httpResponse();
 	}
-
-	private static void respond(ArrayList<String> productIds) throws IOException
+	
+	private static byte[] encodeState(Subcategory subcategory, int page)
 	{
+		String state = subcategory.getCategoryId() + "."
+				+ subcategory.getSubcategoryId() + "." + page;
+		return state.getBytes(UTF8);
+	}
+	
+	private static State decodeState(byte[] state)
+	{
+		if (state == null || state.length == 0)
+			return null;
+
+		try {
+			String[] tokens = new String(state, UTF8).split("\\.");
+			int categoryId = Integer.parseInt(tokens[0]);
+			int subcategoryId = Integer.parseInt(tokens[1]);
+			int page = Integer.parseInt(tokens[2]);
+			return new State(new Subcategory(null, categoryId, subcategoryId, null), page);
+		} catch (Exception e) {
+			System.err.println("NeweggParser.decodeState: Could not decode state. " + e.getMessage());
+			return null;
+		}
+	}
+
+	private static void respond(ArrayList<String> productIds,
+			Subcategory subcategory, int page) throws IOException
+	{
+		byte[] state = encodeState(subcategory, page);
+		
 		out.writeByte(MODULE_RESPONSE);
+		out.writeShort(state.length);
+		out.write(state);
 		out.writeShort(productIds.size());
 		for (String productId : productIds) {
 			byte[] data = productId.getBytes(UTF8);
@@ -209,7 +240,7 @@ public class NeweggParser
 		out.writeByte(MODULE_RESPONSE);
 		out.writeShort(keyValues.size());
 		for (Entry<String, String> pair : keyValues.entrySet()) {
-			String keyString = pair.getKey().toLowerCase();
+			String keyString = pair.getKey().trim().toLowerCase();
 			byte[] key = keyString.getBytes(UTF8);
 			out.writeShort(key.length);
 			out.write(key);
@@ -318,10 +349,10 @@ public class NeweggParser
 		return subcategories;
 	}
 
-	private static void parseSubcategory(Subcategory subcategory)
+	private static void parseSubcategory(Subcategory subcategory, int pageStart)
 	{
 		ArrayList<String> productIds = new ArrayList<String>(20);
-		for (int pageNumber = 1;; pageNumber++) {
+		for (int pageNumber = pageStart;; pageNumber++) {
 			String url = SUBCATEGORY_URL
 					+ "categoryId=" + subcategory.getSubcategoryId()
 					+ "&storeId=" + subcategory.getStoreId()
@@ -350,7 +381,7 @@ public class NeweggParser
 			
 			/* send the product IDs to the core */
 			try {
-				respond(productIds);
+				respond(productIds, subcategory, pageNumber);
 			} catch (IOException e) {
 				System.err.println("NeweggParser.parseSubcategory ERROR:"
 						+ " Error responding with product ID list.");
@@ -360,7 +391,7 @@ public class NeweggParser
 		}
 	}
 
-	private static void getProductList()
+	private static void getProductList(State previous)
 	{
 		/* first get the list of stores from the root JSON document */
 		byte[] data;
@@ -419,8 +450,21 @@ public class NeweggParser
 
 		/* for each subcategory, get a list of products */
 		for (Subcategory subcategory : subcategories) {
-			parseSubcategory(subcategory);
+			if (previous == null)
+				parseSubcategory(subcategory, 1);
+			else if (subcategory.equals(previous.getSubcategory())) {
+				parseSubcategory(subcategory, previous.getPage());
+				previous = null;
+			}
 		}
+	}
+
+	private static Integer parsePrice(Object price) {
+		if (price == null || !price.getClass().equals(String.class))
+			return null;
+
+		String parsed = (String) price;
+		return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll(".", ""));
 	}
 
 	private static void parseProductInfo(String productId)
@@ -451,7 +495,7 @@ public class NeweggParser
 
 		/* parse general product info */
 		url = PRODUCT_URL + productId;
-		
+
 		try {
 			data = httpGetRequest(url);
 		} catch (IOException e) {
@@ -478,8 +522,12 @@ public class NeweggParser
 		if (name != null)
 			keyValues.put("name", name.toString());
 		Object price = map.get("FinalPrice");
-		if (price != null)
-			keyValues.put("price", price.toString());
+		Integer parsedPrice = parsePrice(price);
+		if (parsedPrice == null)
+			parsedPrice = parsePrice(map.get("MappingFinalPrice"));
+		if (parsedPrice != null)
+			keyValues.put("price", parsedPrice.toString());
+		keyValues.put("url", FULL_PRODUCT_URL + productId);
 		if (PARSE_IMAGES) {
 			Object image = map.get("Image");
 			if (!(image instanceof JSONObject)) {
@@ -509,10 +557,17 @@ public class NeweggParser
 			/* wait for the type of request */
 			switch (in.readUnsignedByte()) {
 			case PRODUCT_LIST_REQUEST:
-				getProductList();
+				State previous = null;
+				int length = in.readUnsignedShort();
+				if (length > 0) {
+					byte[] data = new byte[length];
+					in.readFully(data);
+					previous = decodeState(data);
+				}
+				getProductList(previous);
 				break;
 			case PRODUCT_INFO_REQUEST:
-				int length = in.readUnsignedShort();
+				length = in.readUnsignedShort();
 				while (length > 0) {
 					byte[] data = new byte[length];
 					in.readFully(data);
@@ -528,6 +583,24 @@ public class NeweggParser
 					+ " Error communicating with core.");
 			return;
 		}
+	}
+}
+
+class State {
+	private Subcategory subcategory;
+	private int page;
+
+	public State(Subcategory subcategory, int page) {
+		this.subcategory = subcategory;
+		this.page = page;
+	}
+
+	public Subcategory getSubcategory() {
+		return subcategory;
+	}
+
+	public int getPage() {
+		return page;
 	}
 }
 
@@ -575,6 +648,7 @@ class Subcategory {
 			return false;
 
 		Subcategory other = (Subcategory) o;
-		return categoryId.equals(other.categoryId);
+		return categoryId.equals(other.categoryId)
+				&& subcategoryId.equals(other.subcategoryId);
 	}
 }
