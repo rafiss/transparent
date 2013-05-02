@@ -420,7 +420,6 @@ public class AmazonParser
 
 		/* parse brand name */
 		elements = document.select(".buying span");
-		System.err.println("elements.size(): " + elements.size());
 		for (Element element : elements) {
 			String brand = element.text().trim();
 			if (brand.startsWith("by")) {
