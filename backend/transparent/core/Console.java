@@ -6,7 +6,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -183,11 +185,16 @@ public class Console
 				AnsiConsole.out.print(' ');
 			AnsiConsole.out.print(exception.getClass().getSimpleName() + " thrown. ");
 			String exceptionMessage = exception.getMessage();
-			if (exceptionMessage != null) {
-				AnsiConsole.out.print(GRAY);
+			AnsiConsole.out.print(GRAY);
+			if (exceptionMessage != null)
 				AnsiConsole.out.print(exceptionMessage);
-				AnsiConsole.out.print(DEFAULT);
-			}
+			StringWriter writer = new StringWriter();
+			PrintWriter wrapper = new PrintWriter(writer);
+			exception.printStackTrace(wrapper);
+			wrapper.flush();
+			AnsiConsole.out.print(writer.toString());
+			wrapper.close();
+			AnsiConsole.out.print(DEFAULT);
 		}
 		AnsiConsole.out.println();
 		unlockConsole();

@@ -1,5 +1,7 @@
 package transparent.core;
 
+import transparent.core.database.Database.Results;
+
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -47,7 +49,18 @@ public class Server implements Container
 
 		private void parseModules(PrintStream body) throws IOException, ParseException
 		{
-			Object object = parser.parse(request.getContent());
+			String content = request.getContent();
+			if (content.isEmpty()) {
+				JSONObject result = new JSONObject();
+				for (Module module : Core.getModules()) {
+					JSONObject subresult = moduleInfo(module);
+					result.put(module.getIdString(), subresult);
+				}
+				body.println(result.toJSONString());
+				return;
+			}
+
+			Object object = parser.parse(content);
 			if (!(object instanceof JSONObject)) {
 				body.println(error("Root structure must be a map."));
 				body.close();
@@ -94,7 +107,68 @@ public class Server implements Container
 		
 		private void parseProductQuery(PrintStream body) throws IOException, ParseException
 		{
-			
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Object gidObject = map.get("gid");
+			if (!(gidObject instanceof String)) {
+				body.println(error("'gid' key must map to a string."));
+				body.close();
+				return;
+			}
+
+			long prevId = -1;
+			String name = null;
+			String image = null;
+			String price = null;
+			String[] where = { "gid" };
+			String[] args = { (String) gidObject };
+			Results results = Core.getDatabase().query(where, args, "gid", true, null, null, false);
+			JSONObject rows = new JSONObject();
+			JSONObject row = new JSONObject();
+			int moduleCount = 0;
+			while (results.next()) {
+				long id = results.getLong(1);
+				if (id != prevId && !row.isEmpty()) {
+					moduleCount++;
+					rows.put("module" + moduleCount, row);
+					row = new JSONObject();
+					prevId = id;
+				}
+
+				String key = results.getString(2);
+				String value = results.getString(3);
+				if (key.equals("name"))
+					name = value;
+				else if (key.equals("image"))
+					image = value;
+				else if (key.equals("price")) {
+					if (price == null || Integer.parseInt(value) < Integer.parseInt(price)) {
+						int p = Integer.parseInt(value);
+						price = (p / 100) + "." + (p % 100);
+						value = price;
+					}
+				}
+				row.put(key, value);
+			}
+
+			if (!row.isEmpty()) {
+				moduleCount++;
+				rows.put("module" + moduleCount, row);
+			}
+
+			if (name != null)
+				rows.put("name", name);
+			if (image != null)
+				rows.put("image", image);
+			if (price != null)
+				rows.put("price", price);
+			body.println(rows.toJSONString());
 		}
 		
 		private void parseSearch(PrintStream body) throws IOException, ParseException
@@ -255,17 +329,24 @@ public class Server implements Container
 		}
 	}
 
+	private static JSONObject moduleInfo(Module module)
+	{
+		if (module == null)
+			return null;
+
+		JSONObject map = new JSONObject();
+		map.put("name", module.getModuleName());
+		map.put("source", module.getSourceName());
+		return map;
+	}
+
 	private static JSONObject moduleInfo(String moduleId)
 	{
-		try {
-			Module module = Core.getModule(new BigInteger(moduleId).longValue());
-			if (module == null)
-				return null;
+		if (moduleId == null)
+			return null;
 
-			JSONObject map = new JSONObject();
-			map.put("name", module.getModuleName());
-			map.put("source", module.getSourceName());
-			return map;
+		try {
+			return moduleInfo(Core.getModule(new BigInteger(moduleId).longValue()));
 		} catch (NumberFormatException e) {
 			return null;
 		}

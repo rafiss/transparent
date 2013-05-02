@@ -466,7 +466,7 @@ public class NeweggParser
 
 		try {
 			String parsed = (String) price;
-			return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll(".", ""));
+			return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll("\\.", ""));
 		} catch (NumberFormatException e) {
 			return null;
 		}
@@ -527,9 +527,11 @@ public class NeweggParser
 		if (name != null)
 			keyValues.put("name", name.toString());
 		Object price = map.get("FinalPrice");
+System.err.println("FinalPrice: " + map.get("FinalPrice") + ", " + price);
 		Integer parsedPrice = parsePrice(price);
 		if (parsedPrice == null)
 			parsedPrice = parsePrice(map.get("MappingFinalPrice"));
+System.err.println("MappingFinalPrice: " + map.get("MappingFinalPrice") + ", " + price);
 		if (parsedPrice != null)
 			keyValues.put("price", parsedPrice.toString());
 		keyValues.put("url", FULL_PRODUCT_URL + productId);

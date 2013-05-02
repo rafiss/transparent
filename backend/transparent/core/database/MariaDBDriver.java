@@ -36,7 +36,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
         String username = properties.getProperty("username");
         String password = properties.getProperty("password");
         String driver = properties.getProperty("driver");
-	Console.println(host + " " + username + " " + password + " " + driver);
 
         // Register JDBC driver class
         Class.forName(driver);

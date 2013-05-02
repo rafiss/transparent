@@ -13,6 +13,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Map.Entry;
 
 public class ModuleThread implements Runnable, Interruptable
@@ -217,7 +218,7 @@ public class ModuleThread implements Runnable, Interruptable
 		}
 
 		@SuppressWarnings("unchecked")
-		Entry<String, String>[] keyValues = new Entry[count + 1];
+		ArrayList<Entry<String, String>> keyValues = new ArrayList<Entry<String, String>>(count + 1);
 		String name = null;
 		String price = null;
 		String brand = null;
@@ -239,10 +240,11 @@ public class ModuleThread implements Runnable, Interruptable
 				brand = value;
 			else if (key.equals("model"))
 				model = value;
-			else if (key.equals("price"))
+			else if (key.equals("price")) {
 				price = value;
+			}
 
-			keyValues[i] = new SimpleEntry<String, String>(key, value);
+			keyValues.add(new SimpleEntry<String, String>(key, value));
 		}
 
 		if (name != null && price != null) {
@@ -263,7 +265,7 @@ public class ModuleThread implements Runnable, Interruptable
 			long id = results.getLong(1);
 			if (id != prevId) {
 				if (found && gid != null) {
-					keyValues[count] = new SimpleEntry<String, String>("gid", gid);
+					keyValues.add(new SimpleEntry<String, String>("gid", gid));
 					break;
 				}
 				gid = null;
@@ -279,12 +281,14 @@ public class ModuleThread implements Runnable, Interruptable
 				gid = value;
 		}
 		if (!found || gid == null) {
-			keyValues[count] = new SimpleEntry<String, String>(
-					"gid", Core.toUnsignedString(Core.random()));
+			keyValues.add(new SimpleEntry<String, String>(
+					"gid", Core.toUnsignedString(Core.random())));
 		}
 
 		if (dummy) return;
-		if (!Core.getDatabase().addProductInfo(module, productId, keyValues)) {
+		Entry<String, String>[] keyValuesArray = new Entry[keyValues.size()];
+		keyValuesArray = keyValues.toArray(keyValuesArray);
+		if (!Core.getDatabase().addProductInfo(module, productId, keyValuesArray)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
 		}

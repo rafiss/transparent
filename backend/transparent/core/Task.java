@@ -222,50 +222,55 @@ public class Task implements Comparable<Task>, Callable<Object>
 	@Override
 	public Object call() throws Exception
 	{
-		/* notify the core that this task has started */
-		Core.startTask(this);
+		try {
+			/* notify the core that this task has started */
+			Core.startTask(this);
 
-		switch (type) {
-		case PRODUCT_LIST_PARSE:
-			wrapper = new ModuleThread(module, dummy);
-			wrapper.setState(state);
-			wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
-			wrapper.run();
-			Core.stopTask(this, false);
-			if (reschedules && !stopped) {
-				Core.queueTask(new Task(TaskType.PRODUCT_INFO_PARSE,
-						module, System.currentTimeMillis(), true, dummy));
-				if (!Core.saveQueue())
-					Console.printError("Task", "call", "Unable to save tasks.");
+			switch (type) {
+			case PRODUCT_LIST_PARSE:
+				wrapper = new ModuleThread(module, dummy);
+				wrapper.setState(state);
+				wrapper.setRequestType(Core.PRODUCT_LIST_REQUEST);
+				wrapper.run();
+				Core.stopTask(this, false);
+				if (reschedules && !stopped) {
+					Core.queueTask(new Task(TaskType.PRODUCT_INFO_PARSE,
+							module, System.currentTimeMillis(), true, dummy));
+					if (!Core.saveQueue())
+						Console.printError("Task", "call", "Unable to save tasks.");
+				}
+				return null;
+			case PRODUCT_INFO_PARSE:
+				wrapper = new ModuleThread(module, dummy);
+				wrapper.setState(state);
+				wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
+				wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
+				wrapper.run();
+				Core.stopTask(this, false);
+				if (reschedules && !stopped) {
+					Core.queueTask(new Task(TaskType.PRODUCT_LIST_PARSE,
+							module, System.currentTimeMillis(), true, dummy));
+					if (!Core.saveQueue())
+						Console.printError("Task", "call", "Unable to save tasks.");
+				}
+				return null;
+			case IMAGE_FETCH:
+				Console.printError("Task", "call", "Image fetching not implemented.");
+				Core.stopTask(this, false);
+				if (reschedules) {
+					Core.queueTask(new Task(TaskType.IMAGE_FETCH,
+							module, System.currentTimeMillis(), true, dummy));
+					if (!Core.saveQueue())
+						Console.printError("Task", "call", "Unable to save tasks.");
+				}
+				return null;
+			default:
+				Console.printError("Task", "call", "Unrecognized task type.");
+				Core.stopTask(this, true);
+				return null;
 			}
-			return null;
-		case PRODUCT_INFO_PARSE:
-			wrapper = new ModuleThread(module, dummy);
-			wrapper.setState(state);
-			wrapper.setRequestType(Core.PRODUCT_INFO_REQUEST);
-			wrapper.setRequestedProductIds(Core.getDatabase().getProductIds(module));
-			wrapper.run();
-			Core.stopTask(this, false);
-			if (reschedules && !stopped) {
-				Core.queueTask(new Task(TaskType.PRODUCT_LIST_PARSE,
-						module, System.currentTimeMillis(), true, dummy));
-				if (!Core.saveQueue())
-					Console.printError("Task", "call", "Unable to save tasks.");
-			}
-			return null;
-		case IMAGE_FETCH:
-			Console.printError("Task", "call", "Image fetching not implemented.");
-			Core.stopTask(this, false);
-			if (reschedules) {
-				Core.queueTask(new Task(TaskType.IMAGE_FETCH,
-						module, System.currentTimeMillis(), true, dummy));
-				if (!Core.saveQueue())
-					Console.printError("Task", "call", "Unable to save tasks.");
-			}
-			return null;
-		default:
-			Console.printError("Task", "call", "Unrecognized task type.");
-			Core.stopTask(this, true);
+		} catch (Exception e) {
+			Console.printError("Task", "run", "", e);
 			return null;
 		}
 	}

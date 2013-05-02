@@ -267,8 +267,15 @@ public class AmazonParser
 		if (price == null || !price.getClass().equals(String.class))
 			return null;
 
-		String parsed = (String) price;
-		return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll("\\.", ""));
+		try {
+			String parsed = (String) price;
+			if (parsed.contains("-")) {
+				parsed = parsed.split("-")[0];
+			}
+			return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll("\\.", ""));
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	private static void parseProductDetail(
