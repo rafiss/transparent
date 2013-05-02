@@ -1,0 +1,42 @@
+{% extends "rightbase.html" %}
+
+{% block title %}
+<title>Modules</title>
+{% endblock %}
+
+{% block content %}
+{% load staticfiles %}
+
+<div class="centered-content">
+    	<!-- TEXT START -->
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Introduction -->
+                <h3>Transparent.Modules</h3>
+
+                <!-- Iterate through all sources and related modules -->
+                <div class="text-header">
+                	Source1
+                </div>
+                <br>
+                <ul class="text-left">
+            		<li><a href="/module.html">module1</a></li>
+                    <li><a href="/module.html">module2</a></li>
+                    <li><a href="/module.html">module5</a></li>
+                </ul>
+                <br>
+                <br>
+                <div class="text-header">
+                	Source2
+                </div>
+                <br>
+                <ul class="text-left">
+            		<li><a href="/module.html">module3</a></li>
+                    <li><a href="/module.html">module4</a></li>
+                </ul>
+            </div>
+        </div>  <!-- End of row. Max of 3 items per row. --> 
+    
+    </div> <!-- End of Contents-->
+
+{% endblock %}
