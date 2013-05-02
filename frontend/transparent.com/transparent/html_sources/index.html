@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="../assets/css/bootstrap-responsive.css" rel="stylesheet">
+<link href="/assets/css/bootstrap-responsive.css" rel="stylesheet">
 <!-- TemplateBeginEditable name="doctitle" -->
 <title>Transparent: An Open Price Tracking Platform</title>
 <!-- TemplateEndEditable -->
@@ -39,6 +39,10 @@
 .sidebarRight {
 	float:left;
 	width: 16%;	
+}
+
+.sidebar_header {
+	font-size:16px;
 }
 
 body {
@@ -85,6 +89,11 @@ body {
 	.container {
 		width: 95%;
 	}
+}
+@media(max-width:1280px) {
+	.container {
+		width: 95%;
+	}
 
 	.content {
 		float: left;
@@ -98,7 +107,7 @@ body {
 	}
 	.sidebarRight {
 		float:left;
-		width: 17%;	
+		width: 20%;	
 	}
 }
 
@@ -111,7 +120,7 @@ body {
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
       		<!-- Logo at top right of screen. Should link to home page -->
-            <a class="brand" href="index.html">Transparent</a>
+            <a class="brand" href="/Templates/index.html">Transparent</a>
             <div class="nav-collapse collapse">
                 
               	<!-- Register form -->
@@ -141,7 +150,7 @@ body {
 
 			<div class="well">
 			<ul class="nav nav-list">
-			  <li class="nav-header">Categories</li>
+			  <li class="sidebar_header nav-header">Categories</li>
 			  <li><a href="#">Category 2</a></li>
 			  <li><a href="#">Category 3</a></li>
 			  <li><a href="#">Category 4</a></li>
@@ -161,21 +170,34 @@ body {
 		            
 		        <!-- Search bar form -->
 		        <div class="input-append">
-		            <input class="span5" id="appendedInputButton" type="text" autofocus="autofocus">
+		            <input class="span5" id="appendedInputButton" type="text" autofocus>
 		            <button class="btn btn-info" type="button">Search</button>
 		    	</div>
 		    </div>	
 		</div>
 
+        <div class="sidebarRight">
+            <div class="well">
+                <ul class="nav nav-list">
+                  <li><a href="/tracked_items.html"> <i class="icon-shopping-cart"> </i> Tracked Items</a></li>
+                  <li><a href="/selected_modules.html"> <i class="icon-list-alt"> </i> Selected Modules</a></li>
+                  <li><a href="/settings.html"> <i class="icon-cog"> </i> Settings</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-success btn-block">Submit New Module</button>
+        </div>
+        
 		<!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+        <!--
 		<div class="sidebarRight">
 		    <div class="well well-small btn-group btn-group-vertical">
-		        <button class="btn btn-block"><i class="icon-shopping-cart"> </i> Tracked Items</button>
-		        <button class="btn btn-block"><i class="icon-list-alt"> </i> Selected Modules</button>
-		        <button class="btn btn-block"><i class="icon-cog"> </i> Settings</button>
+	          <button class="btn btn-link"><i class="icon-shopping-cart"> </i> Tracked Items</button>
+		        <button class="btn btn-link"><i class="icon-list-alt"> </i> Selected Modules</button>
+		        <button class="btn btn-link"><i class="icon-cog"> </i> Settings</button>
 		   </div>
 		   <button class="btn btn-success btn-block">Submit New Module</button>
 		</div>
+        -->
 	</div>
 </div>
 <!-- ------------------ FOOTER ------------------ -->
@@ -185,7 +207,7 @@ body {
             <ul class="nav" >
               <li><a href="/about.html">About</a></li>
 			  <li class="divider-vertical"></li>
-              <li><a href="/howItWorks.html">How It Works</a></li>
+              <li><a href="/how_it_works.html">How It Works</a></li>
 			  <li class="divider-vertical"></li>
               <li><a href="/modules.html">Modules</a></li>
             </ul>
@@ -196,19 +218,19 @@ body {
     <!-- Le javascript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="../assets/js/jquery.js"></script>
-    <script src="../assets/js/bootstrap-transition.js"></script>
-    <script src="../assets/js/bootstrap-alert.js"></script>
-    <script src="../assets/js/bootstrap-modal.js"></script>
-    <script src="../assets/js/bootstrap-dropdown.js"></script>
-    <script src="../assets/js/bootstrap-scrollspy.js"></script>
-    <script src="../assets/js/bootstrap-tab.js"></script>
-    <script src="../assets/js/bootstrap-tooltip.js"></script>
-    <script src="../assets/js/bootstrap-popover.js"></script>
-    <script src="../assets/js/bootstrap-button.js"></script>
-    <script src="../assets/js/bootstrap-collapse.js"></script>
-    <script src="../assets/js/bootstrap-carousel.js"></script>
-    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    <script src="/assets/js/jquery.js"></script>
+    <script src="/assets/js/bootstrap-transition.js"></script>
+    <script src="/assets/js/bootstrap-alert.js"></script>
+    <script src="/assets/js/bootstrap-modal.js"></script>
+    <script src="/assets/js/bootstrap-dropdown.js"></script>
+    <script src="/assets/js/bootstrap-scrollspy.js"></script>
+    <script src="/assets/js/bootstrap-tab.js"></script>
+    <script src="/assets/js/bootstrap-tooltip.js"></script>
+    <script src="/assets/js/bootstrap-popover.js"></script>
+    <script src="/assets/js/bootstrap-button.js"></script>
+    <script src="/assets/js/bootstrap-collapse.js"></script>
+    <script src="/assets/js/bootstrap-carousel.js"></script>
+    <script src="/assets/js/bootstrap-typeahead.js"></script>
     
 </body>
 </html>

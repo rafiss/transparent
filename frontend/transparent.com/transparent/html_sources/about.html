@@ -2,7 +2,8 @@
 <html>
 <head>
 <meta charset="utf-8">
-<link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,700' rel='stylesheet' type='text/css'>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="/assets/css/bootstrap-responsive.css" rel="stylesheet">
 <!-- TemplateBeginEditable name="doctitle" -->
 <title>About</title>
 <!-- TemplateEndEditable -->
@@ -12,57 +13,103 @@
 
 /* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
 @import url("../bootstrap/css/bootstrap.css");
+@import url(http://fonts.googleapis.com/css?family=Megrim);
 
-body {
-	font-family: "Open Sans", sans-serif;
-}
-
-.page-header {
-	font-size: 18px !important;
-	line-height: 20px !important;
-	font-weight: 300 !important;
-	color: #000033;
-}
-
-.text-header {
-	font-size: 16px;
-	line-height: 20px;
-	font-weight: 400;
-	color: #000066;
-}
-
-.text-left {
-	font-size: 16px;
-	line-height: 20px;
-	font-weight: 300;
+.navbar-inverse .brand {
+	font-family: 'Megrim', Sans;
+	color: white;
+	padding-top: 13px;
 }
 
 .container {
 	margin-top: 8%;
-	margin-bottom: 4%;
-	width: 90%;
+	width: 65%;
 }
 
 .content {
 	float: left;
-	width: 70%;
-	margin-left: 15%;
-}
-
-.searchResults {
-	width: 85%;
-	float: left;
-		
+	width:65%;
+	margin-left: 16%;
 }
 
 .sidebarLeft {
 	float:left;
-	width: 15%;	
+	width: 16%;	
 
 }
 .sidebarRight {
 	float:left;
-	width: 15%;	
+	width: 16%;	
+}
+
+.sidebar_header {
+	font-size:16px;
+}
+
+body {
+	padding-top: 40px;
+	background-color: rgb(245, 245, 245);
+}
+
+.outer-container {
+	background-color: rgb(240, 240, 240);
+	width: 100%;
+	padding-top: 5px;
+	padding-bottom: 40px;
+	border-bottom: rgb(226, 226, 226) 1px solid;
+}
+
+.nav-list > li > a {
+	padding-left: 15px;
+}
+
+.nav-list > li {
+	padding-left: 10px;
+}
+
+.navbar .nav,
+.navbar .nav > li {
+    float:none;
+    display:inline-block;
+    *display:inline; /* ie7 fix */
+    *zoom:1; /* hasLayout ie7 trigger */
+    vertical-align: top;
+}
+
+ .navbar-inner {
+    text-align:center;
+}
+
+@media(max-width:1600px) {
+	.container {
+		width: 90%;
+	}
+}
+
+@media(max-width:1368px) {
+	.container {
+		width: 95%;
+	}
+}
+@media(max-width:1280px) {
+	.container {
+		width: 95%;
+	}
+
+	.content {
+		float: left;
+		width:60%;
+	}
+
+	.sidebarLeft {
+		float:left;
+		width: 17%;	
+
+	}
+	.sidebarRight {
+		float:left;
+		width: 20%;	
+	}
 }
 
 </style>
@@ -74,8 +121,8 @@ body {
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
       		<!-- Logo at top right of screen. Should link to home page -->
-            <a class="brand" href="index.html"> Transparent</a>
-        <div class="nav-collapse collapse">
+            <a class="brand" href="/Templates/index.html">Transparent</a>
+            <div class="nav-collapse collapse">
                 
               	<!-- Register form -->
                 <!-- For now, just takes you to a different page -->
@@ -91,14 +138,15 @@ body {
                 </form>
 
           </div>
-      </div>
+        </div>
 </div>
 
 <!-- ------------------ ACTUAL CONTENT ------------------ -->
-<div class=" container">
-    
-	<!-- Search bar -->
-	<div class="content">
+
+<div class="outer-container">
+	<div class=" container">
+
+		<div class="content">
     
     <!-- THING TO DO -->
 	    <!-- Replace src="" with correct image source -->
@@ -106,80 +154,97 @@ body {
         <!-- Replace the placeholder in the search bar (above) -->
         <!-- Pagination should point back to this page, but change the results being displayed -->
     
-    	<!-- TEXT START -->
-        <div class="row-fluid">
-        	<div class="span12">
-                <!-- Introduction -->
-                <h3>Transparent.About</h3>
-                <div class="text-header">
-                	Introduction
+            <!-- TEXT START -->
+            <div class="row-fluid">
+                <div class="span12">
+                    <!-- Introduction -->
+                    <h3>Transparent.About</h3>
+                    <div class="text-header">
+                        Introduction
+                    </div>
+                    <br>
+                    <div class="text-left">
+                        <p>Have you ever used an online search engine to look for the cheapest products on the market? Have you ever found lower prices at retailers not included in those searches? Transparent is an open source effort to deliver the best deals on online retail stores to its users. It accomplishes this by opening up the development process to the community to expand the search to previously unreachable vendors.</p>
+                    </div>
+                    <br>
+                    <br>
+                    <div class="text-header">
+                        Features
+                    </div>
+                    <br>
+                    <div class="text-left">
+                        <p>The price tracking feature allows the user to view a product's price history and perform a simple prediction of the future product cost. Users can also contribute code to extend the current search database of the application.</p>
+                    </div>
                 </div>
-                <br>
-                <div class="text-left">
-            		<p>Have you ever used an online search engine to look for the cheapest products on the market? Have you ever found lower prices at retailers not included in those searches? Transparent is an open source effort to deliver the best deals on online retail stores to its users. It accomplishes this by opening up the development process to the community to expand the search to previously unreachable vendors.</p>
-                </div>
-                <br>
-                <br>
-                <div class="text-header">
-                	Features
-                </div>
-                <br>
-                <div class="text-left">
-            		<p>The price tracking feature allows the user to view a product's price history and perform a simple prediction of the future product cost. Users can also contribute code to extend the current search database of the application.</p>
-                </div>
+            </div>  <!-- End of row. Max of 3 items per row. --> 
+        
+        </div> <!-- End of Contents-->
+        
+        <div class="sidebarRight">
+    		<div class="well">
+                <ul class="nav nav-list">
+                  <li><a href="/about.html"> <i class="icon-info-sign"> </i> About</a></li>
+                  <li><a href="/how_it_works.html"> <i class="icon-info-sign"> </i> How it Works</a></li>
+                  <li><a href="/selected_modules.html"> <i class="icon-list-alt"> </i> Modules</a></li>
+                </ul>
             </div>
-        </div>  <!-- End of row. Max of 3 items per row. --> 
-    
-    </div> <!-- End of Contents-->
-
-    <!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
-    <div class="sidebarRight">
-    	<div class="well well-small btn-group btn-group-vertical">
-            <button class="btn btn-block">Transparent.How_it_Works</button>
-            <button class="btn btn-block">Transparent.Modules</button>
+    	</div>
+        
+        <div class="sidebarRight">
+            <div class="well">
+                <ul class="nav nav-list">
+                  <li><a href="/tracked_items.html"> <i class="icon-shopping-cart"> </i> Tracked Items</a></li>
+                  <li><a href="/selected_modules.html"> <i class="icon-list-alt"> </i> Selected Modules</a></li>
+                  <li><a href="/settings.html"> <i class="icon-cog"> </i> Settings</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-success btn-block">Submit New Module</button>
         </div>
-    </div>
-	<div class="sidebarRight">
-        <div class="well well-small btn-group btn-group-vertical">
-            <button class="btn btn-block">My_Tracker</button>
-            <button class="btn btn-block">My_Modules</button>
-            <button class="btn btn-block">My_Settings</button>
-            <br>
-            <button class="btn btn-block">Submit_Module</button>
-        </div>
-    </div>
+        
+		<!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+        <!--
+		<div class="sidebarRight">
+		    <div class="well well-small btn-group btn-group-vertical">
+	          <button class="btn btn-link"><i class="icon-shopping-cart"> </i> Tracked Items</button>
+		        <button class="btn btn-link"><i class="icon-list-alt"> </i> Selected Modules</button>
+		        <button class="btn btn-link"><i class="icon-cog"> </i> Settings</button>
+		   </div>
+		   <button class="btn btn-success btn-block">Submit New Module</button>
+		</div>
+        -->
+	</div>
 </div>
-
 <!-- ------------------ FOOTER ------------------ -->
 
-<div class="navbar navbar-inverse navbar-fixed-bottom">
+	<div class="navbar navbar-inverse navbar-fixed-bottom">
       <div class="navbar-inner" >
-        <ul class="nav" >
-              <li><a href="about.html">About</a></li>
-              <li><a href="howItWorks.html">How_it_Works</a></li>
-              <li><a href="modules.html">Modules</a></li>
+            <ul class="nav" >
+              <li><a href="/about.html">About</a></li>
+			  <li class="divider-vertical"></li>
+              <li><a href="/how_it_works.html">How It Works</a></li>
+			  <li class="divider-vertical"></li>
+              <li><a href="/modules.html">Modules</a></li>
             </ul>
-  </div><!--/.nav-collapse -->
+          </div><!--/.nav-collapse -->
     </div>
 
     
     <!-- Le javascript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="../assets/js/jquery.js"></script>
-    <script src="../assets/js/bootstrap-transition.js"></script>
-
-    <script src="../assets/js/bootstrap-alert.js"></script>
-    <script src="../assets/js/bootstrap-modal.js"></script>
-    <script src="../assets/js/bootstrap-dropdown.js"></script>
-    <script src="../assets/js/bootstrap-scrollspy.js"></script>
-    <script src="../assets/js/bootstrap-tab.js"></script>
-    <script src="../assets/js/bootstrap-tooltip.js"></script>
-    <script src="../assets/js/bootstrap-popover.js"></script>
-    <script src="../assets/js/bootstrap-button.js"></script>
-    <script src="../assets/js/bootstrap-collapse.js"></script>
-    <script src="../assets/js/bootstrap-carousel.js"></script>
-    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    <script src="/assets/js/jquery.js"></script>
+    <script src="/assets/js/bootstrap-transition.js"></script>
+    <script src="/assets/js/bootstrap-alert.js"></script>
+    <script src="/assets/js/bootstrap-modal.js"></script>
+    <script src="/assets/js/bootstrap-dropdown.js"></script>
+    <script src="/assets/js/bootstrap-scrollspy.js"></script>
+    <script src="/assets/js/bootstrap-tab.js"></script>
+    <script src="/assets/js/bootstrap-tooltip.js"></script>
+    <script src="/assets/js/bootstrap-popover.js"></script>
+    <script src="/assets/js/bootstrap-button.js"></script>
+    <script src="/assets/js/bootstrap-collapse.js"></script>
+    <script src="/assets/js/bootstrap-carousel.js"></script>
+    <script src="/assets/js/bootstrap-typeahead.js"></script>
     
 </body>
 </html>

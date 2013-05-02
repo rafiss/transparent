@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,700' rel='stylesheet' type='text/css'>
 <!-- TemplateBeginEditable name="doctitle" -->
-<title>How_it_Works</title>
+<title>Submit_Module</title>
 <!-- TemplateEndEditable -->
 <!-- TemplateBeginEditable name="head" -->
 <!-- TemplateEndEditable -->
 <style type="text/css">
 
 /* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
-@import url("../bootstrap/css/bootstrap.css");
+@import url("file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/bootstrap/css/bootstrap.css");
 
 body {
 	font-family: "Open Sans", sans-serif;
@@ -74,7 +74,10 @@ body {
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
       		<!-- Logo at top right of screen. Should link to home page -->
-            <a class="brand" href="index.html"> Transparent</a>
+            
+            
+            
+            <a class="brand" href="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/Templates/index.html"> Transparent</a>
         <div class="nav-collapse collapse">
                 
               	<!-- Register form -->
@@ -110,41 +113,40 @@ body {
         <div class="row-fluid">
         	<div class="span12">
                 <!-- Introduction -->
-                <h3>Transparent.How_it_Works</h3>
-                <div class="text-header">
-                	Product Search
+                <h3>Submit_Module</h3>
+                <!-- use for loop to interate through all sources and related modules -->
+                <p>Please submit all code and documentation necessary for us to operate this module.</p>
+                
+                
+                <!-- Login form -->
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Module Name">
+                </form>
+                
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Source Code Files">
+                <button type="submit" class="btn">Browse</button>
+                </form>
+                
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Documentation Files">
+                <button type="submit" class="btn">Browse</button>
+                </form>
+                
+                <div class="container">
+                	<ul>
+                    	<b>Uploaded code</b><br>
+                        main.java<br>
+                        branch1.java<br>
+                        <br>
+                        <b>Uploaded documentation</b><br>
+                        about.txt<br>
+                    </ul>
                 </div>
-                <br>
-                <div class="text-left">
-            		<p>Transparent searches through a number of different retail sites for the current lowest product prices. The searchable retailers are determined by the availability of a website parsing module for that retailer. During searches, the user can select which retailers to search through and the parsing algorithms to employ by selecting which modules to use.</p>
-                </div>
-                <br>
-                <br>
-                <div class="text-header">
-                	Price Tracking
-                </div>
-                <br>
-                <div class="text-left">
-            		<p>The <a href="/product.html">product page</a> for each item lists the current lowest price and the various attributes of the product. It also contains a price history graph to inform the user about the item's price trends. The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
-                </div>
-                <br>
-                <br>
-                <div class="text-header">
-                	Local Search Modules
-                </div>
-                <br>
-                <div class="text-left">
-            		<p>One type of module available to the user is all modules that are stored on the application's backend server. Each such module is accompanied by documentation on the module <a href="/module.html">description page</a>. The implementation of these modules can also be viewed from the same page.</p>
-                </div>
-                <br>
-                <br>
-                <div class="text-header">
-                	Remote Search Modules
-                </div>
-                <br>
-                <div class="text-left">
-            		<p>If the user would rather not reveal the implementation of their parser, they have the option of running their module on their own computer and simply delivering the parsed data to transparent for storage and search.</p>
-                </div>
+                
+                <form class="navbar-form">
+                <button type="register" class="btn">Submit</button>
+                </form>
             </div>
         </div>  <!-- End of row. Max of 3 items per row. --> 
     
@@ -153,7 +155,7 @@ body {
     <!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
     <div class="sidebarRight">
     	<div class="well well-small btn-group btn-group-vertical">
-            <button class="btn btn-block">Transparent.About</button>
+            <button class="btn btn-block">Transparent.How_it_Works</button>
             <button class="btn btn-block">Transparent.Modules</button>
         </div>
     </div>
@@ -169,13 +171,12 @@ body {
 </div>
 
 <!-- ------------------ FOOTER ------------------ -->
-
 <div class="navbar navbar-inverse navbar-fixed-bottom">
       <div class="navbar-inner" >
         <ul class="nav" >
-              <li><a href="about.html">About</a></li>
-              <li><a href="howItWorks.html">How_it_Works</a></li>
-              <li><a href="modules.html">Modules</a></li>
+              <li><a href="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/Templates/about.html">About</a></li>
+              <li><a href="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/Templates/howItWorks.html">How_it_Works</a></li>
+              <li><a href="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/Templates/modules.html">Modules</a></li>
             </ul>
   </div><!--/.nav-collapse -->
     </div>
@@ -184,21 +185,20 @@ body {
     <!-- Le javascript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="../assets/js/jquery.js"></script>
-    <script src="../assets/js/bootstrap-transition.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/jquery.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-transition.js"></script>
 
-    <script src="../assets/js/bootstrap-alert.js"></script>
-    <script src="../assets/js/bootstrap-modal.js"></script>
-    <script src="../assets/js/bootstrap-dropdown.js"></script>
-    <script src="../assets/js/bootstrap-scrollspy.js"></script>
-    <script src="../assets/js/bootstrap-tab.js"></script>
-    <script src="../assets/js/bootstrap-tooltip.js"></script>
-    <script src="../assets/js/bootstrap-popover.js"></script>
-    <script src="../assets/js/bootstrap-button.js"></script>
-    <script src="../assets/js/bootstrap-collapse.js"></script>
-    <script src="../assets/js/bootstrap-carousel.js"></script>
-    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-alert.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-modal.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-dropdown.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-scrollspy.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-tab.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-tooltip.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-popover.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-button.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-collapse.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-carousel.js"></script>
+    <script src="file:///C|/Users/abeebe/Dropbox/Abdul + Alex Beebe/Transparent/assets/js/bootstrap-typeahead.js"></script>
     
 </body>
 </html>
-
