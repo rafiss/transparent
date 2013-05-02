@@ -5,6 +5,7 @@ from django.contrib import auth
 from django.contrib.auth.forms import UserCreationForm
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
+from finder.models import Module, UserProfile
 import json, urllib2
 
 BACKEND_URL = 'http://140.180.186.131:16317'
@@ -55,8 +56,14 @@ def search(request):
     page = request.GET.get('p', '1')
     if 'q' in request.GET and request.GET['q']:
         query = request.GET['q']
+
+        modules = [module.backend_id for module in Module.objects.all()]
+        if request.user is not None and request.user.is_active:
+            modules = [module.backend_id for module in user.userprofile.modules]
+
         payload = {'select': ['name', 'image', 'price', 'gid'],
                 'where': {'name': '=' + query},
+                'modules': modules
                 'page': page,
                 'page_size': PAGE_SIZE,
                 'limit': 500}
@@ -75,11 +82,14 @@ def search(request):
     else:
         return HttpResponseRedirect('/')
 
-def product(request, model):
-    name = request.GET['q']
-    payload = {'select': ['name', 'image', 'price', 'model'],
-            'where': {'name': '=' + name[0] + '*', 'model': '=' + model},
-            'limit': 1}
+def product(request, gid):
+    #payload = {'select': ['name', 'image', 'price', 'model'],
+            #'where': {'name': '=' + name[0] + '*', 'model': '=' + model},
+            #'limit': 1}
+    modules = [module.backend_id for module in Module.objects.all()]
+    if request.user is not None and request.user.is_active:
+        modules = [module.backend_id for module in user.userprofile.modules]
+    payload = {'gid': gid, 'modules': modules}
     resp = urllib2.urlopen(BACKEND_URL + '/product/', json.dumps(payload))
     results = json.loads(resp.read())
     product = {}
