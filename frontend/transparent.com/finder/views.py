@@ -85,13 +85,10 @@ def search(request):
         return HttpResponseRedirect(referer)
 
 def product(request, gid):
-    #payload = {'select': ['name', 'image', 'price', 'model'],
-            #'where': {'name': '=' + name[0] + '*', 'model': '=' + model},
-            #'limit': 1}
-    modules = [module.backend_id for module in Module.objects.all()]
-    if request.user is not None and request.user.is_active:
-        modules = [module.backend_id for module in request.user.userprofile.modules]
     #TODO: specify modules
+    #modules = [module.backend_id for module in Module.objects.all()]
+    #if request.user is not None and request.user.is_active:
+        #modules = [module.backend_id for module in request.user.userprofile.modules]
     #payload = {'gid': gid, 'modules': modules}
     payload = {'gid': gid}
     resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))

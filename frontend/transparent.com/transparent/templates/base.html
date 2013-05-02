@@ -74,6 +74,9 @@
             	<ul class="nav nav-list">
               	  <li><a href="{% url 'finder.views.settings' %}"> <i class="icon-cog"> </i> Settings</a></li>
               	  <li><a href="{% url 'finder.views.tracked_items' %}"> <i class="icon-shopping-cart"> </i> Tracked Items</a></li>
+              	  {% comment %}
+              	  <li><a href="{% url 'finder.views.selected_modules' %}"> <i class="icon-list-alt"> </i> Selected Modules</a></li> 
+              	  {% endcomment %}
             	  </ul>
         	</div>
         	<form method="get" action="/submit/">
