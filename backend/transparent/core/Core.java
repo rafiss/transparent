@@ -181,7 +181,7 @@ public class Core
 		doc.add(priceField); /* TODO: only the lowest price of a product should be kept */
 
 		try {
-			indexWriter.updateDocument(new Term(PRODUCT_ID_FIELD, id.getModuleProductId()), doc);
+			indexWriter.addDocument(doc);
 		} catch (IOException e) {
 			Console.printError("Core", "addToIndex", "Error adding "
 					+ "product name to search index.", e);
