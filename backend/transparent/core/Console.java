@@ -1249,7 +1249,7 @@ public class Console
 				if (args.size() > 2)
 					limit = args.get(2).getToken();
 
-				URLConnection connection = new URL("http://140.180.186.131:16317/search" /*"http://140.180.186.131:16317"*/).openConnection();
+				URLConnection connection = new URL("http://140.180.186.131:16317/product" /*"http://140.180.186.131:16317"*/).openConnection();
 				HttpURLConnection http = (HttpURLConnection) connection;
 				http.setDoInput(true);
 				http.setDoOutput(true);
@@ -1257,10 +1257,12 @@ public class Console
 				http.setRequestMethod("GET");
 				http.connect();
 	
-				http.getOutputStream().write(
+				/*http.getOutputStream().write(
 						("{\"select\":[\"dimensions\",\"price\",\"model\",\"image\",\"name\",\"gid\",\"url\"],"
 						+ " \"where\":{\"name\":\"=" + query + "\"},"
-						+ " \"pagesize\":" + limit + "}").getBytes());
+						+ " \"pagesize\":" + limit + "}").getBytes());*/
+				http.getOutputStream().write(
+						("{\"gid\":\"" + query + "\"}").getBytes());
 				http.getOutputStream().flush();
 				http.getOutputStream().close();
 
