@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,700' rel='stylesheet' type='text/css'>
+<!-- TemplateBeginEditable name="doctitle" -->
+<title>My_Tracker</title>
+<!-- TemplateEndEditable -->
+<!-- TemplateBeginEditable name="head" -->
+<!-- TemplateEndEditable -->
+<style type="text/css">
+
+/* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
+@import url("../bootstrap/css/bootstrap.css");
+
+body {
+	font-family: "Open Sans", sans-serif;
+}
+
+.page-header {
+	font-size: 18px !important;
+	line-height: 20px !important;
+	font-weight: 300 !important;
+	color: #000033;
+}
+
+.text-header {
+	font-size: 16px;
+	line-height: 20px;
+	font-weight: 400;
+	color: #000066;
+}
+
+.text-left {
+	font-size: 16px;
+	line-height: 20px;
+	font-weight: 300;
+}
+
+.container {
+	margin-top: 8%;
+	margin-bottom: 4%;
+	width: 90%;
+}
+
+.content {
+	float: left;
+	width: 70%;
+	margin-left: 15%;
+}
+
+.searchResults {
+	width: 85%;
+	float: left;
+		
+}
+
+.sidebarLeft {
+	float:left;
+	width: 15%;	
+
+}
+.sidebarRight {
+	float:left;
+	width: 15%;	
+}
+
+</style>
+
+</head>
+
+<body>
+<!-- ------------------ HEADER ----------------- -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+      		<!-- Logo at top right of screen. Should link to home page -->
+            <a class="brand" href="index.html"> Transparent</a>
+        <div class="nav-collapse collapse">
+                
+              	<!-- Register form -->
+                <!-- For now, just takes you to a different page -->
+                <form class="navbar-form pull-right">
+                <button type="register" class="btn">Register</button>
+                </form>
+                
+                <!-- Login form -->
+                <form class="navbar-form pull-right">
+                <input class="span2" type="text" placeholder="Email">
+                <input class="span2" type="password" placeholder="Password">
+                <button type="submit" class="btn">Sign in</button>
+                </form>
+
+          </div>
+      </div>
+</div>
+
+<!-- ------------------ ACTUAL CONTENT ------------------ -->
+<div class=" container">
+    
+	<!-- Search bar -->
+	<div class="content">
+    
+    <!-- THING TO DO -->
+	    <!-- Replace src="" with correct image source -->
+    	<!-- Replace href="#" in thumbnail with link to product page -->
+        <!-- Replace the placeholder in the search bar (above) -->
+        <!-- Pagination should point back to this page, but change the results being displayed -->
+    
+    	<!-- TEXT START -->
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Introduction -->
+                <h3>My_Tracker</h3>
+                <table width="90%" border="0">
+					<tr style="background-color:#E0E0E0;">
+                    <td>
+                    	<b>Product Name</b>
+					</td>
+                    <td>
+                        <b>Current Price</b>
+					</td>
+                    <td>
+						<b>Price Trend</b>
+					</td>
+                    </tr>
+                    <tr>
+					<td style="width:20%;">
+                    	<!-- Iterate through products being tracked -->
+						<a href="/product_info.html">product1</a><br> 
+						<a href="/product_info.html">product2</a><br>
+						<a href="/product_info.html">product3</a></td>
+					<td style="width:20%;">
+                    	<!-- Iterate through product prices -->
+						$0.00<br> 
+						$0.00<br>
+						$0.00</td>
+                	<td style="width:20%;">
+                    	<!-- Iterate through product price trends (maybe change in price since last login?) -->
+						+12%<br> 
+						-10%<br>
+						+1%</td>
+					</tr>
+				</table>
+            </div>
+        </div>  <!-- End of row. Max of 3 items per row. --> 
+    
+    </div> <!-- End of Contents-->
+
+    <!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+    <div class="sidebarRight">
+    	<div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">Transparent.About</button>
+            <button class="btn btn-block">Transparent.Modules</button>
+        </div>
+    </div>
+	<div class="sidebarRight">
+        <div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">My_Tracker</button>
+            <button class="btn btn-block">My_Modules</button>
+            <button class="btn btn-block">My_Settings</button>
+            <br>
+            <button class="btn btn-block">Submit_Module</button>
+        </div>
+    </div>
+</div>
+
+<!-- ------------------ FOOTER ------------------ -->
+
+<div class="navbar navbar-inverse navbar-fixed-bottom">
+      <div class="navbar-inner" >
+        <ul class="nav" >
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/howItWorks.html">How_it_Works</a></li>
+              <li><a href="/modules.html">Modules</a></li>
+            </ul>
+  </div><!--/.nav-collapse -->
+    </div>
+
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../assets/js/jquery.js"></script>
+    <script src="../assets/js/bootstrap-transition.js"></script>
+
+    <script src="../assets/js/bootstrap-alert.js"></script>
+    <script src="../assets/js/bootstrap-modal.js"></script>
+    <script src="../assets/js/bootstrap-dropdown.js"></script>
+    <script src="../assets/js/bootstrap-scrollspy.js"></script>
+    <script src="../assets/js/bootstrap-tab.js"></script>
+    <script src="../assets/js/bootstrap-tooltip.js"></script>
+    <script src="../assets/js/bootstrap-popover.js"></script>
+    <script src="../assets/js/bootstrap-button.js"></script>
+    <script src="../assets/js/bootstrap-collapse.js"></script>
+    <script src="../assets/js/bootstrap-carousel.js"></script>
+    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    
+</body>
+</html>
+

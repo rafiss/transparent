@@ -1,0 +1,197 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- TemplateBeginEditable name="doctitle" -->
+<title>Product Results</title>
+<!-- TemplateEndEditable -->
+<!-- TemplateBeginEditable name="head" -->
+<!-- TemplateEndEditable -->
+<style type="text/css">
+
+/* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
+@import url("../bootstrap/css/bootstrap.css");
+
+.container {
+	margin-top: 8%;
+	margin-bottom: 4%;
+	width: 90%;
+}
+
+.content {
+	float: left;
+	width:70%;
+}
+
+.searchResults {
+	width: 85%;
+	float: left;
+		
+}
+
+.sidebarLeft {
+	float:left;
+	width: 15%;	
+
+}
+.sidebarRight {
+	float:left;
+	width: 15%;	
+}
+
+</style>
+
+</head>
+
+<body>
+<!-- ------------------ HEADER ----------------- -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+      		<!-- Logo at top right of screen. Should link to home page -->
+            <a class="brand" href="index.html"> Transparent</a>
+        <div class="nav-collapse collapse">
+                
+              	<!-- Register form -->
+                <!-- For now, just takes you to a different page -->
+                <form class="navbar-form pull-right">
+                <button type="register" class="btn">Register</button>
+                </form>
+                
+                <!-- Login form -->
+                <form class="navbar-form pull-right">
+                <input class="span2" type="text" placeholder="Email">
+                <input class="span2" type="password" placeholder="Password">
+                <button type="submit" class="btn">Sign in</button>
+                </form>
+
+          </div>
+      </div>
+</div>
+
+<!-- ------------------ ACTUAL CONTENT ------------------ -->
+<div class=" container">
+
+	<!-- Contains different product categories -->
+    <div class="sidebarLeft">
+      <div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">Hardware</button>
+            <button class="btn btn-block">Category 2</button>
+            <button class="btn btn-block">Category 3</button>
+            <button class="btn btn-block">Category 4</button>
+            <button class="btn btn-block">Category 5</button>
+        </div>
+    </div>
+    
+	<!-- Search bar -->
+	<div class="content">
+      <div class="btn-group btn-group-vertical">
+                <!-- INCLUDE LOGO SOURCE HERE instead of "..." --            <!-- Search bar form -->
+            <div class="input-append">
+            <!-- We want to replace the placeholder string with the string that was just searched. -->
+                <input class="span5" id="appendedInputButton" type="text" placeholder="What you just searched yo!">
+                <button class="btn btn-primary" type="button">Search</button>
+             </div>
+        </div>
+        
+    <!-- Display results of search -->
+    
+    <!-- THING TO DO -->
+	    <!-- Replace src="" with correct image source -->
+    	<!-- Replace href="#" in thumbnail with link to product page -->
+        <!-- Replace the placeholder in the search bar (above) -->
+        <!-- Pagination should point back to this page, but change the results being displayed -->
+
+    <!-- Rows and row entries should be generated automatically. 
+    	 
+    
+    -->
+    
+    <!-- ROW START-->
+	<div class="row-fluid">
+    	<ul class="thumbnails">
+        	<!-- Item in row-->
+        	<li class="span4">
+            	<div class="thumbnail"> <a href="product_info.html"><img src="" alt="300x200" style="width: 300px; height: 200px;" data-src="holder.js/300x200" border="0"></a></img>
+                	<div class="caption">
+                        <h4> <!-- Large font for Name (or price)-->
+                          Product Name 1
+                        </h4>    
+                        <!-- List of attributes for product -->
+                        <ul style="list-style:none;">
+                            <li> Attribute: value </li>
+                            <li> Attribute: value </li>
+                            <li> Attribute: value </li>
+                        </ul>
+                  </div>
+              </div>
+			</li>
+            <!-- Next item would start from here (item 2 in row) -->
+            
+            <!-- Next item would start from here (item 3 in row) -->
+		</ul>
+    </div>  <!-- End of row. Max of 3 items per row. --> 
+    
+    <!-- End of Product Diplays. -->
+    
+    <!-- Pagination-->
+    <div class="pagination pagination-large pagination-centered">
+        <ul>
+            <li><a href="#">Prev</a></li>
+            <li><a href="#">1</a></li>
+            <li><a href="#">2</a></li>
+            <li><a href="#">3</a></li>
+            <li><a href="#">4</a></li>
+            <li><a href="#">5</a></li>
+            <li><a href="#">Next</a></li>
+        </ul>
+    </div>
+    <!-- End Pagination -->
+    
+    
+    </div> <!-- End of Contents-->
+
+    <!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+	<div class="sidebarRight">
+      <div class="well well-small btn-group btn-group-vertical">
+            <button class="btn btn-block">My_Tracker</button>
+            <button class="btn btn-block">My_Modules</button>
+            <button class="btn btn-block">My_Settings</button>
+            <br>
+          	<button class="btn btn-block">Submit_Module</button>
+       </div>
+    </div>
+</div>
+
+<!-- ------------------ FOOTER ------------------ -->
+
+<div class="navbar navbar-inverse navbar-fixed-bottom">
+      <div class="navbar-inner" >
+        <ul class="nav" >
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/howItWorks.html">How_it_Works</a></li>
+              <li><a href="/modules.html">Modules</a></li>
+            </ul>
+  </div><!--/.nav-collapse -->
+    </div>
+
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../assets/js/jquery.js"></script>
+    <script src="../assets/js/bootstrap-transition.js"></script>
+
+    <script src="../assets/js/bootstrap-alert.js"></script>
+    <script src="../assets/js/bootstrap-modal.js"></script>
+    <script src="../assets/js/bootstrap-dropdown.js"></script>
+    <script src="../assets/js/bootstrap-scrollspy.js"></script>
+    <script src="../assets/js/bootstrap-tab.js"></script>
+    <script src="../assets/js/bootstrap-tooltip.js"></script>
+    <script src="../assets/js/bootstrap-popover.js"></script>
+    <script src="../assets/js/bootstrap-button.js"></script>
+    <script src="../assets/js/bootstrap-collapse.js"></script>
+    <script src="../assets/js/bootstrap-carousel.js"></script>
+    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    
+</body>
+</html>

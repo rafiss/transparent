@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="../assets/css/bootstrap-responsive.css" rel="stylesheet">
+<!-- TemplateBeginEditable name="doctitle" -->
+<title>Transparent: An Open Price Tracking Platform</title>
+<!-- TemplateEndEditable -->
+<!-- TemplateBeginEditable name="head" -->
+<!-- TemplateEndEditable -->
+<style type="text/css">
+
+/* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
+@import url("../bootstrap/css/bootstrap.css");
+@import url(http://fonts.googleapis.com/css?family=Megrim);
+
+.navbar-inverse .brand {
+	font-family: 'Megrim', Sans;
+	color: white;
+	padding-top: 13px;
+}
+
+.container {
+	margin-top: 8%;
+	width: 65%;
+}
+
+.content {
+	float: left;
+	width:65%;
+}
+
+.sidebarLeft {
+	float:left;
+	width: 16%;	
+
+}
+.sidebarRight {
+	float:left;
+	width: 16%;	
+}
+
+body {
+	padding-top: 40px;
+	background-color: rgb(245, 245, 245);
+}
+
+.outer-container {
+	background-color: rgb(240, 240, 240);
+	width: 100%;
+	padding-top: 5px;
+	padding-bottom: 40px;
+	border-bottom: rgb(226, 226, 226) 1px solid;
+}
+
+.nav-list > li > a {
+	padding-left: 15px;
+}
+
+.nav-list > li {
+	padding-left: 10px;
+}
+
+.navbar .nav,
+.navbar .nav > li {
+    float:none;
+    display:inline-block;
+    *display:inline; /* ie7 fix */
+    *zoom:1; /* hasLayout ie7 trigger */
+    vertical-align: top;
+}
+
+ .navbar-inner {
+    text-align:center;
+}
+
+@media(max-width:1600px) {
+	.container {
+		width: 90%;
+	}
+}
+
+@media(max-width:1368px) {
+	.container {
+		width: 95%;
+	}
+
+	.content {
+		float: left;
+		width:60%;
+	}
+
+	.sidebarLeft {
+		float:left;
+		width: 17%;	
+
+	}
+	.sidebarRight {
+		float:left;
+		width: 17%;	
+	}
+}
+
+</style>
+
+</head>
+
+<body>
+<!-- ------------------ HEADER ----------------- -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+      		<!-- Logo at top right of screen. Should link to home page -->
+            <a class="brand" href="index.html">Transparent</a>
+            <div class="nav-collapse collapse">
+                
+              	<!-- Register form -->
+                <!-- For now, just takes you to a different page -->
+                <form class="navbar-form pull-right">
+                <button type="register" class="btn">Register</button>
+                </form>
+                
+                <!-- Login form -->
+                <form class="navbar-form pull-right">
+                <input class="span2" type="text" placeholder="Email">
+                <input class="span2" type="password" placeholder="Password">
+                <button type="submit" class="btn">Sign in</button>
+                </form>
+
+          </div>
+        </div>
+</div>
+
+<!-- ------------------ ACTUAL CONTENT ------------------ -->
+
+<div class="outer-container">
+	<div class=" container">
+
+		<!-- Contains different product categories -->
+		<div class="sidebarLeft">
+
+			<div class="well">
+			<ul class="nav nav-list">
+			  <li class="nav-header">Categories</li>
+			  <li><a href="#">Category 2</a></li>
+			  <li><a href="#">Category 3</a></li>
+			  <li><a href="#">Category 4</a></li>
+			  <li><a href="#">Category 5</a></li>
+			</ul>
+			</div>
+		</div>
+		
+		<!-- Search bar -->
+		<div class="content">
+		    <div class="btn-group btn-group-vertical">
+		            <!-- INCLUDE LOGO SOURCE HERE instead of "..." -->
+		
+		            <a href="/Templates/index.html"><img src="../images/logo.png" width="512" height="94" class="img"></a>
+		            <br>
+		            <br>
+		            
+		        <!-- Search bar form -->
+		        <div class="input-append">
+		            <input class="span5" id="appendedInputButton" type="text" autofocus="autofocus">
+		            <button class="btn btn-info" type="button">Search</button>
+		    	</div>
+		    </div>	
+		</div>
+
+		<!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
+		<div class="sidebarRight">
+		    <div class="well well-small btn-group btn-group-vertical">
+		        <button class="btn btn-block"><i class="icon-shopping-cart"> </i> Tracked Items</button>
+		        <button class="btn btn-block"><i class="icon-list-alt"> </i> Selected Modules</button>
+		        <button class="btn btn-block"><i class="icon-cog"> </i> Settings</button>
+		   </div>
+		   <button class="btn btn-success btn-block">Submit New Module</button>
+		</div>
+	</div>
+</div>
+<!-- ------------------ FOOTER ------------------ -->
+
+	<div class="navbar navbar-inverse navbar-fixed-bottom">
+      <div class="navbar-inner" >
+            <ul class="nav" >
+              <li><a href="/about.html">About</a></li>
+			  <li class="divider-vertical"></li>
+              <li><a href="/howItWorks.html">How It Works</a></li>
+			  <li class="divider-vertical"></li>
+              <li><a href="/modules.html">Modules</a></li>
+            </ul>
+          </div><!--/.nav-collapse -->
+    </div>
+
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../assets/js/jquery.js"></script>
+    <script src="../assets/js/bootstrap-transition.js"></script>
+    <script src="../assets/js/bootstrap-alert.js"></script>
+    <script src="../assets/js/bootstrap-modal.js"></script>
+    <script src="../assets/js/bootstrap-dropdown.js"></script>
+    <script src="../assets/js/bootstrap-scrollspy.js"></script>
+    <script src="../assets/js/bootstrap-tab.js"></script>
+    <script src="../assets/js/bootstrap-tooltip.js"></script>
+    <script src="../assets/js/bootstrap-popover.js"></script>
+    <script src="../assets/js/bootstrap-button.js"></script>
+    <script src="../assets/js/bootstrap-collapse.js"></script>
+    <script src="../assets/js/bootstrap-carousel.js"></script>
+    <script src="../assets/js/bootstrap-typeahead.js"></script>
+    
+</body>
+</html>
