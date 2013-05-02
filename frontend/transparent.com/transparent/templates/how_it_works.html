@@ -1,7 +1,7 @@
 {% extends "rightbase.html" %}
 
 {% block title %}
-<title>How it Works</title>
+<title>Transparent: How it Works</title>
 {% endblock %}
 
 {% block content %}
@@ -28,7 +28,7 @@
                 </div>
                 <br>
                 <div class="text-left">
-            		<p>The <a href="/product.html">product page</a> for each item lists the current lowest price and the various attributes of the product. It also contains a price history graph to inform the user about the item's price trends. The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
+                    <p>The <a href="{% url 'finder.views.product' 1 %}">product page</a> for each item lists the current lowest price and the various attributes of the product. It also contains a price history graph to inform the user about the item's price trends. The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
                 </div>
                 <br>
                 <br>
@@ -37,7 +37,7 @@
                 </div>
                 <br>
                 <div class="text-left">
-            		<p>One type of module available to the user is all modules that are stored on the application's backend server. Each such module is accompanied by documentation on the module <a href="/module.html">description page</a>. The implementation of these modules can also be viewed from the same page.</p>
+            		<p>One type of module available to the user is all modules that are stored on the application's backend server. Each such module is accompanied by documentation on the <a href="{% url 'finder.views.modules' %}">module description page</a>. The implementation of these modules can also be viewed from the same page.</p>
                 </div>
                 <br>
                 <br>

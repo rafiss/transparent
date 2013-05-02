@@ -22,7 +22,7 @@ urlpatterns = patterns('',
     (r'^how_it_works/$', views.how_it_works),
     (r'^modules/$', views.modules),
 	(r'^settings/$', views.settings),
-	(r'^selected_modules/$', views.selected_modules),
+#	(r'^selected_modules/$', views.selected_modules),
 	(r'^tracked_items/$', views.tracked_items),
 	(r'^submit/$', views.submit),
 

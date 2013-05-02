@@ -1,0 +1,61 @@
+{% extends "leftbase.html" %}
+
+{% block title %}
+<title>Transparent: An Open Price Tracking Platform</title>
+{% endblock %}
+
+{% block content %}
+
+<div class="centered-content">
+    	<!-- TEXT START -->
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Introduction -->
+                <h3>Submit_Module</h3>
+                <!-- use for loop to interate through all sources and related modules -->
+                <p>Please submit all code and documentation necessary for us to operate this module.</p>
+                
+                
+                <!-- Login form -->
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Module Name">
+                </form>
+                
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Source Code Files">
+                <button type="submit" class="btn">Browse</button>
+                </form>
+                
+                <form class="navbar-form">
+                <input class="span4" type="text" placeholder="Documentation Files">
+                <button type="submit" class="btn">Browse</button>
+                </form>
+                
+                <div class="container">
+                	<ul>
+                    	<b>Uploaded code</b><br>
+                        main.java<br>
+                        branch1.java<br>
+                        <br>
+                        <b>Uploaded documentation</b><br>
+                        about.txt<br>
+                    </ul>
+                </div>
+                
+                <form class="navbar-form">
+                <button type="register" class="btn">Submit</button>
+                </form>
+            </div>
+        </div>  <!-- End of row. Max of 3 items per row. --> 
+    
+    </div> <!-- End of Contents-->
+
+<!-- ONLY SHOW THIS IF USER HAS SUBMITTED {TO SERVITUDE -alex} -->
+<div class="centered-content">
+    <div class="btn-group btn-group-vertical">
+        <h2 class="">Thank you for your submission</h2>
+    </div>	
+</div>
+
+
+{% endblock %}

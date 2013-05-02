@@ -12,10 +12,16 @@ class Module(models.Model):
     down_score = models.IntegerField()
     backend_id = models.IntegerField()
 
+    def __unicode__(self):
+        return u'id:{0} name:{1}'.format(backend_id, name)
+
 class UserProfile(models.Model):
     user = models.OneToOneField(User)
     modules = models.ManyToManyField(Module)
     tracked_items = models.CommaSeparatedIntegerField(max_length=32000)
+
+    def __unicode__(self):
+        return u'{0} profile'.format(user.username)
 
 def create_profile(sender, instance, created, **kwargs):
     if created:
