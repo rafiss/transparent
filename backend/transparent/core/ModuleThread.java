@@ -260,7 +260,7 @@ public class ModuleThread implements Runnable, Interruptable
 		String[] args = { model };
 		Results results = Core.getDatabase().query(where, args, "model", true, null, null, false);
 		while (results.next()) {
-			long id = results.getLong(0);
+			long id = results.getLong(1);
 			if (id != prevId) {
 				if (found && gid != null) {
 					keyValues[count] = new SimpleEntry<String, String>("gid", gid);
@@ -270,8 +270,8 @@ public class ModuleThread implements Runnable, Interruptable
 				prevId = id;
 			}
 
-			String key = results.getString(1);
-			String value = results.getString(2);
+			String key = results.getString(2);
+			String value = results.getString(3);
 			if (key.equals("brand") &&
 					value.toLowerCase().trim().equals(brand.toLowerCase().trim()))
 				found = true;
@@ -369,6 +369,7 @@ public class ModuleThread implements Runnable, Interruptable
 			}
 
 			/* TODO: if a particular product ID fails, try to skip it */
+			/* TODO: if active logging is on, the error stream should print to console */
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */

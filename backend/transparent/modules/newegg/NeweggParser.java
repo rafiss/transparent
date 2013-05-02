@@ -235,6 +235,7 @@ public class NeweggParser
 	private static void respond(Map<String, String> keyValues) throws IOException
 	{
 		keyValues.remove("features");
+		keyValues.remove("windows vista");
 		keyValues.remove("operating systems supported");
 
 		out.writeByte(MODULE_RESPONSE);
