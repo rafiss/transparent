@@ -54,22 +54,24 @@ def logout(request):
 
 def search(request):
     page = request.GET.get('p', '1')
+    referer = request.META.get('HTTP_REFERER', '/')
     if 'q' in request.GET and request.GET['q']:
         query = request.GET['q']
 
-        modules = [module.backend_id for module in Module.objects.all()]
-        if request.user is not None and request.user.is_active:
-            modules = [module.backend_id for module in user.userprofile.modules]
+        #TODO: get modules
+        #modules = [module.backend_id for module in Module.objects.all()]
+        #if request.user is not None and request.user.is_active:
+            #modules = [module.backend_id for module in request.user.userprofile.modules]
+            #modules = []
 
         payload = {'select': ['name', 'image', 'price', 'gid'],
                 'where': {'name': '=' + query},
-                'modules': modules,
+                #TODO: specify modules
+                #'modules': modules,
                 'page': page,
-                'page_size': PAGE_SIZE,
-                'limit': 500}
-        resp = urllib2.urlopen(BACKEND_URL + '/search/', json.dumps(payload))
+                'pagesize': PAGE_SIZE}
+        resp = urllib2.urlopen(BACKEND_URL + '/search', json.dumps(payload))
         results = json.loads(resp.read())
-        results = results[:15]
         for i in range(len(results)):
             new = {}
             for j in range(len(payload['select'])):
@@ -80,7 +82,7 @@ def search(request):
             products.append(results[i:i+3])
         return render(request, "search.html", {'products': products, 'query': query})
     else:
-        return HttpResponseRedirect('/')
+        return HttpResponseRedirect(referer)
 
 def product(request, gid):
     #payload = {'select': ['name', 'image', 'price', 'model'],
@@ -88,13 +90,13 @@ def product(request, gid):
             #'limit': 1}
     modules = [module.backend_id for module in Module.objects.all()]
     if request.user is not None and request.user.is_active:
-        modules = [module.backend_id for module in user.userprofile.modules]
-    payload = {'gid': gid, 'modules': modules}
-    resp = urllib2.urlopen(BACKEND_URL + '/product/', json.dumps(payload))
-    results = json.loads(resp.read())
-    product = {}
-    for j in range(len(payload['select'])):
-        product[payload['select'][j]] = results[0][j]
+        modules = [module.backend_id for module in request.user.userprofile.modules]
+    #TODO: specify modules
+    #payload = {'gid': gid, 'modules': modules}
+    payload = {'gid': gid}
+    resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
+    product = json.loads(resp.read())
+    #return HttpResponse(json.dumps(product))
     return render(request, "product.html", {'product': product})
 
 def about(request):

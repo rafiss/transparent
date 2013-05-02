@@ -48,11 +48,14 @@
         {% endfor %}
 
     </ul>
-</div> 
+</div>
+{% empty %}
+<h2 style="{margin-left:auto; margin-right:auto;}">No results</h2>
 {% endfor %}
     
 <!-- End of Product Diplays. -->
 
+{% comment %}
 <!-- Pagination-->
 <div class="pagination pagination-large pagination-centered">
     <ul>
@@ -66,7 +69,7 @@
     </ul>
 </div>
 <!-- End Pagination -->
-
+{% endcomment %}
 
 </div> <!-- End of Contents-->
 
