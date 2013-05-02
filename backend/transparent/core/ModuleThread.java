@@ -368,6 +368,7 @@ public class ModuleThread implements Runnable, Interruptable
 				requestedProductIds.seekRelative(position);
 			}
 
+			/* TODO: if a particular product ID fails, try to skip it */
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */

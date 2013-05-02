@@ -463,8 +463,12 @@ public class NeweggParser
 		if (price == null || !price.getClass().equals(String.class))
 			return null;
 
-		String parsed = (String) price;
-		return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll(".", ""));
+		try {
+			String parsed = (String) price;
+			return Integer.parseInt(parsed.trim().replaceAll("\\$", "").replaceAll(".", ""));
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	private static void parseProductInfo(String productId)

@@ -285,6 +285,8 @@ public class Server implements Container
 		if (name != null) {
 			/* search by name */
 			Iterator<ProductID> results = Core.searchProductName(name.getValue(), sort, false);
+			if (results == null)
+				return null;
 
 			/* construct a map of where conditions */
 			HashMap<String, Condition> conditions = new HashMap<String, Condition>();
