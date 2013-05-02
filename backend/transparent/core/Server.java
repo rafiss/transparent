@@ -2,10 +2,12 @@ package transparent.core;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import net.minidev.json.JSONArray;
@@ -40,13 +42,65 @@ public class Server implements Container
 			map.put("error", message);
 			return map;
 		}
+
+		private void parseModules(PrintStream body) throws IOException, ParseException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Object idObject = map.get("id");
+			if (idObject instanceof JSONArray) {
+				JSONArray array = (JSONArray) idObject;
+				String[] modules = new String[array.size()];
+				for (int i = 0; i < array.size(); i++) {
+					if (!(array.get(i) instanceof String)) {
+						body.println(error("'id' key must map to a string "
+								+ "or a list of strings."));
+						body.close();
+						return;
+					}
+					modules[i] = (String) array.get(i);
+				}
+
+				JSONObject result = new JSONObject();
+				for (int i = 0; i < modules.length; i++) {
+					JSONObject subresult = moduleInfo(modules[i]);
+					if (subresult == null)
+						result.put(modules[i], error("No such module with id."));
+					else
+						result.put(modules[i], subresult);
+				}
+				body.println(result.toJSONString());
+			} else if (idObject instanceof String) {
+				JSONObject subresult = moduleInfo((String) idObject);
+				if (subresult == null)
+					body.println(error("No such module with id."));
+				else
+					body.println(subresult.toJSONString());
+			} else {
+				body.println(error("'id' key must map to a string "
+						+ "or a list of strings."));
+				body.close();
+				return;
+			}
+		}
+		
+		private void parseProductQuery(PrintStream body) throws IOException, ParseException
+		{
+			
+		}
 		
 		private void parseSearch(PrintStream body) throws IOException, ParseException
 		{
 			Object object = parser.parse(request.getContent());
 			if (!(object instanceof JSONObject)) {
-				body.close();
 				body.println(error("Root structure must be a map."));
+				body.close();
 				return;
 			}
 
@@ -143,21 +197,22 @@ public class Server implements Container
 			}
 
 			int limit = -1;
-			Object limitObject = map.get("limit");
+			Object limitObject = map.get("page size");
 			if (limitObject != null) {
 				if (limitObject instanceof Integer) {
 					limit = (int) limitObject;
 				} else if (limitObject instanceof String) {
 					limit = Integer.parseInt((String) limitObject);
 				} else {
-					body.println(error("'limit' key must map to an integer or string."));
+					body.println(error("'page size' key must map to an integer or string."));
 					body.close();
 					return;
 				}
 			}
 
-			JSONArray results = query(select, name, where, sort, page, limit);
-			if (results != null)
+			JSONArray results = new JSONArray();
+			results.addAll(query(select, name, where, sort, page, limit).values());
+			if (!results.isEmpty())
 				body.println(results.toJSONString());
 			else
 				body.println(error("Internal error occurred during query."));
@@ -189,12 +244,36 @@ public class Server implements Container
 		}
 	}
 
-	private static JSONArray query(String[] select, Condition name,
-			Condition[] where, String sort, int page, int limit)
-	{ /* TODO: implement sort and pagination */
+	private static JSONObject moduleInfo(String moduleId)
+	{
+		try {
+			Module module = Core.getModule(new BigInteger(moduleId).longValue());
+			if (module == null)
+				return null;
+
+			JSONObject map = new JSONObject();
+			map.put("name", module.getModuleName());
+			map.put("source", module.getSourceName());
+			return map;
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+	
+	private static void mergeRows(JSONArray mergeInto, JSONArray from)
+	{
+		for (int i = 0; i < mergeInto.size(); i++) {
+			if (mergeInto.get(i) == null)
+				mergeInto.set(i, from.get(i));
+		}
+	}
+
+	private static Map<String, JSONArray> query(String[] select, Condition name,
+			Condition[] where, String sort, int page, int pageSize)
+	{
 		if (name != null) {
 			/* search by name */
-			Iterator<ProductID> results = Core.searchProductName(name.getValue());
+			Iterator<ProductID> results = Core.searchProductName(name.getValue(), sort, false);
 
 			/* construct a map of where conditions */
 			HashMap<String, Condition> conditions = new HashMap<String, Condition>();
@@ -213,13 +292,17 @@ public class Server implements Container
 			for (Condition condition : where)
 				if (condition != null)
 					properties.add(condition.getKey());
+			boolean gidAdded = !properties.contains("gid");
+			if (gidAdded)
+				properties.add("gid");
 			String[] propertiesArray = new String[properties.size()];
 			propertiesArray = properties.toArray(propertiesArray);
 
 			int conditionsSatisfied = 0;
-			JSONArray json = new JSONArray();
+			int currentPage = 1;
+			HashMap<String, JSONArray> json = new HashMap<String, JSONArray>();
 			ArrayList<ProductID> rowIds = new ArrayList<ProductID>();
-			while ((json.size() < limit || limit < 0) && results.hasNext())
+			while (results.hasNext())
 			{
 				for (int i = 0; i < QUERY_LIMIT; i++) {
 					if (!results.hasNext())
@@ -233,6 +316,7 @@ public class Server implements Container
 
 				/* process the where clauses */
 				long prevId = -1;
+				String gid = null;
 				boolean discard = true;
 				JSONArray row = new JSONArray();
 				row.ensureCapacity(select.length);
@@ -243,9 +327,18 @@ public class Server implements Container
 					if (id != prevId) {
 						/* push the last row into our list of results */
 						if (!discard && conditionsSatisfied == conditions.size()) {
-							json.add(row);
-							if (json.size() == limit)
-								return json;
+							if (json.containsKey(gid))
+								mergeRows(json.get(gid), row);
+							else
+								json.put(gid, row);
+							if (json.size() == pageSize) {
+								if (currentPage == page)
+									return json;
+								else {
+									json.clear();
+									currentPage++;
+								}
+							}
 							row = new JSONArray();
 							row.ensureCapacity(select.length);
 						}
@@ -255,6 +348,7 @@ public class Server implements Container
 
 						conditionsSatisfied = 0;
 						prevId = id;
+						gid = null;
 						discard = false;
 					} else if (discard)
 						continue;
@@ -267,7 +361,10 @@ public class Server implements Container
 						discard = true;
 						continue;
 					}
-					conditionsSatisfied++;
+					if (key.equals("gid"))
+						gid = value;
+					if (!key.equals("gid") || !gidAdded)
+						conditionsSatisfied++;
 
 					/* add this value to our current row */
 					Integer index = selectMap.get(key);

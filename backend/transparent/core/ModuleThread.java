@@ -218,6 +218,8 @@ public class ModuleThread implements Runnable, Interruptable
 
 		@SuppressWarnings("unchecked")
 		Entry<String, String>[] keyValues = new Entry[count + 1];
+		String name = null;
+		String price = null;
 		String brand = null;
 		String model = null;
 		for (int i = 0; i < count; i++) {
@@ -232,13 +234,21 @@ public class ModuleThread implements Runnable, Interruptable
 			String value = new String(data, UTF8);
 
 			if (key.equals("name"))
-				Core.addToIndex(value, productId);
+				name = value;
 			else if (key.equals("brand"))
 				brand = value;
 			else if (key.equals("model"))
 				model = value;
+			else if (key.equals("price"))
+				price = value;
 
 			keyValues[i] = new SimpleEntry<String, String>(key, value);
+		}
+
+		if (name != null && price != null) {
+			try {
+				Core.addToIndex(name, productId, Integer.parseInt(price));
+			} catch (NumberFormatException e) { }
 		}
 
 		if (brand == null || model == null)

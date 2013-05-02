@@ -26,17 +26,21 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
 import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler.Operator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
@@ -65,6 +69,7 @@ public class Core
 	private static final String PRODUCT_NAME_FIELD = "name";
 	private static final String PRODUCT_ID_FIELD = "id";
 	private static final String ROW_ID_FIELD = "row";
+	private static final String PRICE_FIELD = "price";
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final int SEARCH_LIMIT = 256;
 	private static final int HTTP_SERVER_PORT = 16317;
@@ -155,7 +160,7 @@ public class Core
 		dispatcher.execute(task);
 	}
 
-	public static void addToIndex(String productName, ProductID id)
+	public static void addToIndex(String productName, ProductID id, int price)
 	{
 		if (indexWriter == null)
 			return;
@@ -167,13 +172,16 @@ public class Core
 				PRODUCT_ID_FIELD, id.getModuleProductId(), Field.Store.YES);
 		StoredField rowField = new StoredField(
 				ROW_ID_FIELD, id.getRowId());
+		IntField priceField = new IntField(
+				PRICE_FIELD, price, Field.Store.YES);
 
 		doc.add(nameField);
 		doc.add(productIdField);
 		doc.add(rowField);
+		doc.add(priceField);
 
 		try {
-			indexWriter.addDocument(doc);
+			indexWriter.updateDocument(new Term(PRODUCT_ID_FIELD, id.getModuleProductId()), doc);
 		} catch (IOException e) {
 			Console.printError("Core", "addToIndex", "Error adding "
 					+ "product name to search index.", e);
@@ -193,7 +201,8 @@ public class Core
 		return builder.toString();
 	}
 
-	public static Iterator<ProductID> searchProductName(String term)
+	public static Iterator<ProductID> searchProductName(
+			String term, String sortby, boolean descending)
 	{
 		Query query = null;
 		try {
@@ -209,7 +218,10 @@ public class Core
 		}
 
 		try {
-			return new SearchIterator(query);
+			Sort sort = new Sort();
+			if (sortby.equals("price"))
+				sort = new Sort(new SortField(PRICE_FIELD, SortField.Type.INT, descending));
+			return new SearchIterator(query, sort);
 		} catch (IOException e) {
 			Console.printError("Core", "searchProductName",
 					"Error occurred during search.", e);
@@ -759,13 +771,15 @@ public class Core
 	{
 		private ScoreDoc[] results;
 		private Query query;
+		private Sort sort;
 		private int index;
 
-		public SearchIterator(Query query) throws IOException {
+		public SearchIterator(Query query, Sort sort) throws IOException {
 			this.query = query;
+			this.sort = sort;
 			this.index = 0;
 
-			this.results = searcher.search(query, SEARCH_LIMIT).scoreDocs;
+			this.results = searcher.search(query, SEARCH_LIMIT, sort).scoreDocs;
 			if (results.length == 0)
 				results = null;
 		}
@@ -792,7 +806,7 @@ public class Core
 			if (index == results.length) {
 				try {
 					results = searcher.searchAfter(
-							results[index - 1], query, SEARCH_LIMIT).scoreDocs;
+							results[index - 1], query, SEARCH_LIMIT, sort).scoreDocs;
 				} catch (IOException e) {
 					results = null;
 				}
