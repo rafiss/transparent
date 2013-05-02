@@ -726,12 +726,14 @@ public class Core
         }
 
 		/* start the main loop */
-        dispatcher.scheduleWithFixedDelay(
-        		new BackgroundWorker(), 10, 10, TimeUnit.SECONDS);
+        BackgroundWorker worker = new BackgroundWorker();
+        ScheduledFuture<?> future =
+        		dispatcher.scheduleWithFixedDelay(worker, 10, 10, TimeUnit.SECONDS);
 		if (consoleReady)
 			Console.runConsole();
 
 		/* tell all tasks to end */
+		future.cancel(true);
 		tasksLock.lock();
 		try {
 			for (Task task : runningList) {
