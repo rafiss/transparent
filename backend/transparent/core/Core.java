@@ -138,7 +138,6 @@ public class Core
 
 		String seedValue = database.getMetadata(SEED_KEY);
 		if (seedValue == null) {
-			Console.printWarning("Core", "loadSeed", "No stored seed, regenerating...");
 			while (seed == 0)
 				seed = System.nanoTime();
 			database.setMetadata(SEED_KEY, Long.toString(seed));
@@ -178,7 +177,7 @@ public class Core
 		doc.add(nameField);
 		doc.add(productIdField);
 		doc.add(rowField);
-		doc.add(priceField); /* TODO: only the lowest price of a product should be kept */
+//		doc.add(priceField); /* TODO: only the lowest price of a product should be kept */
 
 		try {
 			indexWriter.addDocument(doc);

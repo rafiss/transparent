@@ -111,8 +111,8 @@ def modules(request):
 def settings(request):
     return render(request, "settings.html", {})
 
-def selected_modules(request):
-    return render(request, "selected_modules.html", {})
+#def selected_modules(request):
+#    return render(request, "selected_modules.html", {})
 
 def tracked_items(request):
     return render(request, "tracked_items.html", {})
