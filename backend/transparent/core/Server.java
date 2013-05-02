@@ -2,6 +2,8 @@ package transparent.core;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -197,14 +199,14 @@ public class Server implements Container
 			}
 
 			int limit = -1;
-			Object limitObject = map.get("page size");
+			Object limitObject = map.get("pagesize");
 			if (limitObject != null) {
 				if (limitObject instanceof Integer) {
 					limit = (int) limitObject;
 				} else if (limitObject instanceof String) {
 					limit = Integer.parseInt((String) limitObject);
 				} else {
-					body.println(error("'page size' key must map to an integer or string."));
+					body.println(error("'pagesize' key must map to an integer or string."));
 					body.close();
 					return;
 				}
@@ -236,9 +238,17 @@ public class Server implements Container
 				body.close();
 			} catch (Exception e) {
 				if (body != null) {
-					body.println(error(e.getClass().getSimpleName()
-							+ " thrown. " + e.getMessage()));
+					StringWriter message = new StringWriter();
+					message.write(
+							e.getClass().getSimpleName() + " thrown.");
+					if (e.getMessage() != null)
+						message.write(" " + e.getMessage());
+					PrintWriter writer = new PrintWriter(message);
+					e.printStackTrace(writer);
+					writer.flush();
+					body.println(error(message.toString()));
 					body.close();
+					writer.close();
 				}
 			}
 		}
