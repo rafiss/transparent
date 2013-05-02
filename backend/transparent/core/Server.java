@@ -212,11 +212,12 @@ public class Server implements Container
 				}
 			}
 
-			JSONArray results = new JSONArray();
-			results.addAll(query(select, name, where, sort, page, limit).values());
-			if (!results.isEmpty())
+			Map<String, JSONArray> returned = query(select, name, where, sort, page, limit);
+			if (returned != null) {
+				JSONArray results = new JSONArray();
+				results.addAll(returned.values());
 				body.println(results.toJSONString());
-			else
+			} else
 				body.println(error("Internal error occurred during query."));
 		}
 
