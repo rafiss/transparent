@@ -278,7 +278,7 @@ public class ModuleThread implements Runnable, Interruptable
 			else if (key.equals("gid"))
 				gid = value;
 		}
-		if (!found) {
+		if (!found || gid == null) {
 			keyValues[count] = new SimpleEntry<String, String>(
 					"gid", Core.toUnsignedString(Core.random()));
 		}

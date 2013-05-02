@@ -86,9 +86,18 @@ public class Console
 		if (!consoleLock.isHeldByCurrentThread())
 			consoleLock.lock();
 		else nestedLock++;
+		if (isReading && in != null) {
+			AnsiConsole.out.print(ERASE);
+			AnsiConsole.out.print(new Ansi().cursorLeft(
+					in.getCursorBuffer().cursor + PROMPT.length()));
+		}
 	}
 
 	public static void unlockConsole() {
+		try {
+			if (isReading && in != null)
+				in.restoreLine();
+		} catch (IOException e) { }
 		if (nestedLock == 0)
 			consoleLock.unlock();
 		else nestedLock--;
@@ -111,16 +120,7 @@ public class Console
 	public static void println(String s)
 	{
 		lockConsole();
-		if (isReading && in != null) {
-			AnsiConsole.out.print(ERASE);
-			AnsiConsole.out.print(new Ansi().cursorLeft(
-					in.getCursorBuffer().cursor + PROMPT.length()));
-		}
 		AnsiConsole.out.println(s);
-		try {
-			if (isReading && in != null)
-				in.restoreLine();
-		} catch (IOException e) { }
 		unlockConsole();
 	}
 

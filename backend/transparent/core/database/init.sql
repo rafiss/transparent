@@ -51,6 +51,8 @@ LEFT JOIN transparent.Trait     AS t ON t.property_id      = p.property_id
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS transparent.InsertNewAttribute;
+DROP PROCEDURE IF EXISTS transparent.QueryWithAttributes;
+DROP PROCEDURE IF EXISTS transparent.QueryWithIndexes;
 DROP PROCEDURE IF EXISTS transparent.AddProductId;
 
 CREATE PROCEDURE transparent.InsertNewAttribute(
@@ -109,31 +111,31 @@ CREATE PROCEDURE transparent.QueryWithAttributes(
     IN numRows INT)
     SQL SECURITY INVOKER
 BEGIN
-    IF sortAsc IS TRUE THEN
-        SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
-            FROM vModel AS v1
-            INNER JOIN vModel AS v2
-                ON v1.EntityID=v2.EntityID
-                AND v2.PropertyName=whereClause
-                AND v2.TraitValue=whereArg
-            INNER JOIN vModel AS v3
-                ON v1.EntityID=v3.EntityID
-                AND v3.PropertyName=sortClause
-        ORDER BY v3.TraitValue ASC
-        LIMIT startRow, numRows;
-    ELSE
-        SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
-            FROM vModel AS v1
-            INNER JOIN vModel AS v2
-                ON v1.EntityID=v2.EntityID
-                AND v2.PropertyName=whereClause
-                AND v2.TraitValue=whereArg
-            INNER JOIN vModel AS v3
-                ON v1.EntityID=v3.EntityID
-                AND v3.PropertyName=sortClause
-        ORDER BY v3.TraitValue DESC
-        LIMIT startRow, numRows;
-    END IF;
+	IF sortAsc IS TRUE THEN
+		SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
+			FROM vModel AS v1
+			INNER JOIN vModel AS v2
+				ON v1.EntityID=v2.EntityID
+				AND v2.PropertyName=whereClause
+				AND v2.TraitValue=whereArg
+			INNER JOIN vModel AS v3
+				ON v1.EntityID=v3.EntityID
+				AND v3.PropertyName=sortClause
+		ORDER BY v3.TraitValue ASC
+		LIMIT startRow, numRows;
+	ELSE
+		SELECT v1.EntityID, v1.PropertyName, v1.TraitValue
+			FROM vModel AS v1
+			INNER JOIN vModel AS v2
+				ON v1.EntityID=v2.EntityID
+				AND v2.PropertyName=whereClause
+				AND v2.TraitValue=whereArg
+			INNER JOIN vModel AS v3
+				ON v1.EntityID=v3.EntityID
+				AND v3.PropertyName=sortClause
+		ORDER BY v3.TraitValue DESC
+		LIMIT startRow, numRows;
+	END IF;
 END//
 
 CREATE PROCEDURE transparent.QueryWithIndexes(

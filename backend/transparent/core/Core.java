@@ -178,7 +178,7 @@ public class Core
 		doc.add(nameField);
 		doc.add(productIdField);
 		doc.add(rowField);
-		doc.add(priceField);
+		doc.add(priceField); /* TODO: only the lowest price of a product should be kept */
 
 		try {
 			indexWriter.updateDocument(new Term(PRODUCT_ID_FIELD, id.getModuleProductId()), doc);

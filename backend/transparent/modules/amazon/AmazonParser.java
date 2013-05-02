@@ -395,6 +395,14 @@ public class AmazonParser
 			keyValues.put("price", price.toString());
 		keyValues.put("url", url);
 
+		/* parse the product name */
+		elements = document.select("#btAsinTitle");
+		if (elements.size() > 0) {
+			String name = elements.get(0).text().trim();
+			if (name != null)
+				keyValues.put("name", name);
+		}
+
 		/* parse the image */
 		elements = document.select("#main-image");
 		if (elements.size() > 0) {
@@ -405,11 +413,11 @@ public class AmazonParser
 
 		/* parse brand name */
 		elements = document.select(".buying span");
+		System.err.println("elements.size(): " + elements.size());
 		for (Element element : elements) {
-			String brand = element.text();
-			String[] tokens = brand.split("\\s+", 2);
-			if (tokens[0].trim().equals("by") && tokens.length > 1) {
-				keyValues.put("brand", tokens[1].trim());
+			String brand = element.text().trim();
+			if (brand.startsWith("by")) {
+				keyValues.put("brand", brand.substring(3).trim());
 				break;
 			}
 		}
