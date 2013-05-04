@@ -1,4 +1,4 @@
-{% extends "leftbase.html" %}
+{% extends "base.html" %}
 
 {% block title %}
 <title>Transparent: Submit a Module</title>
@@ -6,12 +6,61 @@
 
 {% block content %}
 
-<!-- Search bar -->
-<div class="content">
+<div class="centered-content">
+
     <div class="btn-group btn-group-vertical">
         <h2 class="">This page is under construction</h2>
     </div>	
-</div>
 
+	<!-- TEXT START -->
+	<div class="row-fluid">
+		<div class="span12">
+	        <!-- Begin submission form -->
+	        <h3>Submit_Module</h3>
+	        <!-- use for loop to interate through all sources and related modules -->
+	        <p>Please submit all code and documentation necessary for us to operate this module.</p>
+	        
+	        
+	        <!-- Submit code and optional documentation(?) -->
+	        <form class="navbar-form">
+	        <input class="span4" type="text" name="module_name" placeholder="Module Name">
+	        </form>
+			<br>
+	        
+	        <form class="navbar-form">
+	        	Source Code Files<br>
+				<input class="span4" type="file" name="source" title="Source Code Files">
+				{% comment %}
+	        	<button type="submit" class="btn">Browse</button>
+				{% endcomment %}
+	        </form>
+	        
+	        <form class="navbar-form">
+	        	Documentation Files<br>
+				<input class="span4" type="file" name="doc" placeholder="doc">
+				{% comment %}
+	        	<button type="submit" class="btn">Browse</button>
+				{% endcomment %}
+	        </form>
+	        
+	        <div class="container">
+	        	<ul>
+	            	<b>Uploaded code</b><br>
+			        <!-- Iterate through and print source code file names -->
+	                main.java<br>
+	                branch1.java<br>
+	                <br>
+	                <b>Uploaded documentation</b><br>
+			        <!-- Iterate through and print documentation file names -->
+	                about.txt<br>
+	            </ul>
+	        </div>
+	        
+	        <form class="navbar-form">
+	        <input type="submit" class="btn">
+	        </form>
+	    </div>
+	</div>  <!-- End of row. Max of 3 items per row. -->
+</div>
 
 {% endblock %}

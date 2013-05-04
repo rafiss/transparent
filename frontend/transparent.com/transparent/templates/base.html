@@ -79,6 +79,13 @@
               	  {% endcomment %}
             	  </ul>
         	</div>
+			{% comment %}
+			<form class="btn btn-success btn-block" method="post" action="/submit/">
+            	{% csrf_token %}
+            	<input type="submit" class="btn" value="Submit New Module">
+            </form>
+			{% endcomment %}
+
         	<form method="get" action="/submit/">
             	<button type="submit" class="btn btn-success btn-block">Submit New Module</button>
         	</form>

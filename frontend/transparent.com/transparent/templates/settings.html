@@ -1,50 +1,44 @@
-{% extends "leftbase.html" %}
+{% extends "base.html" %}
 
 {% block title %}
 <title>Transparent: Settings</title>
 {% endblock %}
 
 {% block content %}
-
-<div class="content">
-    <div class="btn-group btn-group-vertical">
-        <h2 class="">This page is under construction</h2>
-    </div>	
-</div>
-
 <div class="centered-content">
     
+	<!-- Under construction notice -->
+    <h2 class="">This page is under construction</h2>
+
     <!-- TEXT START -->
-    <div class="row-fluid">
-      	<div class="span12">
-            <!-- Introduction -->
-            <h3>My_Settings</h3>
-            {% comment %}
-            <table width="90%" border="0">
-				<tr>
-                <td>
-                 	<select>
-                    <!-- Iterate through all of the available ModuleSets -->
-					<option>ModuleSet1</option>
-					<option>ModuleSet2</option>
-					<option>ModuleSet3</option>
-					<option>ModuleSet4</option>
-					<option>ModuleSet5</option>
-					</select><br>
-                    <!-- Iterate through all of the modules included in the ModuleSet delected from above -->
-					<select multiple="multiple">
-					<option>module1</option>
-					<option>module2</option>
-					<option>module3</option>
-					<option>module4</option>
-					<option>module5</option>
-					</select>
-                </td>
-				</tr>
-			</table>
-			{% endcomment %}
-        </div>
-    </div>  <!-- End of row. Max of 3 items per row. --> 
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Introduction -->
+                <h3>My_Settings</h3>
+            	<table width="90%" border="0">
+					<tr>
+                    <td>
+                    	<select>
+                        <!-- Iterate through all of the available ModuleSets -->
+						<option>ModuleSet1</option>
+						<option>ModuleSet2</option>
+						<option>ModuleSet3</option>
+						<option>ModuleSet4</option>
+						<option>ModuleSet5</option>
+						</select><br>
+                        <!-- Iterate through all of the modules included in the ModuleSet delected from above -->
+						<select multiple="multiple">
+						<option>module1</option>
+						<option>module2</option>
+						<option>module3</option>
+						<option>module4</option>
+						<option>module5</option>
+						</select>
+                    </td>
+					</tr>
+				</table>
+            </div>
+        </div>  <!-- End of row. Max of 3 items per row. --> 
     
 </div> <!-- End of Contents-->
 
