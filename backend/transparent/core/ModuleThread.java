@@ -69,10 +69,14 @@ public class ModuleThread implements Runnable, Interruptable
 					throws IOException
 	{
 		/* first pass in the content type field from the HTTP header */
-		if (contentType.length() > MAX_USHORT)
-			throw new IOException("Content type header field too long.");
-		dest.writeShort(contentType.length());
-		dest.writeBytes(contentType);
+		if (contentType == null) {
+			dest.writeShort(0);
+		} else {
+			if (contentType.length() > MAX_USHORT)
+				throw new IOException("Content type header field too long.");
+			dest.writeShort(contentType.length());
+			dest.writeBytes(contentType);
+		}
 
 		int total = 0;
 		if (blocked) {

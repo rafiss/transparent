@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -19,6 +20,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -112,10 +114,122 @@ public class Console
 		unlockConsole();
 	}
 
+	public static void print(boolean b)
+	{
+		lockConsole();
+		AnsiConsole.out.print(b);
+		unlockConsole();
+	}
+
+	public static void print(char c)
+	{
+		lockConsole();
+		AnsiConsole.out.print(c);
+		unlockConsole();
+	}
+
+	public static void print(int i)
+	{
+		lockConsole();
+		AnsiConsole.out.print(i);
+		unlockConsole();
+	}
+
+	public static void print(long l)
+	{
+		lockConsole();
+		AnsiConsole.out.print(l);
+		unlockConsole();
+	}
+
+	public static void print(float f)
+	{
+		lockConsole();
+		AnsiConsole.out.print(f);
+		unlockConsole();
+	}
+
+	public static void print(double d)
+	{
+		lockConsole();
+		AnsiConsole.out.print(d);
+		unlockConsole();
+	}
+
+	public static void print(char[] c)
+	{
+		lockConsole();
+		AnsiConsole.out.print(c);
+		unlockConsole();
+	}
+
 	public static void print(String s)
 	{
 		lockConsole();
 		AnsiConsole.out.print(s);
+		unlockConsole();
+	}
+
+	public static void print(Object obj)
+	{
+		lockConsole();
+		AnsiConsole.out.print(obj);
+		unlockConsole();
+	}
+
+	public static void println()
+	{
+		lockConsole();
+		AnsiConsole.out.println();
+		unlockConsole();
+	}
+
+	public static void println(boolean b)
+	{
+		lockConsole();
+		AnsiConsole.out.println(b);
+		unlockConsole();
+	}
+
+	public static void println(char c)
+	{
+		lockConsole();
+		AnsiConsole.out.println(c);
+		unlockConsole();
+	}
+
+	public static void println(int i)
+	{
+		lockConsole();
+		AnsiConsole.out.println(i);
+		unlockConsole();
+	}
+
+	public static void println(long l)
+	{
+		lockConsole();
+		AnsiConsole.out.println(l);
+		unlockConsole();
+	}
+
+	public static void println(float f)
+	{
+		lockConsole();
+		AnsiConsole.out.println(f);
+		unlockConsole();
+	}
+
+	public static void println(double d)
+	{
+		lockConsole();
+		AnsiConsole.out.println(d);
+		unlockConsole();
+	}
+
+	public static void println(char[] c)
+	{
+		lockConsole();
+		AnsiConsole.out.println(c);
 		unlockConsole();
 	}
 
@@ -126,12 +240,30 @@ public class Console
 		unlockConsole();
 	}
 
-	public static void println()
+	public static void println(Object obj)
 	{
 		lockConsole();
-		AnsiConsole.out.println();
+		AnsiConsole.out.println(obj);
 		unlockConsole();
 	}
+
+    public static void format(String format, Object ... args) {
+		lockConsole();
+		AnsiConsole.out.format(format, args);
+		unlockConsole();
+    }
+
+    public static void format(Locale l, String format, Object ... args) {
+		lockConsole();
+		AnsiConsole.out.format(l, format, args);
+		unlockConsole();
+    }
+
+    public static void append(CharSequence csq, int start, int end) {
+		lockConsole();
+		AnsiConsole.out.append(csq, start, end);
+		unlockConsole();
+    }
 
 	public static void printWarning(String className,
 			String methodName, String message)

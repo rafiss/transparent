@@ -26,13 +26,11 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.IntField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
 import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler.Operator;
@@ -143,7 +141,7 @@ public class Core
 			database.setMetadata(SEED_KEY, Long.toString(seed));
 		} else {
 			try {
-				seed = Long.parseLong(seedValue);
+				seed = new BigInteger(seedValue).longValue();
 			} catch (NumberFormatException e) {
 				Console.printWarning("Core", "loadSeed",
 						"Unable to read seed, regenerating...");
@@ -171,8 +169,6 @@ public class Core
 				PRODUCT_ID_FIELD, id.getModuleProductId(), Field.Store.YES);
 		StoredField rowField = new StoredField(
 				ROW_ID_FIELD, id.getRowId());
-		IntField priceField = new IntField(
-				PRICE_FIELD, price, Field.Store.YES);
 
 		doc.add(nameField);
 		doc.add(productIdField);

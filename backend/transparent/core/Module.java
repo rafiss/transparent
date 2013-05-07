@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.math.BigInteger;
+import java.util.Locale;
 
 import transparent.core.database.Database;
 
@@ -50,7 +51,7 @@ public class Module
 
 	public Module(long id, String moduleName,
 			String sourceName, String path,
-			PrintStream log, boolean isRemote,
+			OutputStream log, boolean isRemote,
 			boolean blockedDownload)
 	{
 		this.path = path;
@@ -59,7 +60,7 @@ public class Module
 		this.remote = isRemote;
 		this.useBlockedDownload = blockedDownload;
 		this.id = id;
-		this.log = log;
+		this.log = new ModuleLogStream(log);
 	}
 
 	/**
@@ -362,6 +363,170 @@ public class Module
 			return true;
 		}
 		return false;
+	}
+	
+	class ModuleLogStream extends PrintStream
+	{
+		public ModuleLogStream(OutputStream log) {
+			super(log);
+		}
+
+	    @Override
+	    public void print(boolean b) {
+	        super.print(b);
+	    	if (logActivity)
+		    	Console.print(b);
+	    }
+
+	    @Override
+	    public void print(char c) {
+	        super.print(c);
+	    	if (logActivity)
+		    	Console.print(c);
+	    }
+
+	    @Override
+	    public void print(int i) {
+	        super.print(i);
+	    	if (logActivity)
+		    	Console.print(i);
+	    }
+
+	    @Override
+	    public void print(long l) {
+	        super.print(l);
+	    	if (logActivity)
+		    	Console.print(l);
+	    }
+
+	    @Override
+	    public void print(float f) {
+	        super.print(f);
+	    	if (logActivity)
+		    	Console.print(f);
+	    }
+
+	    @Override
+	    public void print(double d) {
+	        super.print(d);
+	    	if (logActivity)
+		    	Console.print(d);
+	    }
+
+	    @Override
+	    public void print(char s[]) {
+	        super.print(s);
+	    	if (logActivity)
+		    	Console.print(s);
+	    }
+
+	    @Override
+	    public void print(String s) {
+	        super.print(s);
+	    	if (logActivity)
+		    	Console.print(s);
+	    }
+
+	    @Override
+	    public void print(Object obj) {
+	        super.print(obj);
+	    	if (logActivity)
+		    	Console.print(obj);
+	    }
+
+	    @Override
+	    public void println() {
+	        super.println();
+	    	if (logActivity)
+		    	Console.println();
+	    }
+
+	    @Override
+	    public void println(boolean x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(char x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(int x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(long x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(float x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(double x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(char x[]) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(String x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public void println(Object x) {
+	        super.println(x);
+	    	if (logActivity)
+		    	Console.println(x);
+	    }
+
+	    @Override
+	    public PrintStream format(String format, Object ... args) {
+	    	super.format(format, args);
+	    	if (logActivity)
+	    		Console.format(format, args);
+	    	return this;
+	    }
+
+	    @Override
+	    public PrintStream format(Locale l, String format, Object ... args) {
+	    	super.format(l, format, args);
+	    	if (logActivity)
+	    		Console.format(l, format, args);
+	    	return this;
+	    }
+
+	    @Override
+	    public PrintStream append(CharSequence csq, int start, int end) {
+	    	super.append(csq, start, end);
+	    	if (logActivity)
+	    		Console.append(csq, start, end);
+	    	return this;
+	    }
 	}
 }
 
