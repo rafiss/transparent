@@ -32,10 +32,12 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     private static final String METADATA_TABLE = "Metadata";
     private static final String ENTITY_TABLE = "Entity";
+	private static final String NAME_INDEX_TABLE = "NameIndex";
 
 	private static final Column ENTITY_ID_COL = new Column("entity_id", Type.NUMBER, true);
 	private static final Column MODULE_ID_COL = new Column("module_id", Type.NUMBER, true);
 	private static final Column MODULE_PRODUCT_ID_COL = new Column("module_product_id", Type.STRING, true);
+	private static final Column NAME_COL = new Column("name", Type.STRING, true);
 	private static final String DYNAMIC_COLS = "dynamic_cols";
 
 	/* NOTE: All static columns are added before dynamic columns */
@@ -44,6 +46,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 		COLUMNS.put(ENTITY_ID_COL.getName(), ENTITY_ID_COL);
 		COLUMNS.put(MODULE_ID_COL.getName(), MODULE_ID_COL);
 		COLUMNS.put(MODULE_PRODUCT_ID_COL.getName(), MODULE_PRODUCT_ID_COL);
+		COLUMNS.put(NAME_COL.getName(), NAME_COL);
 	}
 
     private final Connection connection;
@@ -53,12 +56,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
         properties.load(new FileInputStream(CFG_FILE));
 
         String host = properties.getProperty("host");
+		String index = properties.getProperty("index");
         String username = properties.getProperty("username");
         String password = properties.getProperty("password");
         String driver = properties.getProperty("driver");
 
         // Register JDBC driver class
-        Class.forName(driver);
+		Class.forName(driver);
 
         Console.println("Connecting to database...");
         connection = DriverManager.getConnection(host, username, password);
@@ -101,7 +105,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public ResultSetIterator getProductIds(Module module) {
         PreparedStatement statement = null;
         try {
-            statement = buildSelectStatement(new Column[] { ENTITY_ID_COL, MODULE_PRODUCT_ID_COL },
+            statement = buildSelectStatement(null,
+											 new Column[] { ENTITY_ID_COL, MODULE_PRODUCT_ID_COL },
                                              new Column[] { MODULE_ID_COL },
 											 new Relation[] { Relation.EQUALS },
                                              new Object[] { module.getId() },
@@ -241,23 +246,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    /**
-     * Query the database with the given parameters and return a Results object.
-     * <br />
-     * <br />
-     * <b>NOTE: Only the first WHERE clause is applied.</b>
-     *
-     * @param whereClause Fields names to apply
-     * @param whereArgs   Values for the given fields
-     * @param sortBy      Value to sort by
-     * @param sortAsc     True if sort ascending, false if sort descending
-     * @param startRow    The index in the query result to first return
-     * @param numRows     The number of rows to return
-     * @param onlyIndexes True if only distinct EntityIDs are to be returned
-     * @return Results returned from the database
-     */
     @Override
-    public Results query(String[] select,
+    public Results query(String query,
+						 String[] select,
 						 String[] whereClause,
 						 Relation[] whereRelation,
 						 Object[] whereArgs,
@@ -286,7 +277,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
 					throw new IllegalArgumentException("Unrecognized column name.");
 			}
 
-			statement = buildSelectStatement(selectColumns,
+			statement = buildSelectStatement(query,
+											 selectColumns,
 											 whereColumns,
 											 whereRelation,
 											 whereArgs,
@@ -430,7 +422,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
 		}
 	}
 
-    private PreparedStatement buildSelectStatement(Column[] select,
+    private PreparedStatement buildSelectStatement(String query,
+												   Column[] select,
 												   Column[] whereClause,
 												   Relation[] whereRelation,
 												   Object[] whereArgs,
@@ -466,6 +459,17 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         builder.append(" FROM ");
         builder.append(ENTITY_TABLE);
+
+		if (query != null) {
+			builder.append(" LEFT JOIN (SELECT ");
+			builder.append(ENTITY_ID_COL.getName());
+			builder.append(" FROM ");
+			builder.append(NAME_INDEX_TABLE);
+			builder.append(" WHERE query=?) t1 USING (");
+			parameters.add(query + ";mode=any");
+			builder.append(ENTITY_ID_COL.getName());
+			builder.append(")" );
+		}
 
 		appendWhereStatement(builder, parameters, whereClause, whereRelation, whereArgs);
 
@@ -547,8 +551,10 @@ public class MariaDBDriver implements transparent.core.database.Database {
 		dynamicBuilder.append(") ");
 		if (dynamicParameters.size() == 0)
 			builder.deleteCharAt(builder.length() - 1);
-		builder.append(dynamicBuilder);
-		parameters.addAll(dynamicParameters);
+		else {	
+			builder.append(dynamicBuilder);
+			parameters.addAll(dynamicParameters);
+		}
 
 		appendWhereStatement(builder, parameters, whereClause, whereRelation, whereArgs);
 
@@ -598,13 +604,13 @@ public class MariaDBDriver implements transparent.core.database.Database {
             database.addProductInfo(testModule, productID, entry);
             entry = new AbstractMap.SimpleEntry("something", "else");
             database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("something", "else2");
+            entry = new AbstractMap.SimpleEntry("name", "item " + System.nanoTime());
             database.addProductInfo(testModule, productID, entry);
 
         }
         System.err.println(numInserts + " updates took " + ((System.nanoTime() - start) / 4e6) +
                                    "ms");
-        Results search = database.query(null,
+        Results search = database.query("item", null,
                                 new String[] { "baz" },
 								new Relation[] { Relation.EQUALS },
                                 new String[] { "grep" },
@@ -612,12 +618,12 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         while (search.next()) {
             System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t" + search
-                    .getString(3) + "\t" + search.getString(4));
+                    .getString(3) + "\t" + search.getString(4) + "\t" + search.getString(5));
         }
 
         System.err.println("First query complete.");
 
-        search = database.query(null,
+        search = database.query("item", null,
                                 new String[] { "baz" },
 								new Relation[] { Relation.EQUALS },
                                 new String[] { "grep" },

@@ -33,7 +33,8 @@ public interface Database {
 
     public boolean setMetadata(String key, String value);
 
-    public Results query(String[] select,
+    public Results query(String query,
+						 String[] select,
 						 String[] whereClause,
 						 Relation[] whereRelation,
 						 Object[] whereArgs,
