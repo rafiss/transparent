@@ -16,6 +16,8 @@ else:
 
 TEMPLATE_DEBUG = DEBUG
 
+BACKEND_URL = 'http://140.180.186.131:16317'
+
 ADMINS = (
     ('Rafi Shamim', 'admin@rafiss.com'),
     # ('Your Name', 'your_email@example.com'),
@@ -141,6 +143,10 @@ TEMPLATE_DIRS = (
     os.path.join(os.path.dirname(__file__), 'templates').replace('\\','/'),
 )
 
+CRON_CLASSES = [
+    "finder.jobs.FetchModulesJob",
+]
+
 INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -148,6 +154,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_cron',
     'finder',
     # Uncomment the next line to enable the admin:
      'django.contrib.admin',

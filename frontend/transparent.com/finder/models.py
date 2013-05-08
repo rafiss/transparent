@@ -7,13 +7,13 @@ class Module(models.Model):
     name = models.CharField(max_length=1024)
     source_name = models.CharField(max_length=1024)
     author = models.CharField(max_length=1024)
-    timestamp = models.TimeField()
-    up_score = models.IntegerField()
-    down_score = models.IntegerField()
-    backend_id = models.IntegerField()
+    timestamp = models.DateField(auto_now_add=True)
+    up_score = models.IntegerField(default=0)
+    down_score = models.IntegerField(default=0)
+    backend_id = models.TextField()
 
     def __unicode__(self):
-        return u'id:{0} name:{1}'.format(backend_id, name)
+        return u'id:{0} name:{1}'.format(self.backend_id, self.name)
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User)

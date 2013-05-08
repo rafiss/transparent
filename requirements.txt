@@ -4,4 +4,5 @@ MySQL-python==1.2.4
 paramiko==1.10.0
 django-bootstrap-toolkit==2.11.6
 mod-python==3.3.1
+django-cron==0.2.8
 

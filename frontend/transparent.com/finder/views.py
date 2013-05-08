@@ -6,9 +6,9 @@ from django.contrib.auth.forms import UserCreationForm
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from finder.models import Module, UserProfile
+from transparent.settings import BACKEND_URL
 import json, urllib2
 
-BACKEND_URL = 'http://140.180.186.131:16317'
 PAGE_SIZE = 15
 
 def hello(request):
