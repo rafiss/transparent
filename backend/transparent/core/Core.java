@@ -762,6 +762,9 @@ public class Core
 			Console.printError("Core", "main", "Unable "
 					+ "to close search index.", e);
 		}
+
+		if (database != null)
+			database.close();
 	}
 
 	private static class SearchIterator implements Iterator<ProductID>

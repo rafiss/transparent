@@ -36,6 +36,8 @@ public class Module
 	/* indicates whether activity should be logged to standard out */
 	private boolean logActivity;
 
+	private static final NullOutputStream NULL_STREAM = new NullOutputStream();
+
 	/**
 	 * The index of this module as it is stored in the persistent database.
 	 * A value of -1 indicates either this module is not stored in the 
@@ -285,12 +287,12 @@ public class Module
 				Console.printError("Module", "load", "Unable to create log directory."
 						+ " Logging is disabled for this module. (name = " + name
 						+ ", id = " + Core.toUnsignedString(id) + ")");
-				log = new PrintStream(new NullOutputStream());
+				log = new PrintStream(NULL_STREAM);
 			} else if (!logdir.isDirectory()) {
 				Console.printError("Module", "load", "'log' is not a directory."
 						+ " Logging is disabled for this module. (name = " + name
 						+ ", id = " + Core.toUnsignedString(id) + ")");
-				log = new PrintStream(new NullOutputStream());
+				log = new PrintStream(NULL_STREAM);
 			} else {
 				String filename = "log/" + name + "." + Core.toUnsignedString(id) + ".log";
 				File logfile = new File(filename);
@@ -304,7 +306,7 @@ public class Module
 			Console.printError("Module", "load", "Unable to initialize output log."
 					+ " Logging is disabled for this module. (name = " + name
 					+ ", id = " + Core.toUnsignedString(id) + ")", e);
-			log = new PrintStream(new NullOutputStream());
+			log = new PrintStream(NULL_STREAM);
 		}
 
 		return new Module(id, name, source, path, log, isRemote, blockedDownload);
@@ -368,7 +370,7 @@ public class Module
 	class ModuleLogStream extends PrintStream
 	{
 		public ModuleLogStream(OutputStream log) {
-			super(log);
+			super(log == null ? NULL_STREAM : log);
 		}
 
 	    @Override
@@ -534,3 +536,4 @@ class NullOutputStream extends OutputStream {
 	@Override
 	public void write(int b) throws IOException { }
 }
+

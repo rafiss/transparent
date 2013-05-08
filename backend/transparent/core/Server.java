@@ -128,7 +128,7 @@ public class Server implements Container
 			String price = null;
 			String[] where = { "gid" };
 			String[] args = { (String) gidObject };
-			Results results = Core.getDatabase().query(where, args, "gid", true, null, null, false);
+			Results results = null; //Core.getDatabase().query(where, args, "gid", true, null, null, false); TODO: FIX THIS
 			JSONObject rows = new JSONObject();
 			JSONObject row = new JSONObject();
 			int moduleCount = 0;
@@ -407,7 +407,7 @@ public class Server implements Container
 
 				ProductID[] rowArray = new ProductID[rowIds.size()];
 				rowArray = rowIds.toArray(rowArray);
-				Results dbresults = Core.getDatabase().query(rowArray, propertiesArray);
+				Results dbresults = null; //Core.getDatabase().query(rowArray, propertiesArray); TODO: FIX THIS
 
 				/* process the where clauses */
 				long prevId = -1;

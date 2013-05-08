@@ -264,7 +264,7 @@ public class ModuleThread implements Runnable, Interruptable
 		String gid = null;
 		String[] where = { "model" };
 		String[] args = { model };
-		Results results = Core.getDatabase().query(where, args, "model", true, null, null, false);
+		Results results = null; //Core.getDatabase().query(where, args, "model", true, null, null, false); TODO: FIX THIS
 		while (results.next()) {
 			long id = results.getLong(1);
 			if (id != prevId) {
@@ -292,10 +292,10 @@ public class ModuleThread implements Runnable, Interruptable
 		if (dummy) return;
 		Entry<String, String>[] keyValuesArray = new Entry[keyValues.size()];
 		keyValuesArray = keyValues.toArray(keyValuesArray);
-		if (!Core.getDatabase().addProductInfo(module, productId, keyValuesArray)) {
+		/*if (!Core.getDatabase().addProductInfo(module, productId, keyValuesArray)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
-		}
+		}*/ // TODO: FIX THIS
 	}
 
 	private void cleanup(Process process, StreamPipe pipe, Thread piper)

@@ -3,6 +3,9 @@ package transparent.core.database;
 import transparent.core.Module;
 import transparent.core.ProductID;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
@@ -24,16 +27,20 @@ public interface Database {
     @SuppressWarnings("unchecked") /* needed to suppress varargs warning */
     public boolean addProductInfo(Module module,
                                   ProductID moduleProductId,
-                                  Entry<String, String>... keyValues);
+                                  Entry<String, Object>... keyValues);
 
     public String getMetadata(String key);
 
     public boolean setMetadata(String key, String value);
 
-    public Results query(ProductID[] rowIds, String[] properties);
-
-    public Results query(String[] whereClause, String[] whereArgs, String sortBy, boolean sortAsc,
-                         Integer startRow, Integer numRows, boolean onlyIndexes);
+    public Results query(String[] select,
+						 String[] whereClause,
+						 Relation[] whereRelation,
+						 Object[] whereArgs,
+                         String orderBy,
+						 boolean orderAsc,
+						 Integer startRow,
+						 Integer rowCount);
 
 	/* TODO: add API for deleting (both metadata and non-metadata) */
 
@@ -52,4 +59,71 @@ public interface Database {
     public interface ResultsIterator<T> extends Iterator<T> {
         public boolean seekRelative(int position);
     }
+
+	public static enum Type {
+		NUMBER,
+		STRING;
+
+		public void save(DataOutputStream out) throws IOException {
+			switch (this) {
+			case NUMBER:
+				out.writeByte(0);
+				break;
+			case STRING:
+				out.writeByte(1);
+				break;
+			default:
+				throw new IllegalStateException("Unable to parse type.");
+			}
+		}
+
+		public static Type load(DataInputStream in) throws IOException {
+			switch (in.readByte()) {
+			case 0:
+				return NUMBER;
+			case 1:
+				return STRING;
+			default:
+				throw new IOException("Unable to parse type.");
+			}
+		}
+	};
+
+	public static enum Relation {
+		EQUALS,
+		NOT_EQUALS,
+		LESS_THAN,
+		GREATER_THAN;
+
+		public static Relation parse(char operator) {
+			switch (operator) {
+			case '=':
+				return EQUALS;
+			case '!':
+				return NOT_EQUALS;
+			case '<':
+				return LESS_THAN;
+			case '>':
+				return GREATER_THAN;
+			default:
+				return null;
+			}
+		}
+
+		@Override
+		public String toString() {
+			switch (this) {
+				case EQUALS:
+					return "=";
+				case NOT_EQUALS:
+					return "~=";
+				case LESS_THAN:
+					return "<";
+				case GREATER_THAN:
+					return ">";
+				default:
+					throw new IllegalStateException("Unable to serialize relation.");
+			}
+		}
+	}
 }
