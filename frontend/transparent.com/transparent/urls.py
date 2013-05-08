@@ -14,10 +14,6 @@ urlpatterns = patterns('',
     (r'^hello/$', views.hello),
     (r'^search/$', views.search),
     (r'^product/([^/]+)/$', views.product),
-    (r'^profile/$',  views.profile),
-    (r'^login/$',  views.login),
-    (r'^logout/$', views.logout),
-    (r'^register/$', views.register),
     (r'^about/$', views.about),
     (r'^how_it_works/$', views.how_it_works),
     (r'^modules/$', views.modules),
@@ -25,6 +21,12 @@ urlpatterns = patterns('',
 #	(r'^selected_modules/$', views.selected_modules),
 	(r'^tracked_items/$', views.tracked_items),
 	(r'^submit/$', views.submit),
+
+    # for registration
+    (r'^profile/$',  views.profile),
+    (r'^login/$',  views.login),
+    (r'^logout/$', views.logout),
+    (r'^register/$', views.register),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),

@@ -14,10 +14,6 @@ else:
     DB_NAME = 'transparent_dev_db'
     SERVER_TIME_ZONE = 'America/New_York'
 
-LOGIN_REDIRECT_URL = '/profile/'
-LOGIN_URL = '/login/'
-LOGOUT_URL = '/logout/'
-
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
