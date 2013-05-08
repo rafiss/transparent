@@ -20,6 +20,9 @@ public class AmazonParser
 	private static final byte MODULE_RESPONSE = 0;
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 
+	private static final int TYPE_LONG = 0;
+	private static final int TYPE_STRING = 1;
+
 	private static final int BUFFER_SIZE = 4096;
 	private static final int DOWNLOAD_OK = 0;
 
@@ -167,18 +170,26 @@ public class AmazonParser
 		}
 	}
 
-	private static void respond(Map<String, String> keyValues) throws IOException
+	private static void respond(Map<String, Object> keyValues) throws IOException
 	{
 		out.writeByte(MODULE_RESPONSE);
 		out.writeShort(keyValues.size());
-		for (Entry<String, String> pair : keyValues.entrySet()) {
-			byte[] key = pair.getKey().getBytes(UTF8);
+		for (Entry<String, Object> pair : keyValues.entrySet()) {
+			String keyString = pair.getKey().trim().toLowerCase();
+			byte[] key = keyString.getBytes(UTF8);
 			out.writeShort(key.length);
 			out.write(key);
 
-			byte[] value = pair.getValue().getBytes(UTF8);
-			out.writeShort(value.length);
-			out.write(value);
+			Object valueObject = pair.getValue();
+			if (valueObject instanceof String) {
+				byte[] value = ((String) valueObject).getBytes(UTF8);
+				out.writeByte(TYPE_STRING);
+				out.writeShort(value.length);
+				out.write(value);
+			} else if (valueObject instanceof Number) {
+				out.writeByte(TYPE_LONG);
+				out.writeLong(((Number) valueObject).longValue());
+			}
 		}
 	}
 	
@@ -279,7 +290,7 @@ public class AmazonParser
 	}
 
 	private static void parseProductDetail(
-			Map<String, String> keyValues, Element listElement)
+			Map<String, Object> keyValues, Element listElement)
 	{
 		String text = listElement.text();
 		String[] tokens = text.split(":", 2);
@@ -310,7 +321,7 @@ public class AmazonParser
 	}
 
 	private static void parseTechnicalDetail(
-			Map<String, String> keyValues, Element listElement)
+			Map<String, Object> keyValues, Element listElement)
 	{
 		if (listElement.select("b").size() == 0)
 			return;
@@ -329,7 +340,7 @@ public class AmazonParser
 	}
 
 	private static void parseTechnicalDetails(
-			Map<String, String> keyValues, String productId)
+			Map<String, Object> keyValues, String productId)
 	{
 		String url = TECHNICAL_DETAILS_URL + productId;
 
@@ -376,7 +387,7 @@ public class AmazonParser
 			return;
 		}
 
-		HashMap<String, String> keyValues = new HashMap<String, String>();
+		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		Document document = Jsoup.parse(new String(data, UTF8));
 
 		/* parse the price and store the price and URL */
@@ -399,7 +410,7 @@ public class AmazonParser
 				price = parsePrice(elements.get(0).text());
 		}
 		if (price != null)
-			keyValues.put("price", price.toString());
+			keyValues.put("price", price);
 		keyValues.put("url", url);
 
 		/* parse the product name */

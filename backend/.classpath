@@ -5,10 +5,9 @@
 	<classpathentry kind="lib" path="lib/mariadb-java-client-1.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/jansi-1.9.jar"/>
 	<classpathentry kind="lib" path="lib/jline-1.0.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-core-4.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-analyzers-common-4.2.1.jar"/>
-	<classpathentry kind="lib" path="lib/lucene-queryparser-4.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/simple-5.1.1.jar"/>
 	<classpathentry kind="lib" path="lib/json-smart-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/johm-0.5.0.jar"/>
+	<classpathentry kind="lib" path="lib/jedis-2.1.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

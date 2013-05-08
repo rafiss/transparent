@@ -1,5 +1,6 @@
 package transparent.core;
 
+import transparent.core.database.Database.Relation;
 import transparent.core.database.Database.Results;
 import transparent.core.database.Database.ResultsIterator;
 
@@ -22,6 +23,9 @@ public class ModuleThread implements Runnable, Interruptable
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 	private static final byte MODULE_HTTP_POST_REQUEST = 2;
 	private static final byte MODULE_SET_USER_AGENT = 3;
+
+	private static final int TYPE_LONG = 0;
+	private static final int TYPE_STRING = 1;
 
 	private static final int DOWNLOAD_OK = 0;
 	private static final int DOWNLOAD_ABORTED = 1;
@@ -221,81 +225,64 @@ public class ModuleThread implements Runnable, Interruptable
 			return;
 		}
 
-		@SuppressWarnings("unchecked")
-		ArrayList<Entry<String, String>> keyValues = new ArrayList<Entry<String, String>>(count + 1);
-		String name = null;
-		String price = null;
-		String brand = null;
-		String model = null;
-		for (int i = 0; i < count; i++) {
+		ArrayList<Entry<String, Object>> keyValues =
+				new ArrayList<Entry<String, Object>>(count + 1);
+		Object brand = null;
+		Object model = null;
+		for (int i = 0; i < count; i++)
+		{
 			int length = in.readUnsignedShort();
 			byte[] data = new byte[length];
 			in.readFully(data);
 			String key = new String(data, UTF8);
 
-			length = in.readUnsignedShort();
-			data = new byte[length];
-			in.readFully(data);
-			String value = new String(data, UTF8);
+			Object value;
+			int type = in.readUnsignedByte();
+			if (type == TYPE_LONG) {
+				value = in.readLong();
+			} else if (type == TYPE_STRING) {
+				length = in.readUnsignedShort();
+				data = new byte[length];
+				in.readFully(data);
+				value = new String(data, UTF8);
+			} else {
+				module.logError("ModuleThread", "getProductInfoResponse",
+						"Unrecognized value type flag.");
+				return;
+			}
 
-			if (key.equals("name"))
-				name = value;
-			else if (key.equals("brand"))
+			if (key.equals("brand"))
 				brand = value;
 			else if (key.equals("model"))
 				model = value;
-			else if (key.equals("price")) {
-				price = value;
-			}
-
-			keyValues.add(new SimpleEntry<String, String>(key, value));
-		}
-
-		if (name != null && price != null) {
-			try {
-				Core.addToIndex(name, productId, Integer.parseInt(price));
-			} catch (NumberFormatException e) { }
+			else if (!Core.getDatabase().isReservedKey(key))
+				keyValues.add(new SimpleEntry<String, Object>(key, value));
 		}
 
 		if (brand == null || model == null)
 			return;
-		long prevId = -1;
-		boolean found = false;
-		String gid = null;
-		String[] where = { "model" };
-		String[] args = { model };
-		Results results = null; //Core.getDatabase().query(where, args, "model", true, null, null, false); TODO: FIX THIS
-		while (results.next()) {
-			long id = results.getLong(1);
-			if (id != prevId) {
-				if (found && gid != null) {
-					keyValues.add(new SimpleEntry<String, String>("gid", gid));
-					break;
-				}
-				gid = null;
-				prevId = id;
-			}
-
-			String key = results.getString(2);
-			String value = results.getString(3);
-			if (key.equals("brand") &&
-					value.toLowerCase().trim().equals(brand.toLowerCase().trim()))
-				found = true;
-			else if (key.equals("gid"))
-				gid = value;
-		}
-		if (!found || gid == null) {
-			keyValues.add(new SimpleEntry<String, String>(
-					"gid", Core.toUnsignedString(Core.random())));
+		Long gid = null;
+		Results results = Core.getDatabase().query(null,
+				new String[] { "gid" },
+				new String[] { "model", "brand" },
+				new Relation[] { Relation.EQUALS, Relation.EQUALS },
+				new Object[] { model, brand },
+				null, null, true, null, null);
+		if (results.next())
+			gid = results.getLong(1);
+		else if (gid == null) {
+			keyValues.add(new SimpleEntry<String, Object>(
+					"gid", Core.random()));
 		}
 
 		if (dummy) return;
-		Entry<String, String>[] keyValuesArray = new Entry[keyValues.size()];
+		@SuppressWarnings("unchecked")
+		Entry<String, Object>[] keyValuesArray = new Entry[keyValues.size()];
 		keyValuesArray = keyValues.toArray(keyValuesArray);
-		/*if (!Core.getDatabase().addProductInfo(module, productId, keyValuesArray)) {
+		if (!Core.getDatabase().addProductInfo(module, productId, keyValuesArray)) {
 			module.logError("ModuleThread", "getProductInfoResponse",
 					"Error occurred while adding product information.");
-		}*/ // TODO: FIX THIS
+		}
 	}
 
 	private void cleanup(Process process, StreamPipe pipe, Thread piper)

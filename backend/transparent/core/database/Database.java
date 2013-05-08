@@ -15,33 +15,36 @@ import java.util.Map.Entry;
  * NOTE: All implementations must be thread-safe.
  */
 public interface Database {
-    /**
-     * Adds the list of module product IDs to the database associated
-     * with the given module. If any of the product IDs already exist
-     * for that module, then they are not added.
-     */
-    public boolean addProductIds(Module module, String... moduleProductIds);
+	/**
+	 * Adds the list of module product IDs to the database associated
+	 * with the given module. If any of the product IDs already exist
+	 * for that module, then they are not added.
+	 */
+	public boolean addProductIds(Module module, String... moduleProductIds);
 
-    public ResultsIterator<ProductID> getProductIds(Module module);
+	public ResultsIterator<ProductID> getProductIds(Module module);
 
-    @SuppressWarnings("unchecked") /* needed to suppress varargs warning */
-    public boolean addProductInfo(Module module,
-                                  ProductID moduleProductId,
-                                  Entry<String, Object>... keyValues);
+	@SuppressWarnings("unchecked") /* needed to suppress varargs warning */
+	public boolean addProductInfo(Module module,
+								  ProductID moduleProductId,
+								  Entry<String, Object>... keyValues);
 
-    public String getMetadata(String key);
+	public String getMetadata(String key);
 
-    public boolean setMetadata(String key, String value);
+	public boolean setMetadata(String key, String value);
 
-    public Results query(String query,
+	public Results query(String query,
 						 String[] select,
 						 String[] whereClause,
 						 Relation[] whereRelation,
 						 Object[] whereArgs,
+						 String groupBy,
                          String orderBy,
 						 boolean orderAsc,
 						 Integer startRow,
 						 Integer rowCount);
+
+	public boolean isReservedKey(String key);
 
 	/* TODO: add API for deleting (both metadata and non-metadata) */
 
@@ -51,6 +54,8 @@ public interface Database {
         public String getString(int columnIndex);
 
         public long getLong(int columnIndex);
+
+        public Object get(int columnIndex);
 
         public boolean hasNext();
 

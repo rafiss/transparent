@@ -31,6 +31,9 @@ public class NeweggParser
 	private static final byte MODULE_RESPONSE = 0;
 	private static final byte MODULE_HTTP_GET_REQUEST = 1;
 
+	private static final int TYPE_LONG = 0;
+	private static final int TYPE_STRING = 1;
+
 	private static final int BUFFER_SIZE = 4096;
 	private static final int DOWNLOAD_OK = 0;
 
@@ -232,7 +235,7 @@ public class NeweggParser
 		}
 	}
 
-	private static void respond(Map<String, String> keyValues) throws IOException
+	private static void respond(Map<String, Object> keyValues) throws IOException
 	{
 		keyValues.remove("features");
 		keyValues.remove("windows vista");
@@ -240,20 +243,27 @@ public class NeweggParser
 
 		out.writeByte(MODULE_RESPONSE);
 		out.writeShort(keyValues.size());
-		for (Entry<String, String> pair : keyValues.entrySet()) {
+		for (Entry<String, Object> pair : keyValues.entrySet()) {
 			String keyString = pair.getKey().trim().toLowerCase();
 			byte[] key = keyString.getBytes(UTF8);
 			out.writeShort(key.length);
 			out.write(key);
 
-			byte[] value = pair.getValue().getBytes(UTF8);
-			out.writeShort(value.length);
-			out.write(value);
+			Object valueObject = pair.getValue();
+			if (valueObject instanceof String) {
+				byte[] value = ((String) valueObject).getBytes(UTF8);
+				out.writeByte(TYPE_STRING);
+				out.writeShort(value.length);
+				out.write(value);
+			} else if (valueObject instanceof Number) {
+				out.writeByte(TYPE_LONG);
+				out.writeLong(((Number) valueObject).longValue());
+			}
 		}
 	}
 
 	private static void findKeyValues(
-			HashMap<String, String> keyValues, Object json)
+			HashMap<String, Object> keyValues, Object json)
 	{
 		if (json instanceof JSONArray) {
 			/* look for the key-value pair in this array */
@@ -495,7 +505,7 @@ public class NeweggParser
 		}
 
 		/* parse product specifications */
-		HashMap<String, String> keyValues = new HashMap<String, String>();
+		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		findKeyValues(keyValues, parsed);
 
 		/* parse general product info */
@@ -531,7 +541,7 @@ public class NeweggParser
 		if (parsedPrice == null)
 			parsedPrice = parsePrice(map.get("MappingFinalPrice"));
 		if (parsedPrice != null)
-			keyValues.put("price", parsedPrice.toString());
+			keyValues.put("price", parsedPrice);
 		keyValues.put("url", FULL_PRODUCT_URL + productId);
 		if (PARSE_IMAGES) {
 			Object image = map.get("Image");
