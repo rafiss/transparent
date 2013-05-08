@@ -19,6 +19,10 @@
 	width: 63%;
 }
 
+.mini-container {
+	width: 350px;
+}
+
 .content {
 	float: left;
 	width:60%;

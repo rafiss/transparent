@@ -25,34 +25,37 @@
 	        <form class="navbar-form">
 	        <input class="span4" type="text" name="module_name" placeholder="Module Name">
 	        </form>
+			<form class="navbar-form">
+	        <input class="span4" type="text" name="source_name" placeholder="Source Name">
+	        </form>
+			<form class="navbar-form">
+	        <input class="span4" type="text" name="source_url" placeholder="Source url">
+	        </form>
 			<br>
 	        
 	        <form class="navbar-form">
-	        	Source Code Files<br>
+	        	Upload Source Code Files<br>
 				<input class="span4" type="file" name="source" title="Source Code Files">
 				{% comment %}
 	        	<button type="submit" class="btn">Browse</button>
 				{% endcomment %}
-	        </form>
+			</form>
 	        
-	        <form class="navbar-form">
+			{% comment %}
+			<form class="navbar-form">
 	        	Documentation Files<br>
 				<input class="span4" type="file" name="doc" placeholder="doc">
-				{% comment %}
 	        	<button type="submit" class="btn">Browse</button>
-				{% endcomment %}
 	        </form>
+			{% endcomment %}
 	        
-	        <div class="container">
+	        <div class="mini-container" style="background-color: white;border: 3px ridge #aaaaaa;padding: 3px;">
 	        	<ul>
+					<br>
 	            	<b>Uploaded code</b><br>
 			        <!-- Iterate through and print source code file names -->
 	                main.java<br>
 	                branch1.java<br>
-	                <br>
-	                <b>Uploaded documentation</b><br>
-			        <!-- Iterate through and print documentation file names -->
-	                about.txt<br>
 	            </ul>
 	        </div>
 	        

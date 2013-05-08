@@ -26,7 +26,40 @@
 						<option>ModuleSet4</option>
 						<option>ModuleSet5</option>
 						</select><br>
-                        <!-- Iterate through all of the modules included in the ModuleSet delected from above -->
+						<table width="90%" border="0">
+							<tr>
+                    		<td>
+								<h5>Choose</h5>
+							</td>
+                    		<td>
+								<h5>Source</h5>
+							</td>
+                    		<td>
+								<h5>Rating</h5>
+							</td>
+                    		<td>
+								<h5>Last Updated</h5>
+							</td>
+							</tr>
+							<!-- Iterate through all of the modules and urls included in the ModuleSet delected from above -->
+							<tr>
+								<td><form action="">
+								<input type="checkbox" name="module" value="module1"> <a href="{% url 'finder.views.modules' %}">Newegg1</a><br><br>
+								</form></td>
+								<td><a href="http://www.newegg.com/">Newegg</a><br><br></td>
+								<td>5.0<br><br></td>
+								<td>October 07, 2012<br><br></td>
+							</tr>
+							<tr>
+								<td><form action="">
+								<input type="checkbox" name="module" value="module2"> <a href="{% url 'finder.views.modules' %}">Amazon1</a><br><br>
+								</form></td>
+								<td><a href="http://www.amazon.com/">Amazon</a><br><br></td>
+								<td>4.0<br><br></td>
+								<td>October 23, 2012<br><br></td>
+							</tr>
+						</table>
+						{% comment %}
 						<select multiple="multiple">
 						<option>module1</option>
 						<option>module2</option>
@@ -34,6 +67,7 @@
 						<option>module4</option>
 						<option>module5</option>
 						</select>
+						{% endcomment %}
                     </td>
 					</tr>
 				</table>
