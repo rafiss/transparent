@@ -1,24 +1,24 @@
-DROP DATABASE IF EXISTS scratch;
-CREATE DATABASE IF NOT EXISTS scratch;
+DROP DATABASE IF EXISTS scratch2;
+CREATE DATABASE IF NOT EXISTS scratch2;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON scratch.* TO 'darius'@'localhost';
-GRANT EXECUTE ON PROCEDURE scratch.AddProductId TO 'darius'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON scratch2.* TO 'darius'@'localhost';
+GRANT EXECUTE ON PROCEDURE scratch2.AddProductId TO 'darius'@'localhost';
 
-CREATE TABLE IF NOT EXISTS scratch.Metadata (
+CREATE TABLE IF NOT EXISTS scratch2.Metadata (
     `meta_key` TEXT,
     `meta_value` TEXT
 );
 
-CREATE TABLE IF NOT EXISTS scratch.Entity (
+CREATE TABLE IF NOT EXISTS scratch2.Entity (
     `entity_id` INT UNSIGNED PRIMARY KEY AUTO_INCREMENT NOT NULL,
 	`module_id` BIGINT NOT NULL, INDEX(`module_id`),
     `module_product_id` TEXT, INDEX(`module_product_id`(10)),
-	`gid` INT, INDEX(`gid`),
+	`gid` BIGINT, INDEX(`gid`),
 	`name` VARCHAR(2048), INDEX(`name`(10)),
 	`dynamic_cols` BLOB
 );
 
-CREATE TABLE IF NOT EXISTS scratch.NameIndex (
+CREATE TABLE IF NOT EXISTS scratch2.NameIndex (
     `entity_id` INT UNSIGNED NOT NULL,
 	`weight` INT NOT NULL,
 	`query` VARCHAR(2048) NOT NULL,
@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS scratch.NameIndex (
 
 DELIMITER //
 
-DROP PROCEDURE IF EXISTS scratch.AddProductId;
+DROP PROCEDURE IF EXISTS scratch2.AddProductId;
 
-CREATE PROCEDURE scratch.AddProductId(
+CREATE PROCEDURE scratch2.AddProductId(
 	IN moduleIdLong BIGINT,
     IN moduleProductId TEXT)
     SQL SECURITY INVOKER

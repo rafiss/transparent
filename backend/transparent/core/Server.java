@@ -180,9 +180,13 @@ public class Server implements Container
 						new Object[] { gid },
 						null, null, true, null, null);
 			} else {
+for (Long module : modules) {
+Console.printError("TEST","TEST","module: " + module);
+}
+Console.printError("TEST","TEST","gid:" + gid);
 				results = Core.getDatabase().query(
 						null, null,
-						new String[] { "gid", "modules" },
+						new String[] { "gid", "module_id" },
 						new Relation[] { Relation.EQUALS, Relation.EQUALS },
 						new Object[] { gid, modules },
 						null, null, true, null, null);
@@ -190,7 +194,7 @@ public class Server implements Container
 			JSONObject rows = new JSONObject();
 			while (results.next()) {
 				long module_id = results.getLong(2);
-				long module_product_id = results.getLong(3);
+				String module_product_id = results.getString(3);
 				String module_product_name = results.getString(5);
 				if (name == null)
 					name = module_product_name;
@@ -373,6 +377,7 @@ public class Server implements Container
 				body.println(results.toJSONString());
 			} else
 				body.println(error("Internal error occurred during query."));
+
 		}
 
 		private void parseSubscribe(PrintStream body) throws ParseException, IOException
@@ -492,6 +497,7 @@ public class Server implements Container
 					body.println(error("Page not found."));
 				body.close();
 			} catch (Exception e) {
+e.printStackTrace();
 				if (body != null) {
 					StringWriter message = new StringWriter();
 					message.write(
@@ -571,12 +577,18 @@ public class Server implements Container
 		while (dbresults.next())
 			gid_ids.add(dbresults.getLong(1));
 
-		whereClause = Arrays.copyOf(whereClause, whereClause.length + 1);
-		whereRelation = Arrays.copyOf(whereRelation, whereClause.length);
-		whereArgs = Arrays.copyOf(whereArgs, whereClause.length);
-		whereClause[whereClause.length - 1] = "entity_id";
+		if (whereClause != null) {
+			whereClause = Arrays.copyOf(whereClause, whereClause.length + 1);
+			whereRelation = Arrays.copyOf(whereRelation, whereClause.length);
+			whereArgs = Arrays.copyOf(whereArgs, whereClause.length);
+		} else {
+			whereClause = new String[1];
+			whereRelation = new Relation[1];
+			whereArgs = new Object[1];
+		}
+		whereClause[whereClause.length - 1] = "gid";
 		whereRelation[whereClause.length - 1] = Relation.EQUALS;
-		Object[] gidArg = new Object[gid_ids.size()];
+		Long[] gidArg = new Long[gid_ids.size()];
 		for (int i = 0; i < gid_ids.size(); i++)
 			gidArg[i] = gid_ids.get(i);
 		whereArgs[whereClause.length - 1] = gidArg;
@@ -606,6 +618,7 @@ public class Server implements Container
 					if (price > range.getValue())
 						range = new SimpleEntry<Long, Long>(range.getKey(), price);
 				}
+				priceRanges.put(gid, range);
 			}
 
 			if (json.containsKey(gid))
