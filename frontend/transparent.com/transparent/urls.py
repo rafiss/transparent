@@ -21,6 +21,7 @@ urlpatterns = patterns('',
 #	(r'^selected_modules/$', views.selected_modules),
 	(r'^tracked_items/$', views.tracked_items),
 	(r'^submit/$', views.submit),
+    (r'^toggle/$', views.toggle_module),
 
     # for registration
     (r'^profile/$',  views.profile),

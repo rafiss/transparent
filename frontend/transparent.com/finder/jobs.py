@@ -14,7 +14,7 @@ class FetchModulesJob(CronJobBase):
         modules = json.loads(resp.read())
 
         for bid, info in modules.items():
-            exists = Module.objects.filter(backend_id=bid)
+            exists = Module.objects.get(backend_id=bid)
             if not exists:
                 m = Module(backend_id=bid, name=info['name'], source_name=info['source'], author="")
                 m.save()

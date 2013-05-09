@@ -6,74 +6,62 @@
 
 {% block content %}
 <div class="centered-content">
-    
-	<!-- Under construction notice -->
-    <h2 class="">This page is under construction</h2>
-
     <!-- TEXT START -->
         <div class="row-fluid">
         	<div class="span12">
                 <!-- Introduction -->
-                <h3>My_Settings</h3>
-            	<table width="90%" border="0">
-					<tr>
-                    <td>
-                    	<select>
-                        <!-- Iterate through all of the available ModuleSets -->
-						<option>ModuleSet1</option>
-						<option>ModuleSet2</option>
-						<option>ModuleSet3</option>
-						<option>ModuleSet4</option>
-						<option>ModuleSet5</option>
-						</select><br>
-						<table width="90%" border="0">
-							<tr>
-                    		<td>
-								<h5>Choose</h5>
-							</td>
-                    		<td>
-								<h5>Source</h5>
-							</td>
-                    		<td>
-								<h5>Rating</h5>
-							</td>
-                    		<td>
-								<h5>Last Updated</h5>
-							</td>
-							</tr>
-							<!-- Iterate through all of the modules and urls included in the ModuleSet delected from above -->
-							<!-- First link for each module should be to the github directory of the module -->
-							<tr>
-								<td><form action="">
-								<input type="checkbox" name="module" value="module1"> <a href=#>Newegg1</a><br><br>
-								</form></td>
-								<td><a href="http://www.newegg.com/">Newegg</a><br><br></td>
-								<td>5.0<br><br></td>
-								<td>October 07, 2012<br><br></td>
-							</tr>
-							<tr>
-								<td><form action="">
-								<input type="checkbox" name="module" value="module2"> <a href=#>Amazon1</a><br><br>
-								</form></td>
-								<td><a href="http://www.amazon.com/">Amazon</a><br><br></td>
-								<td>4.0<br><br></td>
-								<td>October 23, 2012<br><br></td>
-							</tr>
-						</table>
-						{% comment %}
-						<select multiple="multiple">
-						<option>module1</option>
-						<option>module2</option>
-						<option>module3</option>
-						<option>module4</option>
-						<option>module5</option>
-						</select>
-						{% endcomment %}
-                    </td>
-					</tr>
-				</table>
+                {% if user.is_authenticated %}
+                    <h3>Settings</h3>
+                	
+				    <table width="90%" class="table table-hover table-bordered">
+				        <thead>
+					    <tr>
+                    		<th>
+						        <h5>Choose</h5>
+					        </th>
+                    		<th>
+						        <h5>Source</h5>
+					        </th>
+                    		<th>
+						        <h5>Upvotes</h5>
+					        </th>
+					        <th>
+						        <h5>Downvotes</h5>
+					        </th>
+                    		<th>
+						        <h5>Submitted</h5>
+					        </th>
+					    </tr>
+					    </thead>
+					    <!-- Iterate through all of the modules and urls included in the ModuleSet delected from above -->
+					    {% for module in modules %}
+					    <tr>
+						    <td>
+						        <label class="checkbox">
+						            {% if module.backend_id in user_modules %}
+						                <input class="foobar" type="checkbox"  checked="true"
+						                       name="{{ module.name }}" value="{{ module.backend_id }}" onclick="toggleModule(this);">
+						            {% else %}
+						            	<input class="foobar" type="checkbox"
+				                               name="{{ module.name }}" value="{{ module.backend_id }}" onclick="toggleModule(this);">
+		                            {% endif %}
+		  				            {{ module.name }}
+						        </label>
+					        </td>
+						    <td>
+						        {{ module.source_name }}
+					        </td>
+						    <td>{{ module.up_score }}</td>
+						    <td>{{ module.down_score }}</td>
+						    <td>{{ module.timestamp }}</td>
+					    </tr>
+					    {% endfor %}
+				    </table>
+			    {% else %}
+    			    <h3>Please log in</h3>
+			    {% endif %}
             </div>
-        </div>  <!-- End of row. Max of 3 items per row. --> 
+        </div>
     
 </div> <!-- End of Contents-->
 

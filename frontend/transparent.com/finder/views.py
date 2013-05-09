@@ -3,7 +3,7 @@
 from django import forms
 from django.contrib import auth
 from django.contrib.auth.forms import UserCreationForm
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound
 from django.shortcuts import render
 from finder.models import Module, UserProfile
 from transparent.settings import BACKEND_URL
@@ -106,10 +106,34 @@ def modules(request):
     return render(request, "modules.html", {})
 
 def settings(request):
-    return render(request, "settings.html", {})
+    modules = Module.objects.all()
+    user_modules = []
+    if request.user and request.user.is_authenticated():
+        user_modules = request.user.userprofile.modules.all()
+    u = [um.backend_id for um in user_modules]
+    return render(request, "settings.html", {'modules': modules, 'user_modules': u})
 
-#def selected_modules(request):
-#    return render(request, "selected_modules.html", {})
+def toggle_module(request):
+    if (not request.is_ajax() or
+       not request.user or
+       not request.user.is_authenticated() or
+       not request.method == "POST"):
+        return HttpResponseNotFound()
+
+    bid = request.POST.get('bid', None)
+    if bid:
+        module = Module.objects.get(backend_id=bid)
+        if module:
+            enable = request.POST.get('enable')
+            if enable == "1":
+                request.user.userprofile.modules.add(module)
+            else:
+                request.user.userprofile.modules.remove(module)
+            request.user.userprofile.save()
+    return HttpResponse()
+
+def moduleAPI(request):
+    return render(request, "moduleAPI.html", {})
 
 def tracked_items(request):
     return render(request, "tracked_items.html", {})

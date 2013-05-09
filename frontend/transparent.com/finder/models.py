@@ -21,7 +21,7 @@ class UserProfile(models.Model):
     tracked_items = models.CommaSeparatedIntegerField(max_length=32000)
 
     def __unicode__(self):
-        return u'{0} profile'.format(user.username)
+        return u'{0} profile'.format(self.user.username)
 
 def create_profile(sender, instance, created, **kwargs):
     if created:
