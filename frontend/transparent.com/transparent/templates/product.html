@@ -7,30 +7,23 @@
 {% endcomment %}
 {% endblock %}
 
-{% block top %}
-
-<div class="topCenter">
-  <div class="btn-group btn-group-vertical" style="margin-bottom: 20px;">
-        <!-- Search bar form -->
-        <div class="input-append">
-        <!-- We want to replace the placeholder string with the string that was just searched. -->
-        <form action="/search/">
-            <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. GTX 670, Intel 3770K, ...)" type="text" name="q">
-            <input type="hidden" type="text" name="p" value="1">
-            <input class="btn btn-info" type="submit" value="Search">
-        </form>
-         </div>
-    </div>
-</div>
-
-{% endblock top %}
-
-
 {% block content %}
 
 <!-- Search bar -->
 <div class="content">
     
+	<div class="btn-group btn-group-vertical" style="margin-bottom: 20px;">
+		<!-- Search bar form -->
+		<div class="input-append">
+			<!-- We want to replace the placeholder string with the string that was just searched. -->
+			<form action="/search/">
+				<input class="span7" id="appendedInputButton" placeholder="Type your query (e.g. CoolerMaster, Intel 3770K, ...)" type="text" name="q">
+				<input type="hidden" type="text" name="p" value="1">
+				<input class="btn btn-info" type="submit" value="Search">
+			</form>
+		</div>
+	</div>
+
     <!-- Display product -->
         <!-- THINGS TO DO -->
         <!-- Don't hard code Module Name -->
@@ -74,7 +67,7 @@
         </ul>
         
 		<!-- Start tabs with other module results here -->
-	    <div class="tabbable tabs-left">
+	    <div class="tabbable tabs-left well well-large">
 	    	<ul class="nav nav-tabs">
 				<!-- ITERATE THROUGH MODULES AND PRINT NAME. change href-->
 				<li class="active">
