@@ -6,12 +6,6 @@
 
 {% block content %}
 
-<div class="content">
-    <div class="btn-group btn-group-vertical">
-        <h2 class="">This page is under construction</h2>
-    </div>	
-</div>
-
 <div class="centered-content">
     
             <!-- TEXT START -->
@@ -19,21 +13,92 @@
                 <div class="span12">
                     <!-- Introduction -->
                     <h3>Transparent.Module_API</h3>
+					<br>
+					<br>
                     <div class="text-header">
-                        Module Functionality
+                        Binary API
                     </div>
                     <br>
                     <div class="text-left">
-                        <p>Have you ever used an online search engine to look for the cheapest products on the market? Have you ever found lower prices at retailers not included in those searches? Transparent is an open source effort to deliver the best deals on online retail stores to its users. It accomplishes this by opening up the development process to the community to expand the search to previously unreachable vendors.</p>
+                        <p>The binary API enables modules to communicate with the Transparent Core using standard input/output. When the module first starts, the Transparent Core will specify the type of request in the first 8-bit unsigned integer:</p>
+						<br/>
+						<table width="90%" class="table table-hover table-bordered">
+						    <thead>
+							<tr>
+		                		<th>
+								    <h5>TYPE (8-bit unsigned)</h5>
+							    </th>
+		                		<th>
+								    <h5>Value</h5>
+							    </th>
+							</tr>
+							</thead>
+							<tr>
+								<td>Product list request</td>
+								<td>0</td>
+							</tr>
+							<tr>
+								<td>Product info request</td>
+								<td>1</td>
+							</tr>
+						</table>
+						<br/>
+						<p>If the type of request is a <b>Product list request</b>, the Transparent Core will provide the module with a State data, that the module can use to save persistent data across runs. This should be utilized to restore the position of the product list parse to the last location. This data is length-encoded, in that the first 16-bits encode the unsigned length of the State data in bytes. Let this be <i>n</i>. The next <i>n</i> bytes contain the State data.</p>
+						<p>If the type of request is a <b>Product info request</b>, then the Transparent Core enters a loop, requesting the module for the information about a number of products. For each request, the Transparent Core will provide the module with a product ID string. This indicates the identity of the product that the module should parse. This data is also length-encoded, in that the first 16-bits encode the unsigned length of the product ID data in bytes. Let this be <i>n</i>. The next <i>n</i> bytes contain the product ID data.</p>
+						<br/>
+						<p>Once the Transparent Core has specified its request, it will listen to the module for feedback. The module can make an HTTP GET or POST request, in addition to setting the User agent string of future requests. The feedback options are listed below:</p>
+						<br/>
+						<table width="90%" class="table table-hover table-bordered">
+						    <thead>
+							<tr>
+		                		<th>
+								    <h5>Feedback type</h5>
+							    </th>
+		                		<th>
+								    <h5>Flag (first 8-bit unsigned)</h5>
+							    </th>
+		                		<th>
+								    <h5>Specification</h5>
+							    </th>
+							</tr>
+							</thead>
+							<tr>
+								<td>Response</td>
+								<td>0</td>
+								<td><p>If this is a <b>Product list request</b>, then the response should consist of the new State data, and the list of product IDs that were parsed by the module. In detail, the next 16-bits is the unsigned length of the State data in bytes. The State data then follows. The next 16-bits is the unsigned count of product IDs that will be returned by the module. Let this be <i>n</i>. The following repeats <i>n</i> times: Each product ID is a length-encoded UTF8 string, where the first 16-bits is the unsigned length of the product ID <i>in bytes</i>. This is followed by the UTF8-encoded product ID string. The Transparent Core then pushes this data into the database, also saving the State data for the module, and continues to listen to the module for further feedback.</p>
+									<p>If this is a <b>Product info request</b>, then the first unsigned 16-bits indicate the number of key-value pairs parsed by the module. The following is repeated until the specified number of key-value pairs are read: The key is specified as a length-encoded UTF8 string, where the first 16-bits is the unsigned length of the string <i>in bytes</i>, followed by the UTF8-encoded string. The value can either be a number or a string, as specified by the next 8-bit unsigned flag. If this flag is 0, the value is assumed to be numeric, in which case the next 64-bits are parsed and stored as a number. If this flag is 1, it is assumed to be a string, which is also a length-encoded UTF8 string. This implies that the first 16-bits indicate the unsigned length of the string <i>in bytes</i>, which is then followed by the UTF8-encoded string. The Transparent Core then interprets the data, maybe pushing the data to the database, and then continuing to listen to the module for further feedback.</p></td>
+							</tr>
+							<tr>
+								<td>HTTP GET request</td>
+								<td>1</td>
+								<td><p>The URL is specified next as a length-encoded ASCII string. More precisely, the next 16-bits is the unsigned length of the URL. Let this be <i>n</i>. The next <i>n</i> bytes store the URL. The Transparent Core will then return an HTTP response (see below).</p></td>
+							</tr>
+							<tr>
+								<td>HTTP POST request</td>
+								<td>2</td>
+								<td><p>The URL is specified exactly as in the HTTP GET request. More precisely, the next 16-bits is the unsigned length of the URL. Let this be <i>n</i>. The next <i>n</i> bytes store the URL. The Transparent Core will then return an HTTP response (see below). The POST data is then also length-encoded sequence of bytes. The next 32-bits represent the length of the POST data. This is then followed by the POST data itself. The Transparent Core will then return an HTTP response (see below).</p></td>
+							</tr>
+							<tr>
+								<td>Set user agent</td>
+								<td>3</td>
+								<td><p>The user agent to set is specified as a length-encoded UTF8 string. More precisely, the next 16-bits is the unsigned length of the user agent string <i>in bytes</i>. This is then followed by the UTF8-encoded user agent string.</p></td>
+							</tr>
+						</table>
+						<br/>
+						<p>For HTTP GET and POST requests, the Transparent Core first specifies the HTTP Content Type field as a length-encoded byte sequence. The first 16-bits indicate the unsigned length of the Content Type field, which is followed by the Content Type byte sequence. The Transparent Core provides two methods for downloading and sending the data to the module: <b>blocked</b> or <b>complete</b>. This is specified when the module is initially submitted.</p>
+						<ul>
+							<li><p>For <b>blocked</b> downloading, the page is passed to the module in chunks, each length-encoded such that the first 16-bits indicate the unsigned length of the chunk. The chunk byte sequence is then provided. The end of the download is indicated when the length provided is zero.</p></li>
+							<li><p>For <b>complete</b> downloading, the page is downloaded into a single byte sequence in the Core, and then passed as a single length-encoded chunk, where the length is 32-bits. This is <i>not</i> followed by a terminating 0-length as in the blocked downloading case.</p></li>
+						</ul>
                     </div>
                     <br>
                     <br>
                     <div class="text-header">
-                        Module API
+                        JSON API
                     </div>
                     <br>
                     <div class="text-left">
-                        <p>The price tracking feature allows the user to view a product's price history and perform a simple prediction of the future product cost. Users can also contribute code to extend the current search database of the application.</p>
+                        <p>JSON API is currently under development. Coming soon!</p>
                     </div>
           </div>
     </div>  <!-- End of row. Max of 3 items per row. --> 

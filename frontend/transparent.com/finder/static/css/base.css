@@ -1,6 +1,10 @@
 /* IMPORTANT! CHANGE PATH TO REFLECT ACTUAL LOCATION OF CSS FILE */
 @import url(http://fonts.googleapis.com/css?family=Megrim);
 
+p, a, h1, h2, h3, h4, input[type="submit"].btn, li, td, th {
+	font-family: 'Open Sans', Sans;
+}
+
 .loggedin {
 	margin-top: 13px;
 	margin-right: 20px;
