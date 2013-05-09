@@ -103,9 +103,10 @@ def product(request, gid):
         #modules = [module.backend_id for module in request.user.userprofile.modules]
     #payload = {'gid': gid, 'modules': modules}
     payload = {'gid': gid}
-    resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
-    product = json.loads(resp.read())
-    #return HttpResponse(json.dumps(product))
+    #resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
+    #product = json.loads(resp.read())
+    product = {}
+	#return HttpResponse(json.dumps(product))
     return render(request, "product.html", {'product': product})
 
 def about(request):

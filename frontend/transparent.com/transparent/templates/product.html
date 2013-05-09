@@ -1,70 +1,130 @@
 {% extends "leftbase.html" %}
 
 {% block title %}
+<title>Transparent: Product: Case 101</title>
+{% comment %}
 <title>Transparent: Product: {{ product.name }}</title>
+{% endcomment %}
 {% endblock %}
 
-{% block content %}
+{% block top %}
 
-<!-- Search bar -->
-<div class="content">
-  <div class="btn-group btn-group-vertical">
+<div class="topCenter">
+  <div class="btn-group btn-group-vertical" style="margin-bottom: 20px;">
         <!-- Search bar form -->
         <div class="input-append">
         <!-- We want to replace the placeholder string with the string that was just searched. -->
         <form action="/search/">
             <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. GTX 670, Intel 3770K, ...)" type="text" name="q">
             <input type="hidden" type="text" name="p" value="1">
-            <input class="btn btn-primary" type="submit" value="Search">
+            <input class="btn btn-info" type="submit" value="Search">
         </form>
          </div>
     </div>
+</div>
+
+{% endblock top %}
+
+
+{% block content %}
+
+<!-- Search bar -->
+<div class="content">
     
     <!-- Display product -->
         <!-- THINGS TO DO -->
         <!-- Don't hard code Module Name -->
 
     <div class="row-fluid" style="padding: 20px;">
+        <h2>Case 101</h2>
+		{% comment %}
         <h2>{{ product.name }}</h2>
+		{% endcomment %}
 	    <ul class="thumbnails">
+        	<li class="span4"><a class="thumbnail" href="#"><img alt="360x270" data-src="holder.js/360x270" style="width: 360px; height: 270px;" src="/"></img></a></li>
+			{% comment %}
         	<li class="span4"><a class="thumbnail" href="#"><img alt="360x270" data-src="holder.js/360x270" style="width: 360px; height: 270px;" src="{{ product.image }}"></img></a></li>
+			{% endcomment %}
+			{% comment %}
+			<!-- UNCOMMENT AND ADD DJANGO LOGIC -->
 		    <li class="span6">
 				<!-- Logic for tracked or untracked -->
 				<!-- MUST REMEMBER TO SEND TRACKING INFORMATION TO FRONTEND -->
 				<form method="get">
 				   	<button type="submit" class="btn">Track Item</button>
 				</form>
-				{% comment %}
-				<!-- UNCOMMENT AND ADD DJANGO LOGIC -->
+			</li>
+			{% endcomment %}
+			<li class="span6">
 				<form method="get" action="/">
     				<button type="submit" class="btn btn-success">Tracking</button>
     			</form>
-				{% endcomment %}
+			</li>
+			<li class="span6">
+				Alert when price drops below: $1.88 <!-- REPLACE VALUE WITH 90% OF CURRENT PRICE FOR DEFAULT THRESHOLD -->
+				<div class="input-prepend" style="margin-top:10px;">
+					<!-- CHANGES THE THRESHOLD VALUE IN THE SETTINGS FIELDS FOR THE TRACKED ITEM -->
+					<form>
+	   					<button type="submit" class="btn">Change to</button>
+						<input type="text" class="span3">
+					</form>
+				</div>
 			</li>
             <li class="span6"> <h3> Current Price: </h3> <h3> {{ product.price }} </h3> </li>
         </ul>
         
+		<!-- Start tabs with other module results here -->
+	    <div class="tabbable tabs-left">
+	    	<ul class="nav nav-tabs">
+				<!-- ITERATE THROUGH MODULES AND PRINT NAME. change href-->
+				<li class="active">
+					<a data-toggle="tab" href="#lA">
+						Newegg1
+					</a>
+				</li>
+				<li class="">
+					<a data-toggle="tab" href="#lB">
+						Amazon1
+					</a>
+				</li>
+   			</ul>
+    		<div class="tab-content">
+				<!-- ITERATE THROUGH MODULES AND PRINT CONTENT. change id -->
+    			<div id="lA" class="tab-pane active">
+					<ul>
+						<!-- MAKE SURE TO LIST THE PRICE FIRST -->
+			            {% for key,value in product.module1.items %}
+		  	            <li class="span10"> <b> {{ key }}: </b> {{ value }} </li>
+			            {% endfor %}
+					</ul>
+				</div>
+				<div id="lB" class="tab-pane">
+					<ul>
+						<li class="span10"> <b> Attribute: </b> value </li>
+					</ul>
+				</div>
+    		</div>
+    	</div>
+
+
+		{% comment %}
         <ul>
             {% for key,value in product.module1.items %}
   	            <li class="span6"> <h5> {{ key }}: </h5> {{ value }} </li>
             {% endfor %}
-            {% comment %}
-          	<li class="span6"> <h4> Source: </h4> <a href="#">Newegg</a> </li>
-		    <li class="span6"></li>
-            <li class="span6"> <h5> Attribute: </h5> value </li>
-            {% endcomment %}
         </ul>
+		{% endcomment %}
         
+		{% comment %}
         <ul>
             {% for key,value in product.module2.items %}
   	            <li class="span6"> <h5> {{ key }}: </h5> {{ value }} </li>
             {% endfor %}
-            {% comment %}
           	<li class="span6"> <h4> Source: </h4> <a href="#">Amazon</a> </li>
 		    <li class="span6"></li>
             <li class="span6"> <h5> Attribute: </h5> value </li>
-            {% endcomment %}
         </ul>
+		{% endcomment %}
     </div>
 </div>
 
