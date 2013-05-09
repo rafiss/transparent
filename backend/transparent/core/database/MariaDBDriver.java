@@ -3,10 +3,14 @@ package transparent.core.database;
 import transparent.core.Console;
 import transparent.core.Module;
 import transparent.core.ProductID;
-import transparent.core.database.Database.Results;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -14,6 +18,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -21,10 +31,35 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
     private static final String CFG_FILE = "transparent/core/database/transparent.cfg";
 
-    private static final String MODULE_ID = "module_id";
-    private static final String METADATA_TABLE = "Metadata";
     private static final String ENTITY_TABLE = "Entity";
-    private static final String MODEL_NAME = "vModel";
+	private static final String NAME_INDEX_TABLE = "NameIndex";
+
+	private static final Column ENTITY_ID_COL = new Column("entity_id", Type.NUMBER, true);
+	private static final Column MODULE_ID_COL = new Column("module_id", Type.NUMBER, true);
+	private static final Column MODULE_PRODUCT_ID_COL = new Column("module_product_id", Type.STRING, true);
+	private static final Column GID_COL = new Column("gid", Type.NUMBER, true);
+	private static final Column NAME_COL = new Column("name", Type.STRING, true);
+	private static final String DYNAMIC_COLS = "dynamic_cols";
+
+	private static final Map<String, Column> RESERVED_COLUMNS;
+	static {
+		Map<String, Column> reserved = new HashMap<String, Column>();
+		reserved.put(ENTITY_ID_COL.getName(), ENTITY_ID_COL);
+		reserved.put(MODULE_ID_COL.getName(), MODULE_ID_COL);
+		reserved.put(MODULE_PRODUCT_ID_COL.getName(), MODULE_PRODUCT_ID_COL);
+		reserved.put(GID_COL.getName(), GID_COL);
+		RESERVED_COLUMNS = Collections.unmodifiableMap(reserved);
+	}
+
+	/* NOTE: All static columns are added before dynamic columns */
+	private static Map<String, Column> COLUMNS = new LinkedHashMap<String, Column>();
+	static {
+		COLUMNS.put(ENTITY_ID_COL.getName(), ENTITY_ID_COL);
+		COLUMNS.put(MODULE_ID_COL.getName(), MODULE_ID_COL);
+		COLUMNS.put(MODULE_PRODUCT_ID_COL.getName(), MODULE_PRODUCT_ID_COL);
+		COLUMNS.put(GID_COL.getName(), GID_COL);
+		COLUMNS.put(NAME_COL.getName(), NAME_COL);
+	}
 
     private final Connection connection;
 
@@ -38,30 +73,29 @@ public class MariaDBDriver implements transparent.core.database.Database {
         String driver = properties.getProperty("driver");
 
         // Register JDBC driver class
-        Class.forName(driver);
+		Class.forName(driver);
 
         Console.println("Connecting to database...");
         connection = DriverManager.getConnection(host, username, password);
         Console.println("Successfully connected to database...");
+
+		loadColumns();
     }
 
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
         CallableStatement statement = null;
-        String query = "{ CALL transparent.AddProductId(?, ?, ?) }";
+        String query = "{ CALL scratch.AddProductId(?, ?) }";
 
         try {
-            connection.setAutoCommit(false);
             statement = connection.prepareCall(query);
 
             for (String moduleProductId : moduleProductIds) {
-                statement.setString(1, module.getIdString());
-                statement.setLong(2, module.getId());
-                statement.setString(3, moduleProductId);
+                statement.setLong(1, module.getId());
+                statement.setString(2, moduleProductId);
                 statement.executeUpdate();
             }
 
-            connection.commit();
             return true;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -69,7 +103,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
             return true;
         } finally {
             try {
-                connection.setAutoCommit(true);
                 if (statement != null) {
                     statement.close();
                 }
@@ -83,14 +116,12 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public ResultSetIterator getProductIds(Module module) {
         PreparedStatement statement = null;
         try {
-            statement = buildSelectStatement(ENTITY_TABLE,
-                                             new String[] { "entity_id", "name" },
-                                             new long[] { module.getId() },
-                                             "entity_id",
-                                             null,
-                                             null,
-                                             null,
-                                             null);
+            statement = buildSelectStatement(null,
+											 new Column[] { ENTITY_ID_COL, MODULE_PRODUCT_ID_COL },
+                                             new Column[] { MODULE_ID_COL },
+											 new Relation[] { Relation.EQUALS },
+                                             new Object[] { module.getId() },
+                                             null, null, true, null, null);
             return new ResultSetIterator(module, statement.executeQuery());
         } catch (SQLException e) {
             e.printStackTrace();
@@ -111,44 +142,45 @@ public class MariaDBDriver implements transparent.core.database.Database {
     @SafeVarargs
     public final boolean addProductInfo(Module module,
                                         ProductID productId,
-                                        Entry<String, String>... keyValues) {
-        CallableStatement statement = null;
-        String query = "{ CALL transparent.InsertNewAttribute(?, ?, ?, ?) }";
-        int index = 0;
-
+                                        Entry<String, Object>... keyValues) {
+        PreparedStatement statement = null;
         try {
-            connection.setAutoCommit(false);
-            statement = connection.prepareCall(query);
+			Column[] setClause = new Column[keyValues.length];
+			Object[] setArgs = new Object[keyValues.length];
+            for (int i = 0; i < keyValues.length; i++)
+			{
+				Entry<String, Object> pair = keyValues[i];
+				setClause[i] = COLUMNS.get(pair.getKey());
+				if (setClause[i] == null) {
+					if (pair.getValue() instanceof String) {
+						setClause[i] = new Column(pair.getKey(), Type.STRING, false);
+						COLUMNS.put(setClause[i].getName(), setClause[i]);
+					} else if (pair.getValue() instanceof Number) {
+						setClause[i] = new Column(pair.getKey(), Type.NUMBER, false);
+						COLUMNS.put(setClause[i].getName(), setClause[i]);
+					} else
+						throw new IllegalArgumentException("Unrecognized value type at index "  + i + ".");
+				}
+				setArgs[i] = pair.getValue();
+			}
 
-            for (Entry<String, String> pair : keyValues) {
-                statement.setString(1, module.getIdString());
-                statement.setInt(2, productId.getRowId());
-                statement.setString(3, pair.getKey());
-                statement.setString(4, pair.getValue());
-                statement.addBatch();
-
-                if (++index % 1000 == 0) {
-                    statement.executeBatch();
-                    statement.clearBatch();
-                }
-            }
-
-            if (index % 1000 != 0) {
-                statement.executeBatch();
-            }
-
-            connection.commit();
+            statement = buildUpdateStatement(setClause, setArgs,
+											 new Column[] { ENTITY_ID_COL },
+											 new Relation[] { Relation.EQUALS },
+											 new Object[] { productId.getRowId() });
+			saveColumns();
+            statement.executeUpdate();
         } catch (SQLException e) {
+            e.printStackTrace();
             module.logError("MariaDBDriver", "addProductInfo", "", e);
             return false;
         } finally {
-            try {
-                connection.setAutoCommit(true);
-                if (statement != null) {
+            if (statement != null) {
+                try {
                     statement.close();
+                } catch (SQLException e) {
+                    module.logError("MariaDBDriver", "addProductInfo", "", e);
                 }
-            } catch (SQLException e) {
-                module.logError("MariaDBDriver", "addProductInfo", "", e);
             }
         }
 
@@ -160,14 +192,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
         PreparedStatement statement = null;
 
         try {
-            statement = buildSelectStatement(METADATA_TABLE,
-                                             new String[] { "meta_value" },
-                                             null,
-                                             null,
-                                             null,
-                                             new String[] { "meta_key" },
-                                             new String[] { "=" + key },
-                                             null);
+			String query = "SELECT `meta_value` FROM Metadata WHERE `meta_key`=?";
+            statement = connection.prepareStatement(query);
+			statement.setString(1, key);
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
                 return resultSet.getString(1);
@@ -192,22 +219,20 @@ public class MariaDBDriver implements transparent.core.database.Database {
     public boolean setMetadata(String key, String value) {
         PreparedStatement statement = null;
         try {
-            connection.setAutoCommit(false);
-
             if (getMetadata(key) != null) {
-                statement = buildUpdateStatement(METADATA_TABLE,
-                                                 new String[] { "meta_value" },
-                                                 new String[] { value },
-                                                 new String[] { "meta_key" },
-                                                 new String[] { key });
+				String query = "UPDATE Metadata SET `meta_value`=? WHERE `meta_key`=?";
+		        statement = connection.prepareStatement(query);
+				statement.setString(1, value);
+				statement.setString(2, key);
                 statement.executeUpdate();
             } else {
-                statement = buildInsertStatement(METADATA_TABLE,
-                                                 new String[] { key, value });
+				String query = "INSERT INTO Metadata VALUES(?,?)";
+		        statement = connection.prepareStatement(query);
+				statement.setString(1, key);
+				statement.setString(2, value);
                 statement.executeUpdate();
             }
 
-            connection.commit();
             return true;
         } catch (SQLException e) {
             Console.printError("MariaDBDriver", "setMetadata", "", e);
@@ -216,7 +241,6 @@ public class MariaDBDriver implements transparent.core.database.Database {
             if (statement != null) {
                 try {
                     statement.close();
-                    connection.setAutoCommit(true);
                 } catch (SQLException e) {
                     Console.printError("MariaDBDriver", "setMetadata", "", e);
                 }
@@ -234,75 +258,46 @@ public class MariaDBDriver implements transparent.core.database.Database {
     }
 
     @Override
-    public Results query(ProductID[] rowIds, String[] properties) {
+    public Results query(String query,
+						 String[] select,
+						 String[] whereClause,
+						 Relation[] whereRelation,
+						 Object[] whereArgs,
+						 String groupBy,
+                         String orderBy,
+						 boolean orderAsc,
+						 Integer startRow,
+						 Integer rowCount)
+	{
         PreparedStatement statement = null;
-
         try {
-            statement = buildQueryStatement(rowIds, properties);
-            return new MariaDBResults(null, statement.executeQuery());
-        } catch (SQLException e) {
-            Console.printError("MariaDBDriver", "query", "", e);
-        } finally {
-            if (statement != null) {
-                try {
-                    statement.close();
-                } catch (SQLException e) {
-                    Console.printError("MariaDBDriver", "query", "", e);
-                }
-            }
-        }
+			Column[] selectColumns = null;
+			if (select != null) {
+				selectColumns = new Column[select.length];
+				for (int i = 0; i < select.length; i++) {
+					selectColumns[i] = COLUMNS.get(select[i]);
+					if (selectColumns[i] == null)
+						throw new IllegalArgumentException("Unrecognized column name.");
+				}
+			}
 
-        return null;
-    }
+			Column[] whereColumns = new Column[whereClause.length];
+            for (int i = 0; i < whereClause.length; i++)
+			{
+				whereColumns[i] = COLUMNS.get(whereClause[i]);
+				if (whereColumns[i] == null)
+					throw new IllegalArgumentException("Unrecognized column name.");
+			}
 
-    /**
-     * Query the database with the given parameters and return a Results object.
-     * <br />
-     * <br />
-     * <b>NOTE: Only the first WHERE clause is applied.</b>
-     *
-     * @param whereClause Fields names to apply
-     * @param whereArgs   Values for the given fields
-     * @param sortBy      Value to sort by
-     * @param sortAsc     True if sort ascending, false if sort descending
-     * @param startRow    The index in the query result to first return
-     * @param numRows     The number of rows to return
-     * @param onlyIndexes True if only distinct EntityIDs are to be returned
-     * @return Results returned from the database
-     */
-    @Override
-    public Results query(String[] whereClause, String[] whereArgs, String sortBy, boolean sortAsc,
-                         Integer startRow, Integer numRows, boolean onlyIndexes) {
-        CallableStatement statement = null;
-        String query = null;
-
-        if (onlyIndexes) {
-            query = "{ CALL transparent.QueryWithIndexes(?, ?, ?, ?, ?, ?) }";
-        } else {
-            query = "{ CALL transparent.QueryWithAttributes(?, ?, ?, ?, ?, ?) }";
-        }
-
-        try {
-            statement = connection.prepareCall(query);
-
-            statement.setString(1, whereClause[0]);
-            statement.setString(2, whereArgs[0]);
-            statement.setString(3, sortBy);
-            statement.setBoolean(4, sortAsc);
-
-            if (startRow == null) {
-                statement.setInt(5, 1);
-            } else {
-                statement.setInt(5, startRow);
-            }
-
-            if (numRows == null) {
-                statement.setInt(6, 1 << 64 - 1);
-            } else {
-                statement.setInt(6, numRows);
-            }
-
-            return new MariaDBResults(null, statement.executeQuery());
+			statement = buildSelectStatement(query,
+											 selectColumns,
+											 whereColumns,
+											 whereRelation,
+											 whereArgs,
+											 COLUMNS.get(groupBy),
+											 COLUMNS.get(orderBy), orderAsc,
+											 startRow, rowCount);
+            return new MariaDBResults(null, statement.executeQuery(), whereColumns);
 
         } catch (Exception e) {
             Console.printError("MariaDBDriver", "queryWithAttributes", "", e);
@@ -318,175 +313,273 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    private PreparedStatement buildInsertStatement(String tableName,
-                                                   String[] values) throws SQLException {
-        StringBuilder stringBuilder = new StringBuilder("INSERT INTO ");
-
-        stringBuilder.append(tableName);
-        stringBuilder.append(" VALUES (");
-
-        for (int i = 0; i < values.length; i++) {
-            stringBuilder.append("?");
-            if (i != values.length - 1) {
-                stringBuilder.append(",");
-            }
-        }
-
-        stringBuilder.append(")");
-
-        PreparedStatement statement = connection.prepareStatement(stringBuilder.toString());
-
-        for (int i = 0; i < values.length; i++) {
-            statement.setString(i + 1, values[i]);
-        }
-
-        return statement;
+    @Override
+    public boolean isReservedKey(String key) {
+    	return RESERVED_COLUMNS.containsKey(key);
     }
 
-    private PreparedStatement buildSelectStatement(String tableName, String[] select,
-                                                   long[] moduleIds, String rowIdName,
-                                                   ProductID[] rowIds, String[] whereClause,
-                                                   String[] whereArgs,
-                                                   String orderBy) throws SQLException {
-        StringBuilder stringBuilder = new StringBuilder();
+	private void loadColumns() throws IOException
+	{
+		Integer columnCount = 0;
+		try {
+			columnCount = Integer.parseInt(getMetadata("column_count"));
+		} catch (NumberFormatException e) { }
 
-        stringBuilder.append("SELECT ");
+		String columns = getMetadata("columns");
+		if (columns == null)
+			return;
+		DataInputStream in = new DataInputStream(new ByteArrayInputStream(columns.getBytes()));
+		for (int i = 0; i < columnCount; i++) {
+			Column col = Column.load(in);
+			COLUMNS.put(col.getName(), col);
+		}
+	}
 
-        for (int i = 0; i < select.length; i++) {
-            stringBuilder.append(select[i]);
-            if (i != select.length - 1) {
-                stringBuilder.append(",");
-            }
-        }
+	private void saveColumns()
+	{
+		if (!setMetadata("column_count", String.valueOf(COLUMNS.size()))) {
+			Console.printError("MariaDBDriver", "saveColumns",
+				"Unable to save column count.");
+		}
 
-        stringBuilder.append(" FROM ");
-        stringBuilder.append(tableName);
-        stringBuilder.append(" WHERE ");
+		try {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+			DataOutputStream out = new DataOutputStream(bytes);
+			for (Column col : COLUMNS.values()) {
+					col.save(out);
+			}
+			out.flush();
+			setMetadata("columns", bytes.toString());
+		} catch (IOException e) {
+			Console.printError("MariaDBDriver", "saveColumns",
+				"Unable to save columns.", e);
+		}
+	}
 
-        if (moduleIds != null) {
-            for (long moduleId : moduleIds) {
-                stringBuilder.append(MODULE_ID);
-                stringBuilder.append("=");
-                stringBuilder.append(moduleId);
-                stringBuilder.append(" AND ");
-            }
-        }
+	private Object checkType(Column clause, Object arg) {
+		switch (clause.getType()) {
+		case STRING:
+			return arg.toString();
+		case NUMBER:
+			if (arg instanceof String)
+				return new BigInteger((String) arg).longValue();
+			else return arg;
+		default:
+			throw new IllegalArgumentException("Unrecognized clause type.");
+		}
+	}
 
-        if (rowIds != null) {
-            stringBuilder.append(rowIdName);
-            stringBuilder.append(" IN (");
+	private void appendWhereStatement(StringBuilder builder,
+									  List<Object> parameters,
+									  Column[] whereClause,
+									  Relation[] whereRelation,
+									  Object[] whereArgs)
+	{
+        builder.append(" WHERE ");
 
-            for (ProductID rowId : rowIds) {
-                stringBuilder.append(rowId.getRowId());
-                stringBuilder.append(",");
-            }
+		if (whereClause != null && whereClause.length > 0 && whereArgs != null)
+		{
+			if (whereClause.length != whereArgs.length || whereClause.length != whereRelation.length) {
+				throw new IllegalArgumentException("Clauses and arguments must have same length.");
+		    }
 
-            // Delete trailing ","
-            stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-            stringBuilder.append(") AND ");
-        }
+			for (int i = 0; i < whereClause.length; i++) {
+				if (whereArgs[i] instanceof String || whereArgs[i] instanceof Number)
+				{
+					whereClause[i].appendQueryString(builder, parameters);
+					builder.append(whereRelation[i]);
+					builder.append("?");
+					parameters.add(checkType(whereClause[i], whereArgs[i]));
+				}
+				else if (whereArgs[i] instanceof String[] || whereArgs[i] instanceof Number[])
+				{
+					Object[] whereArg = (Object[]) whereArgs[i];
 
-        if (whereClause != null) {
-            for (int i = 0; i < whereClause.length; i++) {
-                stringBuilder.append(whereClause[i]);
-                stringBuilder.append(whereArgs[i].charAt(0));
-                stringBuilder.append("? AND ");
-            }
-        }
+					if (whereArg == null || whereArg.length == 0) {
+						throw new IllegalArgumentException("Arrays must be non-empty.");
+					}
 
-        // Delete trailing " AND "
-        if (stringBuilder.substring(stringBuilder.length() - 5).equals(" AND ")) {
-            stringBuilder.delete(stringBuilder.length() - 5, stringBuilder.length() - 1);
-        }
+					whereClause[i].appendQueryString(builder, parameters);
+					switch (whereRelation[i]) {
+					case EQUALS:
+						break;
+					case NOT_EQUALS:
+						builder.append(" NOT");
+						break;
+					default:
+						throw new IllegalArgumentException("Can only use EQUALS or "
+								+ "NOT_EQUALS relations for array values.");
+					}
+					builder.append(" IN (?");
+					parameters.add(checkType(whereClause[i], whereArg[0]));
+					for (int j = 1; j < whereArg.length; j++) {
+						builder.append(",?");
+						parameters.add(checkType(whereClause[i], whereArg[j]));
+					}
+					builder.append(") ");
+				} else {
+					throw new IllegalArgumentException("Unknown argument type.");
+				}
+
+				if (i != whereClause.length - 1) {
+					builder.append(" AND ");
+				}
+			}
+		}
+	}
+
+    private PreparedStatement buildSelectStatement(String query,
+												   Column[] select,
+												   Column[] whereClause,
+												   Relation[] whereRelation,
+												   Object[] whereArgs,
+												   Column groupBy,
+                                                   Column orderBy,
+												   boolean orderAsc,
+												   Integer startRow,
+												   Integer rowCount) throws SQLException
+	{
+        StringBuilder builder = new StringBuilder();
+		List<Object> parameters = new ArrayList<Object>();
+
+        builder.append("SELECT ");
+
+		if (select != null && select.length > 0) {
+			select[0].appendQueryString(builder, parameters);
+		    for (int i = 1; i < select.length; i++) {
+		        builder.append(",");
+				select[i].appendQueryString(builder, parameters);
+		    }
+		} else {
+			for (Column col : COLUMNS.values()) {
+				if (col.isStatic()) {
+					col.appendQueryString(builder, parameters);
+					builder.append(",");
+				} else {
+					break;
+				}
+			}
+			builder.append("COLUMN_JSON(");
+			builder.append(DYNAMIC_COLS);
+			builder.append(")");
+		}
+
+        builder.append(" FROM ");
+        builder.append(ENTITY_TABLE);
+
+		if (query != null) {
+			builder.append(" LEFT JOIN (SELECT ");
+			builder.append(ENTITY_ID_COL.getName());
+			builder.append(" FROM ");
+			builder.append(NAME_INDEX_TABLE);
+			builder.append(" WHERE query=?) t1 USING (");
+			parameters.add(query + ";mode=any");
+			builder.append(ENTITY_ID_COL.getName());
+			builder.append(")" );
+		}
+
+		appendWhereStatement(builder, parameters, whereClause, whereRelation, whereArgs);
+		
+		if (groupBy != null) {
+			builder.append(" GROUP BY ");
+			groupBy.appendQueryString(builder, parameters);
+		}
 
         if (orderBy != null) {
-            stringBuilder.append(" ORDER BY ");
-            stringBuilder.append(orderBy);
-            stringBuilder.append(" ASC");
+			builder.append(" ORDER BY ");
+			orderBy.appendQueryString(builder, parameters);
+
+			if (orderAsc) {
+				builder.append(" ASC");
+			} else {
+				builder.append(" DESC");
+			}
         }
 
-        PreparedStatement statement = connection.prepareStatement(stringBuilder.toString());
-
-        if (whereArgs != null) {
-            for (int i = 0; i < whereArgs.length; i++) {
-                statement.setString(i + 1, whereArgs[i].substring(1));
-            }
+        if (startRow == null) {
+			if (rowCount != null) {
+	            builder.append(" LIMIT 1,");
+				builder.append(rowCount);
+			}
+        } else {
+			if (rowCount == null) {
+	            builder.append(" LIMIT ");
+	            builder.append(startRow);
+	            builder.append(',');
+	            builder.append(1 << 64 - 1);
+			} else {
+	            builder.append(" LIMIT ");
+	            builder.append(startRow);
+	            builder.append(',');
+	            builder.append(rowCount);
+			}
         }
+
+        PreparedStatement statement = connection.prepareStatement(builder.toString());
+
+		int index = 1;
+		for (int i = 0; i < parameters.size(); i++) {
+			if (parameters.get(i) instanceof String) {
+				statement.setString(index++, (String) parameters.get(i));	
+			} else {
+				statement.setLong(index++, (long) parameters.get(i));
+			}
+		}
 
         return statement;
     }
 
-    private PreparedStatement buildUpdateStatement(String tableName, String[] setClause,
-                                                   String[] setArgs, String[] whereClause,
-                                                   String[] whereArgs) throws SQLException {
-        StringBuilder stringBuilder = new StringBuilder("UPDATE ");
+    private PreparedStatement buildUpdateStatement(Column[] setClause,
+                                                   Object[] setArgs,
+												   Column[] whereClause,
+												   Relation[] whereRelation,
+                                                   Object[] whereArgs) throws SQLException
+	{
+        StringBuilder builder = new StringBuilder("UPDATE ");
+		List<Object> parameters = new ArrayList<Object>();
 
-        stringBuilder.append(tableName);
-        stringBuilder.append(" SET ");
+        builder.append(ENTITY_TABLE);
+        builder.append(" SET ");
 
+		if (setClause == null || setClause.length == 0)
+			throw new IllegalArgumentException("Must have at least one set clause.");
+
+		StringBuilder dynamicBuilder = new StringBuilder(DYNAMIC_COLS);
+		List<Object> dynamicParameters = new ArrayList<Object>();
+		dynamicBuilder.append("=COLUMN_ADD(");
+		dynamicBuilder.append(DYNAMIC_COLS);
         for (int i = 0; i < setClause.length; i++) {
-            stringBuilder.append(setClause[i]);
-            stringBuilder.append("=?");
-            if (i != setClause.length - 1) {
-                stringBuilder.append(" AND ");
-            }
+			if (setClause[i].isStatic()) {
+				setClause[i].appendQueryString(builder, parameters);
+				builder.append("=?,");
+				parameters.add(checkType(setClause[i], setArgs[i]));
+			} else {
+	            dynamicBuilder.append(",'");
+				dynamicBuilder.append(setClause[i].getName());
+	            dynamicBuilder.append("',?");
+				dynamicParameters.add(checkType(setClause[i], setArgs[i]));
+			}
         }
+		dynamicBuilder.append(") ");
+		if (dynamicParameters.size() == 0)
+			builder.deleteCharAt(builder.length() - 1);
+		else {	
+			builder.append(dynamicBuilder);
+			parameters.addAll(dynamicParameters);
+		}
 
-        stringBuilder.append(" WHERE ");
+		appendWhereStatement(builder, parameters, whereClause, whereRelation, whereArgs);
 
-        for (int i = 0; i < whereClause.length; i++) {
-            stringBuilder.append(whereClause[i]);
-            stringBuilder.append("=?");
-            if (i != setClause.length - 1) {
-                stringBuilder.append(" AND ");
-            }
-        }
+        PreparedStatement statement = connection.prepareStatement(builder.toString());
 
-        PreparedStatement statement = connection.prepareStatement(stringBuilder.toString());
-
-        for (int i = 0; i < setArgs.length; i++) {
-            statement.setString(i + 1, setArgs[i]);
-        }
-
-        for (int i = 0; i < whereArgs.length; i++) {
-            statement.setString(i + setArgs.length + 1, whereArgs[i]);
-        }
-
-        return statement;
-    }
-
-    private PreparedStatement buildQueryStatement(ProductID[] rowIds,
-                                                  String[] properties) throws SQLException {
-        StringBuilder stringBuilder = new StringBuilder("SELECT EntityID,PropertyName,TraitValue FROM ");
-
-        stringBuilder.append(MODEL_NAME);
-        stringBuilder.append(" WHERE EntityID IN (");
-
-        for (int i = 0; i < rowIds.length; i++) {
-            stringBuilder.append(rowIds[i].getRowId());
-
-            if (i != rowIds.length - 1) {
-                stringBuilder.append(",");
-            }
-        }
-
-        stringBuilder.append(") AND PropertyName IN (");
-
-        for (int i = 0; i < properties.length; i++) {
-            stringBuilder.append("?");
-
-            if (i != properties.length - 1) {
-                stringBuilder.append(",");
-            }
-        }
-
-        stringBuilder.append(") ORDER BY EntityID ASC");
-
-        PreparedStatement statement = connection.prepareStatement(stringBuilder.toString());
-
-        for (int i = 0; i < properties.length; i++) {
-            statement.setString(i + 1, properties[i]);
-        }
+		int index = 1;
+		for (int i = 0; i < parameters.size(); i++) {
+			if (parameters.get(i) instanceof String) {
+				statement.setString(index++, (String) parameters.get(i));	
+			} else if (parameters.get(i) instanceof Number) {
+				statement.setLong(index++, ((Number) parameters.get(i)).longValue());
+			}
+		}
 
         return statement;
     }
@@ -517,50 +610,37 @@ public class MariaDBDriver implements transparent.core.database.Database {
         while (productIDIterator.hasNext()) {
             ProductID productID = productIDIterator.next();
 
-            AbstractMap.SimpleEntry<String, String> entry = new AbstractMap.SimpleEntry("foo", "bar");
+            AbstractMap.SimpleEntry<String, Object> entry =
+            		new AbstractMap.SimpleEntry("foo", System.nanoTime());
             database.addProductInfo(testModule, productID, entry);
             entry = new AbstractMap.SimpleEntry("baz", "grep");
             database.addProductInfo(testModule, productID, entry);
             entry = new AbstractMap.SimpleEntry("something", "else");
             database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("something", "else2");
+            entry = new AbstractMap.SimpleEntry("name", "item " + System.nanoTime());
             database.addProductInfo(testModule, productID, entry);
 
         }
-        System.err.println(numInserts + " updates took " + ((System.nanoTime() - start) / 4e6) +
-                                   "ms");
-
-
-        Results search = database.query(new ProductID[] { new ProductID(2, null),
-                new ProductID(3, null) },
-                                        new String[] { "foo", "something" });
-
-        while (search.next()) {
-            System.out.println(search.getLong(1) + " " + search.getString(2));
-        }
-
-        search = database.query(new String[] { "foo" },
-                                new String[] { "bar" },
-                                "something",
-                                false,
-                                null,
-                                5,
-                                false);
+        System.err.println(numInserts + " updates took "
+        		+ ((System.nanoTime() - start) / 4e6) + "ms");
+        Results search = database.query("item", null,
+                                new String[] { "baz" },
+								new Relation[] { Relation.EQUALS },
+                                new String[] { "grep" },
+                                null, "foo", false, null, 50);
 
         while (search.next()) {
-            System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t\t\t" + search
-                    .getString(3));
+            System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t" + search
+                    .getString(3) + "\t" + search.getString(4) + "\t" + search.getString(5));
         }
 
         System.err.println("First query complete.");
 
-        search = database.query(new String[] { "foo" },
-                                new String[] { "bar" },
-                                "something",
-                                false,
-                                1,
-                                3,
-                                true);
+        search = database.query("item", null,
+                                new String[] { "baz" },
+								new Relation[] { Relation.EQUALS },
+                                new String[] { "grep" },
+                                null, "something", false, 1, 3);
 
         while (search.next()) {
             System.out.println(search.getLong(1));
@@ -572,68 +652,152 @@ public class MariaDBDriver implements transparent.core.database.Database {
         database.setMetadata("key1", "value2");
         assert database.getMetadata("key1").equals("value2");
     }
-}
 
-class MariaDBResults implements Results {
-    private final Module owner;
-    private final ResultSet resultSet;
+	private static class Column
+	{
+		private String name;
+		private boolean isStatic;
+		private Type type;
 
-    public MariaDBResults(Module owner, ResultSet resultSet) {
-        this.owner = owner;
-        this.resultSet = resultSet;
-    }
+		public Column(String name, Type type, boolean isStatic) {
+			if (type == null || name == null)
+				throw new IllegalArgumentException("Arguments cannot be null.");
+			this.name = name;
+			this.type = type;
+			this.isStatic = isStatic;
+		}
 
-    @Override
-    public String getString(int columnIndex) {
-        try {
-            return resultSet.getString(columnIndex);
-        } catch (SQLException e) {
-            if (owner == null)
-                Console.printError("MariaDBResults", "getString", "", e);
-            else
-                owner.logError("MariaDBResults", "getString", "", e);
-            return null;
-        }
-    }
+		public boolean isStatic() {
+			return this.isStatic;
+		}
 
-    @Override
-    public long getLong(int columnIndex) {
-        try {
-            return resultSet.getLong(columnIndex);
-        } catch (SQLException e) {
-            if (owner == null)
-                Console.printError("MariaDBResults", "getLong", "", e);
-            else
-                owner.logError("MariaDBResults", "getLong", "", e);
-            return 0;
-        }
-    }
+		public Type getType() {
+			return this.type;
+		}
 
-    @Override
-    public boolean hasNext() {
-        try {
-            return !resultSet.isLast();
-        } catch (SQLException e) {
-            if (owner == null)
-                Console.printError("MariaDBResults", "hasNext", "", e);
-            else
-                owner.logError("MariaDBResults", "hasNext", "", e);
-            return false;
-        }
-    }
+		public String getName() {
+			return this.name;
+		}
 
-    @Override
-    public boolean next() {
-        try {
-            return resultSet.next();
-        } catch (SQLException e) {
-            if (owner == null)
-                Console.printError("MariaDBResults", "next", "", e);
-            else
-                owner.logError("MariaDBResults", "next", "", e);
-            return false;
-        }
-    }
+		public void appendQueryString(StringBuilder builder, List<Object> parameters)
+		{
+			if (isStatic) {
+				builder.append('`');
+				builder.append(name);
+				builder.append('`');
+			} else {
+				builder.append("COLUMN_GET(");
+				builder.append(DYNAMIC_COLS);
+				builder.append(",?");
+				parameters.add(name);
+				switch (type) {
+				case NUMBER:
+					builder.append(" AS INT) ");
+					break;
+				case STRING:
+					builder.append(" AS CHAR) ");
+					break;
+				}
+			}
+		}
+
+		public void save(DataOutputStream out) throws IOException {
+			out.writeByte(isStatic ? 1 : 0);
+			type.save(out);
+			out.writeUTF(name);
+		}
+
+		public static Column load(DataInputStream in) throws IOException {
+			boolean isStatic = in.readByte() == 1;
+			Type type = Type.load(in);
+			String name = in.readUTF();
+			return new Column(name, type, isStatic);
+		}
+	}
+
+	private static class MariaDBResults implements Results {
+	    private final Module owner;
+	    private final ResultSet resultSet;
+	    private final Column[] select;
+
+	    public MariaDBResults(Module owner, ResultSet resultSet, Column[] select) {
+	        this.owner = owner;
+	        this.resultSet = resultSet;
+	        this.select = select;
+	    }
+
+	    @Override
+	    public String getString(int columnIndex) {
+	        try {
+	            return resultSet.getString(columnIndex);
+	        } catch (SQLException e) {
+	            if (owner == null)
+	                Console.printError("MariaDBResults", "getString", "", e);
+	            else
+	                owner.logError("MariaDBResults", "getString", "", e);
+	            return null;
+	        }
+	    }
+
+	    @Override
+	    public long getLong(int columnIndex) {
+	        try {
+	            return resultSet.getLong(columnIndex);
+	        } catch (SQLException e) {
+	            if (owner == null)
+	                Console.printError("MariaDBResults", "getLong", "", e);
+	            else
+	                owner.logError("MariaDBResults", "getLong", "", e);
+	            return 0;
+	        }
+	    }
+
+	    @Override
+	    public Object get(int columnIndex) {
+	        try {
+	        	switch (select[columnIndex - 1].getType()) {
+	        	case STRING:
+	            	return resultSet.getString(columnIndex);
+	        	case NUMBER:
+	        		return resultSet.getLong(columnIndex);
+	        	default:
+	        		throw new IllegalStateException("Unrecognized column type.");
+	        	}
+	        } catch (SQLException e) {
+	            if (owner == null)
+	                Console.printError("MariaDBResults", "get", "", e);
+	            else
+	                owner.logError("MariaDBResults", "get", "", e);
+	            return 0;
+	        }
+	    }
+
+	    @Override
+	    public boolean hasNext() {
+	        try {
+	            return !resultSet.isLast();
+	        } catch (SQLException e) {
+	            if (owner == null)
+	                Console.printError("MariaDBResults", "hasNext", "", e);
+	            else
+	                owner.logError("MariaDBResults", "hasNext", "", e);
+	            return false;
+	        }
+	    }
+	
+	    @Override
+	    public boolean next() {
+	        try {
+	            return resultSet.next();
+	        } catch (SQLException e) {
+	            if (owner == null)
+	                Console.printError("MariaDBResults", "next", "", e);
+	            else
+	                owner.logError("MariaDBResults", "next", "", e);
+	            return false;
+	        }
+	    }
+	}
 }
 
 class ResultSetIterator implements Database.ResultsIterator<ProductID> {

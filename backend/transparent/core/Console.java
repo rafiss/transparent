@@ -6,7 +6,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -21,6 +20,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -28,6 +29,8 @@ import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Erase;
 import org.fusesource.jansi.AnsiConsole;
 import org.fusesource.jansi.Ansi.Color;
+
+import redis.clients.johm.JOhm;
 
 import jline.CandidateListCompletionHandler;
 import jline.Completor;
@@ -40,6 +43,7 @@ public class Console
 			new TasksCommand(),
 			new HistoryCommand(),
 			new ExitCommand(),
+			new TriggersCommand(),
 			new MigrateCommand(),
 			new TestServerCommand());
 
@@ -50,13 +54,13 @@ public class Console
 	private static final String PROMPT = "$ ";
 
 	/* ANSI string codes for text formatting */
-	private static final String BOLD = new Ansi().bold().toString();
-	private static final String UNBOLD = new Ansi().boldOff().toString();
-	private static final String RED = new Ansi().fg(Color.RED).toString();
-	private static final String BLUE = new Ansi().fg(Color.BLUE).toString();
-	private static final String GRAY = new Ansi().fgBright(Color.BLACK).toString();
-	private static final String DEFAULT = new Ansi().fg(Color.DEFAULT).toString();
-	private static final String ERASE = new Ansi().eraseLine(Erase.ALL).toString();
+	public static final String BOLD = new Ansi().bold().toString();
+	public static final String UNBOLD = new Ansi().boldOff().toString();
+	public static final String RED = new Ansi().fg(Color.RED).toString();
+	public static final String BLUE = new Ansi().fg(Color.BLUE).toString();
+	public static final String GRAY = new Ansi().fgBright(Color.BLACK).toString();
+	public static final String DEFAULT = new Ansi().fg(Color.DEFAULT).toString();
+	public static final String ERASE = new Ansi().eraseLine(Erase.ALL).toString();
 
 	private static List<Token> tokens = new ArrayList<Token>();
 
@@ -1388,7 +1392,7 @@ public class Console
 				if (args.size() > 2)
 					limit = args.get(2).getToken();
 
-				URLConnection connection = new URL("http://140.180.186.131:16317/product" /*"http://140.180.186.131:16317"*/).openConnection();
+				URLConnection connection = new URL("http://localhost:16317/product" /*"http://140.180.186.131:16317"*/).openConnection();
 				HttpURLConnection http = (HttpURLConnection) connection;
 				http.setDoInput(true);
 				http.setDoOutput(true);
@@ -1416,6 +1420,66 @@ public class Console
 			} catch (IOException e) {
 				Console.commandError("testserver", "", e);
 			}
+		}
+	}
+
+	private static class TriggersCommand extends Command
+	{
+		public TriggersCommand() {
+			super("triggers");
+		}
+
+		private void printInfo(PriceTrigger info) {
+			if (info == null) {
+				println("No triggers found.");
+				return;
+			}
+
+			println(BOLD + "Trigger gid = "
+					+ Core.toUnsignedString(info.getGid()) + ":" + UNBOLD);
+			println(GRAY + "  count: " + DEFAULT + info.getNumTracks());
+
+			for (Entry<Long, PriceTrack> entry : info.getModuleTracks().entrySet())
+				println(GRAY + "  module trigger (id = "
+						+ Core.toUnsignedString(entry.getKey()) + ") count: "
+						+ DEFAULT + entry.getValue().getNumTracks());
+
+			PriceTrigger.printInfo(info.getThresholdTracks(), "  ");
+
+			for (Entry<Long, PriceTrackSet> entry
+					: info.getModuleThresholdTracks().entrySet())
+			{
+				println(GRAY + "  module trigger (id = "
+						+ Core.toUnsignedString(entry.getKey()) + "): " + DEFAULT);
+				PriceTrigger.printInfo(entry.getValue().getThresholdTracks(), "    ");
+			}
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			Long gid = null;
+			try {
+				if (args.size() > 1)
+					gid = new BigInteger(args.get(1).getToken()).longValue();
+			} catch (NumberFormatException e) { }
+
+			lockConsole();
+			if (gid == null) {
+				int count = 0;
+				Set<PriceTrigger> set = JOhm.getAll(PriceTrigger.class);
+				for (PriceTrigger info : set) {
+					if (count == 100)
+						break;
+					printInfo(info);
+					count++;
+				}
+				println("Printed " + count + " out of " + set.size() + " price triggers.");
+			} else {
+				PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+				printInfo(info);
+			}
+			unlockConsole();
 		}
 	}
 

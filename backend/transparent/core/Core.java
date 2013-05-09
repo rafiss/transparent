@@ -1,7 +1,6 @@
 package transparent.core;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -10,11 +9,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.Date;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -22,32 +18,15 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.StoredField;
-import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
-import org.apache.lucene.queryparser.flexible.standard.StandardQueryParser;
-import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler.Operator;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.RAMDirectory;
-import org.apache.lucene.util.Version;
 import org.fusesource.jansi.AnsiConsole;
 import org.simpleframework.http.core.ContainerServer;
 import org.simpleframework.transport.connect.Connection;
 import org.simpleframework.transport.connect.SocketConnection;
 
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.johm.JOhm;
+import transparent.core.PriceHistory.Record;
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
 
@@ -64,12 +43,7 @@ public class Core
 	private static final String QUEUED_TASKS = "queued";
 	private static final String SCRIPT_FLAG = "--script";
 	private static final String HELP_FLAG = "--help";
-	private static final String PRODUCT_NAME_FIELD = "name";
-	private static final String PRODUCT_ID_FIELD = "id";
-	private static final String ROW_ID_FIELD = "row";
-	private static final String PRICE_FIELD = "price";
 	private static final int THREAD_POOL_SIZE = 64;
-	private static final int SEARCH_LIMIT = 256;
 	private static final int HTTP_SERVER_PORT = 16317;
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
 
@@ -96,11 +70,6 @@ public class Core
 	/* represents the list encoding of tasks in the database */
 	private static ArrayList<Task> queuedList = new ArrayList<Task>();
 	private static ArrayList<Task> runningList = new ArrayList<Task>();
-
-	/* for product name search indexing */
-	private static IndexWriter indexWriter = null;
-	private static IndexSearcher searcher = null;
-	private static StandardQueryParser parser = null;
 
 	public static InetAddress FRONTEND_ADDRESS = null;
 
@@ -155,73 +124,6 @@ public class Core
 
 	public static void execute(Runnable task) {
 		dispatcher.execute(task);
-	}
-
-	public static void addToIndex(String productName, ProductID id, int price)
-	{
-		if (indexWriter == null)
-			return;
-
-		Document doc = new Document();
-		TextField nameField = new TextField(
-				PRODUCT_NAME_FIELD, productName, Field.Store.YES);
-		TextField productIdField = new TextField(
-				PRODUCT_ID_FIELD, id.getModuleProductId(), Field.Store.YES);
-		StoredField rowField = new StoredField(
-				ROW_ID_FIELD, id.getRowId());
-
-		doc.add(nameField);
-		doc.add(productIdField);
-		doc.add(rowField);
-//		doc.add(priceField); /* TODO: only the lowest price of a product should be kept */
-
-		try {
-			indexWriter.addDocument(doc);
-		} catch (IOException e) {
-			Console.printError("Core", "addToIndex", "Error adding "
-					+ "product name to search index.", e);
-		}
-	}
-
-	private static HashSet<Character> special = new HashSet<Character>(Arrays.asList(
-			'&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', ':', '\\', '/'));
-
-	private static String sanitize(String search) {
-		StringBuilder builder = new StringBuilder();
-		for (int i = 0; i < search.length(); i++) {
-			if (special.contains(search.charAt(i)))
-				builder.append('\\');
-			builder.append(search.charAt(i));
-		}
-		return builder.toString();
-	}
-
-	public static Iterator<ProductID> searchProductName(
-			String term, String sortby, boolean descending)
-	{
-		Query query = null;
-		try {
-			query = parser.parse(term, PRODUCT_NAME_FIELD);
-		} catch (QueryNodeException e) {
-			try {
-				query = parser.parse(sanitize(term), PRODUCT_NAME_FIELD);
-			} catch (QueryNodeException e2) {
-				Console.printError("Core", "searchProductName",
-						"Unable to parse search query.", e2);
-				return null;
-			}
-		}
-
-		try {
-			Sort sort = new Sort();
-			if (sortby != null && sortby.equals("price"))
-				sort = new Sort(new SortField(PRICE_FIELD, SortField.Type.INT, descending));
-			return new SearchIterator(query, sort);
-		} catch (IOException e) {
-			Console.printError("Core", "searchProductName",
-					"Error occurred during search.", e);
-			return null;
-		}
 	}
 
 	public static boolean loadModules()
@@ -603,6 +505,72 @@ public class Core
 		task.setFuture(future);
 	}
 
+	public static void addPriceRecord(long module, long gid, long price)
+	{
+		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		if (history == null)
+			history = new PriceHistory(gid);
+		history.addRecord(module, new Date().getTime(), price);
+		JOhm.save(history);
+	}
+
+	public static List<Record> getPriceHistory(long module, long gid)
+	{
+		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		if (history == null)
+			return null;
+		return history.getHistory(module);
+	}
+
+	public static void addPriceTrack(long gid, Long[] modules, Long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			info = new PriceTrigger(gid);
+		if (modules == null)
+			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price));
+		else
+			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price), modules);
+		JOhm.save(info);
+	}
+
+	public static void removePriceTrack(long gid, Long[] modules, Long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			return;
+		if (modules == null)
+			info.removeTrack(new PriceTrack(0, price));
+		else
+			info.removeTrack(new PriceTrack(0, price), modules);
+		JOhm.save(info);
+	}
+
+	public static long nextJOhmId(Class<?> clazz) {
+		long id = Core.random();
+		while (JOhm.get(clazz, id) != null)
+			id = Core.random();
+		return id;
+	}
+
+	public static boolean checkPrice(Module module, long gid, long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			return false;
+
+		return info.checkPrice(module, price);
+	}
+
+	public static String priceToString(Long price) {
+		return "$" + (price / 100) + "." + (price % 100);
+	}
+
+	public static Long parsePrice(String price) {
+		try {
+			return Long.parseLong(price.replaceAll("\\.", "").replaceAll("\\$", ""));
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
 	public static void main(String[] args)
 	{
 		AnsiConsole.systemInstall();
@@ -635,43 +603,11 @@ public class Core
 		/* load random number generator seed */
         loadSeed();
 
-        /* load search index for product names */
-        Analyzer analyzer = new StandardAnalyzer(Version.LUCENE_42);
-        IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42, analyzer);
-        Directory directory = null;
-        try {
-        	File index = new File("index");
-        	if (!index.exists()) {
-        		if (!index.mkdir()) {
-        			Console.printError("Core", "main",
-        					"Unable to create directory 'index'.");
-        		} else {
-        			directory = FSDirectory.open(index);
-        	        indexWriter = new IndexWriter(directory, config);
-        	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
-        		}
-        	} else if (!index.isDirectory()) {
-    			Console.printError("Core", "main",
-    					"A file named 'index' already exists.");
-        	} else {
-        		directory = FSDirectory.open(index);
-    	        indexWriter = new IndexWriter(directory, config);
-    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
-        	}
-        } catch (IOException e) {
-        	Console.printError("Core", "main", "Unable to open "
-        			+ "directory 'index'. Using memory index...", e);
-        	try {
-        		Directory indexDirectory = new RAMDirectory();
-                indexWriter = new IndexWriter(indexDirectory, config);
-    	        searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
-        	} catch (IOException e2) {
-            	Console.printError("Core", "main", "Unable to "
-            			+ "create memory index.", e2);
-        	}
-        }
-        parser = new StandardQueryParser(analyzer);
-        parser.setDefaultOperator(Operator.AND);
+        /* load the price history/tracking datastore */
+        JedisPoolConfig config = new JedisPoolConfig();
+        config.maxActive = THREAD_POOL_SIZE;
+        JedisPool pool = new JedisPool(config, "localhost");
+        JOhm.setPool(pool);
 
         /* load the script engine */
         boolean consoleReady = Console.initConsole();
@@ -752,74 +688,8 @@ public class Core
 					+ "to shutdown HTTP server.", e);
 		}
 
-		/* close the search index */
-		try {
-			if (indexWriter != null)
-				indexWriter.close();
-			if (directory != null)
-				directory.close();
-		} catch (IOException e) {
-			Console.printError("Core", "main", "Unable "
-					+ "to close search index.", e);
-		}
-	}
-
-	private static class SearchIterator implements Iterator<ProductID>
-	{
-		private ScoreDoc[] results;
-		private Query query;
-		private Sort sort;
-		private int index;
-
-		public SearchIterator(Query query, Sort sort) throws IOException {
-			this.query = query;
-			this.sort = sort;
-			this.index = 0;
-
-			this.results = searcher.search(query, SEARCH_LIMIT, sort).scoreDocs;
-			if (results.length == 0)
-				results = null;
-		}
-
-		@Override
-		public boolean hasNext() {
-			return (results != null);
-		}
-
-		@Override
-		public ProductID next() {
-			if (results == null)
-				throw new NoSuchElementException();
-
-			ProductID product = null;
-			try {
-				Document doc = searcher.doc(results[index].doc);
-				String moduleProductId = doc.getField(PRODUCT_ID_FIELD).stringValue();
-				int row = doc.getField(ROW_ID_FIELD).numericValue().intValue();
-				product = new ProductID(row, moduleProductId);
-			} catch (IOException e) { }
-
-			index++;
-			if (index == results.length) {
-				try {
-					results = searcher.searchAfter(
-							results[index - 1], query, SEARCH_LIMIT, sort).scoreDocs;
-				} catch (IOException e) {
-					results = null;
-				}
-
-				index = 0;
-				if (results.length == 0)
-					results = null;
-			}
-
-			return product;
-		}
-
-		@Override
-		public void remove() {
-			throw new UnsupportedOperationException();
-		}
+		if (database != null)
+			database.close();
 	}
 	
 	private static class BackgroundWorker implements Runnable
@@ -827,14 +697,7 @@ public class Core
 		@Override
 		public void run()
 		{
-			try {
-				if (indexWriter != null)
-					searcher = new IndexSearcher(DirectoryReader.open(indexWriter, false));
-			} catch (IOException e) {
-				Console.printError("Core", "addToIndex", "Error refreshing "
-						+ " search index.", e);
-			}
-
+			/* TODO: run indexer */
 			saveQueue();
 		}	
 	}

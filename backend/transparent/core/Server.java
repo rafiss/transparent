@@ -1,5 +1,6 @@
 package transparent.core;
 
+import transparent.core.database.Database.Relation;
 import transparent.core.database.Database.Results;
 
 import java.io.IOException;
@@ -7,10 +8,10 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -23,13 +24,10 @@ import org.simpleframework.http.Request;
 import org.simpleframework.http.Response;
 import org.simpleframework.http.core.Container;
 
-import transparent.core.database.Database.Results;
-
 public class Server implements Container
 {
 	private static final JSONParser parser =
 			new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
-	private static final int QUERY_LIMIT = 128;
 
 	private static class QueryProcessor implements Runnable
 	{
@@ -45,6 +43,18 @@ public class Server implements Container
 			JSONObject map = new JSONObject();
 			map.put("error", message);
 			return map;
+		}
+
+		private Long parseJsonLong(Object json) {
+			if (json instanceof String) {
+				return new BigInteger((String) json).longValue();
+			} else if (json instanceof BigInteger) {
+				return ((BigInteger) json).longValue();
+			} else if (json instanceof Long) {
+				return (long) json;
+			} else {
+				return null;
+			}
 		}
 
 		private void parseModules(PrintStream body) throws IOException, ParseException
@@ -105,6 +115,29 @@ public class Server implements Container
 			}
 		}
 		
+		private Long[] parseModules(Object modulesObject) {
+			if (modulesObject != null) {
+				if (modulesObject instanceof JSONArray) {
+					JSONArray modulesArray = (JSONArray) modulesObject;
+					Long[] modules = new Long[modulesArray.size()];
+					for (int i = 0; i < modulesArray.size(); i++) {
+						modules[i] = parseJsonLong(modulesArray.get(i));
+						if (modules[i] == null)
+							return null;
+					}
+					return modules;
+				} else {
+					Long[] modules = new Long[1];
+					modules[0] = parseJsonLong(modulesObject);
+					if (modules[0] == null)
+						return null;
+					return modules;
+				}
+			} else {
+				return null;
+			}
+		}
+
 		private void parseProductQuery(PrintStream body) throws IOException, ParseException
 		{
 			Object object = parser.parse(request.getContent());
@@ -115,59 +148,81 @@ public class Server implements Container
 			}
 
 			JSONObject map = (JSONObject) object;
-			Object gidObject = map.get("gid");
-			if (!(gidObject instanceof String)) {
-				body.println(error("'gid' key must map to a string."));
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid' key."));
 				body.close();
 				return;
 			}
 
-			long prevId = -1;
-			String name = null;
+			Object modulesObject = map.get("modules");
+			Long[] modules = null;
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			String brand = null;
+			String model = null;
 			String image = null;
-			String price = null;
-			String[] where = { "gid" };
-			String[] args = { (String) gidObject };
-			Results results = Core.getDatabase().query(where, args, "gid", true, null, null, false);
+			String name = null;
+			Long price = null;
+			Results results;
+			if (modules == null) {
+				results = Core.getDatabase().query(
+						null, null,
+						new String[] { "gid" },
+						new Relation[] { Relation.EQUALS },
+						new Object[] { gid },
+						null, null, true, null, null);
+			} else {
+				results = Core.getDatabase().query(
+						null, null,
+						new String[] { "gid", "modules" },
+						new Relation[] { Relation.EQUALS, Relation.EQUALS },
+						new Object[] { gid, modules },
+						null, null, true, null, null);
+			}
 			JSONObject rows = new JSONObject();
-			JSONObject row = new JSONObject();
-			int moduleCount = 0;
 			while (results.next()) {
-				long id = results.getLong(1);
-				if (id != prevId && !row.isEmpty()) {
-					moduleCount++;
-					rows.put("module" + moduleCount, row);
-					row = new JSONObject();
-					prevId = id;
-				}
+				long module_id = results.getLong(2);
+				long module_product_id = results.getLong(3);
+				String module_product_name = results.getString(5);
+				if (name == null)
+					name = module_product_name;
 
-				String key = results.getString(2);
-				String value = results.getString(3);
-				if (key.equals("name"))
-					name = value;
-				else if (key.equals("image"))
-					image = value;
-				else if (key.equals("price")) {
-					if (price == null || Integer.parseInt(value) < Integer.parseInt(price)) {
-						int p = Integer.parseInt(value);
-						price = (p / 100) + "." + (p % 100);
-						value = price;
-					}
-				}
-				row.put(key, value);
+				JSONObject json = (JSONObject) parser.parse(results.getString(6));
+				if (brand == null)
+					brand = (String) json.get("brand");
+				if (model == null)
+					model = (String) json.get("model");
+				if (image == null)
+					image = (String) json.get("image");
+				if (price == null)
+					price = ((Number) json.get("price")).longValue();
+
+				JSONObject row = new JSONObject();
+				row.putAll(json);
+				row.put("module", module_id);
+				row.put("module_product_id", module_product_id);
+				row.put("name", module_product_name);
+				rows.put(Core.toUnsignedString(module_id), row);
 			}
 
-			if (!row.isEmpty()) {
-				moduleCount++;
-				rows.put("module" + moduleCount, row);
-			}
-
-			if (name != null)
+			if (brand != null && model != null)
+				rows.put("name", brand + " " + model);
+			else if (name != null)
 				rows.put("name", name);
+
 			if (image != null)
 				rows.put("image", image);
 			if (price != null)
-				rows.put("price", price);
+				rows.put("price", Core.priceToString(price));
+
 			body.println(rows.toJSONString());
 		}
 		
@@ -201,8 +256,9 @@ public class Server implements Container
 			}
 
 			Object whereObject = map.get("where");
-			Condition[] where = new Condition[0];
-			Condition name = null;
+			String[] whereClause = null;
+			Relation[] whereRelation = null;
+			Object[] whereArgs = null;
 			if (whereObject != null) {
 				if (!(whereObject instanceof JSONObject)) {
 					body.println(error("'where' key must map to a map of string pairs."));
@@ -212,7 +268,9 @@ public class Server implements Container
 
 				int i = 0;
 				JSONObject whereMap = (JSONObject) whereObject;
-				where = new Condition[whereMap.size()];
+				whereClause = new String[whereMap.size()];
+				whereRelation = new Relation[whereMap.size()];
+				whereArgs = new Object[whereMap.size()];
 				for (Entry<String, Object> pair : whereMap.entrySet()) {
 					String key = pair.getKey();
 					if (!(pair.getValue() instanceof String)) {
@@ -228,20 +286,29 @@ public class Server implements Container
 						body.close();
 						return;
 					}
-					Relation relation = parse(value.charAt(0));
+					Relation relation = Relation.parse(value.charAt(0));
 					if (relation == null) {
 						body.println(error("Unable to parse relation operator"));
 						body.close();
 						return;
 					}
 
-					if (key.equals("name")) {
-						name = new Condition(key, relation, value.substring(1));
-						where[i] = null;
-					} else
-						where[i] = new Condition(key, relation, value.substring(1));
-					i++;
+					whereClause[i] = key;
+					whereRelation[i] = relation;
+					whereArgs[i] = value.substring(1);
 				}
+			}
+
+			String name = null;
+			Object nameObject = map.get("name");
+			if (nameObject != null) {
+				if (!(nameObject instanceof String)) {
+					body.println(error("'name' key must map to a string."));
+					body.close();
+					return;
+				}
+
+				name = (String) nameObject;
 			}
 
 			String sort = null;
@@ -256,7 +323,18 @@ public class Server implements Container
 				sort = (String) sortObject;
 			}
 
-			int page = 1;
+			Boolean ascending = true;
+			Object ascendingObject = map.get("ascending");
+			if (ascendingObject != null) {
+				if (ascendingObject instanceof String) {
+					ascending = ((String) ascendingObject)
+							.toLowerCase().trim().equals("true");
+				} else if (ascendingObject instanceof Integer) {
+					ascending = !ascendingObject.equals(0);
+				}
+			}
+
+			Integer page = null;
 			Object pageObject = map.get("page");
 			if (pageObject != null) {
 				if (pageObject instanceof Integer) {
@@ -272,7 +350,7 @@ public class Server implements Container
 				page = Integer.parseInt((String) pageObject);
 			}
 
-			int limit = -1;
+			Integer limit = null;
 			Object limitObject = map.get("pagesize");
 			if (limitObject != null) {
 				if (limitObject instanceof Integer) {
@@ -286,7 +364,9 @@ public class Server implements Container
 				}
 			}
 
-			Map<String, JSONArray> returned = query(select, name, where, sort, page, limit);
+			Map<Long, JSONArray> returned = query(name, select,
+					whereClause, whereRelation, whereArgs,
+					sort, ascending, page, limit);
 			if (returned != null) {
 				JSONArray results = new JSONArray();
 				results.addAll(returned.values());
@@ -295,19 +375,119 @@ public class Server implements Container
 				body.println(error("Internal error occurred during query."));
 		}
 
+		private void parseSubscribe(PrintStream body) throws ParseException, IOException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid'."));
+				body.close();
+				return;
+			}
+
+			Long price = null;
+			Object priceObject = map.get("price");
+			if (priceObject != null) {
+				if (priceObject instanceof String)
+					price = Core.parsePrice((String) priceObject);
+				else if (priceObject instanceof Number)
+					price = ((Number) priceObject).longValue();
+				else {
+					body.println(error("Unable to parse 'price'."));
+					body.close();
+					return;
+				}
+			}
+
+			Long[] modules = null;
+			Object modulesObject = map.get("modules");
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			Core.addPriceTrack(gid, modules, price);
+			JSONObject result = new JSONObject();
+			result.put("success", "true");
+			body.println(result);
+		}
+
+		private void parseUnsubscribe(PrintStream body) throws ParseException, IOException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid'."));
+				body.close();
+				return;
+			}
+
+			Long price = null;
+			Object priceObject = map.get("price");
+			if (priceObject != null) {
+				if (priceObject instanceof String)
+					price = Core.parsePrice((String) priceObject);
+				else if (priceObject instanceof Number)
+					price = ((Number) priceObject).longValue();
+				else {
+					body.println(error("Unable to parse 'price'."));
+					body.close();
+					return;
+				}
+			}
+
+			Long[] modules = null;
+			Object modulesObject = map.get("modules");
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			Core.addPriceTrack(gid, modules, price);
+			JSONObject result = new JSONObject();
+			result.put("success", "true");
+			body.println(result);
+		}
+
 		@Override
 		public void run() {
 			PrintStream body = null;
 			try {
 				body = response.getPrintStream();
 				response.setValue("Content-Type", "text/plain");
-				String url = request.getPath().toString();
-				if (url.equals("/search"))
+				String url = request.getPath().getPath();
+				if (url.equals("/search") || url.equals("/search/"))
 					parseSearch(body);
-				else if (url.equals("/product"))
+				else if (url.equals("/product") || url.equals("/product/"))
 					parseProductQuery(body);
-				else if (url.equals("/modules"))
+				else if (url.equals("/modules") || url.equals("/modules/"))
 					parseModules(body);
+				else if (url.equals("/subscribe") || url.equals("/subscribe/"))
+					parseSubscribe(body);
+				else if (url.equals("/unsubscribe") || url.equals("/unsubscribe/"))
+					parseUnsubscribe(body);
 				else
 					body.println(error("Page not found."));
 				body.close();
@@ -360,121 +540,98 @@ public class Server implements Container
 		}
 	}
 
-	private static Map<String, JSONArray> query(String[] select, Condition name,
-			Condition[] where, String sort, int page, int pageSize)
+	private static Map<Long, JSONArray> query(String name, String[] select,
+			String[] whereClause, Relation[] whereRelation, Object[] whereArgs,
+			String sort, boolean ascending, Integer page, Integer pageSize)
 	{
-		if (name != null) {
-			/* search by name */
-			Iterator<ProductID> results = Core.searchProductName(name.getValue(), sort, false);
-			if (results == null)
-				return null;
+		/* construct the select array */
+		int gidIndex = -1;
+		int priceIndex = -1;
+		int selectCount = select.length;
+		for (int i = 0; i < select.length; i++) {
+			if (select[i].equals("gid"))
+				gidIndex = i;
+			else if (select[i].equals("price"))
+				priceIndex = i;
+		}
+		if (gidIndex == -1) {
+			select = Arrays.copyOf(select, select.length + 1);
+			select[select.length - 1] = "gid";
+			gidIndex = select.length - 1;
+		}
 
-			/* construct a map of where conditions */
-			HashMap<String, Condition> conditions = new HashMap<String, Condition>();
-			for (Condition condition : where)
-				if (condition != null)
-					conditions.put(condition.getKey(), condition);
+		HashMap<Long, JSONArray> json = new HashMap<Long, JSONArray>();
 
-			/* construct a map of select keys */
-			HashMap<String, Integer> selectMap = new HashMap<String, Integer>();
-			for (int i = 0; i < select.length; i++)
-				selectMap.put(select[i], i);
+		Results dbresults = Core.getDatabase().query(
+				name, new String[] { "gid" },
+				whereClause, whereRelation, whereArgs,
+				"gid", sort, ascending, page, pageSize);
 
-			HashSet<String> properties = new HashSet<String>();
-			for (String s : select)
-				properties.add(s);
-			for (Condition condition : where)
-				if (condition != null)
-					properties.add(condition.getKey());
-			boolean gidAdded = !properties.contains("gid");
-			if (gidAdded)
-				properties.add("gid");
-			String[] propertiesArray = new String[properties.size()];
-			propertiesArray = properties.toArray(propertiesArray);
+		ArrayList<Long> gid_ids = new ArrayList<Long>();
+		while (dbresults.next())
+			gid_ids.add(dbresults.getLong(1));
 
+		whereClause = Arrays.copyOf(whereClause, whereClause.length + 1);
+		whereRelation = Arrays.copyOf(whereRelation, whereClause.length);
+		whereArgs = Arrays.copyOf(whereArgs, whereClause.length);
+		whereClause[whereClause.length - 1] = "entity_id";
+		whereRelation[whereClause.length - 1] = Relation.EQUALS;
+		Object[] gidArg = new Object[gid_ids.size()];
+		for (int i = 0; i < gid_ids.size(); i++)
+			gidArg[i] = gid_ids.get(i);
+		whereArgs[whereClause.length - 1] = gidArg;
 
-			int conditionsSatisfied = 0;
-			int currentPage = 1;
-			HashMap<String, JSONArray> json = new HashMap<String, JSONArray>();
-			ArrayList<ProductID> rowIds = new ArrayList<ProductID>();
-			while (results.hasNext())
-			{
-				for (int i = 0; i < QUERY_LIMIT; i++) {
-					if (!results.hasNext())
-						break;
-					rowIds.add(results.next());
+		dbresults = Core.getDatabase().query(
+				null, select,
+				whereClause, whereRelation, whereArgs,
+				null, sort, ascending, null, null);
+
+		HashMap<Long, Entry<Long, Long>> priceRanges =
+				new HashMap<Long, Entry<Long, Long>>();
+		while (dbresults.next()) {
+			JSONArray row = new JSONArray();
+			row.ensureCapacity(select.length);
+			for (int i = 0; i < selectCount; i++)
+				row.add(dbresults.get(i + 1));
+			Long gid = dbresults.getLong(gidIndex + 1);
+
+			if (priceIndex != -1) {
+				Long price = dbresults.getLong(priceIndex + 1);
+				Entry<Long, Long> range = priceRanges.get(gid);
+				if (range == null)
+					range = new SimpleEntry<Long, Long>(price, price);
+				else {
+					if (price < range.getKey())
+						range = new SimpleEntry<Long, Long>(price, range.getValue());
+					if (price > range.getValue())
+						range = new SimpleEntry<Long, Long>(range.getKey(), price);
 				}
-
-				ProductID[] rowArray = new ProductID[rowIds.size()];
-				rowArray = rowIds.toArray(rowArray);
-				Results dbresults = Core.getDatabase().query(rowArray, propertiesArray);
-
-				/* process the where clauses */
-				long prevId = -1;
-				String gid = null;
-				boolean discard = true;
-				JSONArray row = new JSONArray();
-				row.ensureCapacity(select.length);
-				while (row.size() < select.length)
-					row.add(null);
-				while (dbresults.next()) {
-					long id = dbresults.getLong(1);
-					if (id != prevId) {
-						/* push the last row into our list of results */
-						if (!discard && conditionsSatisfied >= conditions.size()) {
-							if (json.containsKey(gid))
-								mergeRows(json.get(gid), row);
-							else
-								json.put(gid, row);
-							if (json.size() == pageSize) {
-								if (currentPage == page)
-									return json;
-								else {
-									json.clear();
-									currentPage++;
-								}
-							}
-							row = new JSONArray();
-							row.ensureCapacity(select.length);
-						}
-
-						while (row.size() < select.length)
-							row.add(null);
-
-						conditionsSatisfied = 0;
-						prevId = id;
-						gid = null;
-						discard = false;
-					} else if (discard)
-						continue;
-
-					/* ensure the key-value passes our where clauses */
-					String key = dbresults.getString(2);
-					String value = dbresults.getString(3);
-					Condition condition = conditions.get(key);
-					if (condition != null && !condition.evaluate(value)) {
-						discard = true;
-						continue;
-					}
-					if (key.equals("gid"))
-						gid = value;
-					if (!key.equals("gid") || !gidAdded)
-						conditionsSatisfied++;
-
-					/* add this value to our current row */
-					Integer index = selectMap.get(key);
-					if (index != null)
-						row.set(index, value);
-				}
-
-				rowIds.clear();
 			}
 
-			return json;
-		} else {
-			/* TODO: implement this */
-			return null;
+			if (json.containsKey(gid))
+				mergeRows(json.get(gid), row);
+			else
+				json.put(gid, row);
 		}
+
+		if (priceIndex != -1) {
+			for (Entry<Long, JSONArray> entry : json.entrySet())
+			{
+				Long gid = entry.getKey();
+				JSONArray row = entry.getValue();
+				Entry<Long, Long> range = priceRanges.get(gid);
+				Long lowPrice = range.getKey();
+				Long highPrice = range.getValue();
+				if (lowPrice != highPrice) {
+					row.set(priceIndex, Core.priceToString(range.getKey())
+							+ " - " + Core.priceToString(range.getValue()));
+				} else {
+					row.set(priceIndex, Core.priceToString(range.getKey()));
+				}
+			}
+		}
+
+		return json;
 	}
 
 	@Override
@@ -484,82 +641,5 @@ public class Server implements Container
 			return;*/
 
 		Core.execute(new QueryProcessor(request, response));
-	}
-
-	private static enum Relation {
-		EQUALS,
-		LESS_THAN,
-		GREATER_THAN
-	}
-
-	public static Relation parse(char operator) {
-		switch (operator) {
-		case '=':
-			return Relation.EQUALS;
-		case '<':
-			return Relation.LESS_THAN;
-		case '>':
-			return Relation.GREATER_THAN;
-		default:
-			return null;
-		}
-	}
-
-	private static class Condition {
-		private String key;
-		private String value;
-		private Relation relation;
-
-		private double doubleValue;
-
-		public Condition(String key, Relation relation, String value) {
-			this.key = key;
-			this.value = value;
-			this.relation = relation;
-
-			try {
-				doubleValue = Double.parseDouble(value);
-			} catch (NumberFormatException e) {
-				doubleValue = Double.NaN;
-			}
-		}
-
-		public String getKey() {
-			return key;
-		}
-
-		public String getValue() {
-			return value;
-		}
-
-		public Relation getRelation() {
-			return relation;
-		}
-
-		@Override
-		public String toString() {
-			return key + " " + relation + " " + value;
-		}
-
-		public boolean evaluate(String input) {
-			switch (relation) {
-			case EQUALS:
-				return value.equals(input);
-			case LESS_THAN:
-				try {
-					return Double.parseDouble(input) < doubleValue;
-				} catch (NumberFormatException e) {
-					return false;
-				}
-			case GREATER_THAN:
-				try {
-					return Double.parseDouble(input) > doubleValue;
-				} catch (NumberFormatException e) {
-					return false;
-				}
-			default:
-				return false;
-			}
-		}
 	}
 }
