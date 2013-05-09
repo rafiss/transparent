@@ -1,10 +1,7 @@
 {% extends "leftbase.html" %}
 
 {% block title %}
-<title>Transparent: Product: Case 101</title>
-{% comment %}
 <title>Transparent: Product: {{ product.name }}</title>
-{% endcomment %}
 {% endblock %}
 
 {% block content %}
@@ -29,15 +26,9 @@
         <!-- Don't hard code Module Name -->
 
     <div class="row-fluid" style="padding: 20px;">
-        <h2>Case 101</h2>
-		{% comment %}
         <h2>{{ product.name }}</h2>
-		{% endcomment %}
 	    <ul class="thumbnails">
-        	<li class="span4"><a class="thumbnail" href="#"><img alt="360x270" data-src="holder.js/360x270" style="width: 360px; height: 270px;" src="/"></img></a></li>
-			{% comment %}
         	<li class="span4"><a class="thumbnail" href="#"><img alt="360x270" data-src="holder.js/360x270" style="width: 360px; height: 270px;" src="{{ product.image }}"></img></a></li>
-			{% endcomment %}
 			{% comment %}
 			<!-- UNCOMMENT AND ADD DJANGO LOGIC -->
 		    <li class="span6">
@@ -54,16 +45,16 @@
     			</form>
 			</li>
 			<li class="span6">
-				Alert when price drops below: $1.88 <!-- REPLACE VALUE WITH 90% OF CURRENT PRICE FOR DEFAULT THRESHOLD -->
+				<!-- REPLACE VALUE WITH 90% OF CURRENT PRICE FOR DEFAULT THRESHOLD -->
 				<div class="input-prepend" style="margin-top:10px;">
 					<!-- CHANGES THE THRESHOLD VALUE IN THE SETTINGS FIELDS FOR THE TRACKED ITEM -->
 					<form>
-	   					<button type="submit" class="btn">Change to</button>
-						<input type="text" class="span3">
+	   					<button type="submit" class="btn">Alert me when price drops below</button>
+						<input type="text" class="span3" placeholder="$1.88" data-mask="$9999.99"><!-- FILL PLACEHOLDER WITH CURRENT PRICE -->
 					</form>
 				</div>
 			</li>
-            <li class="span6"> <h3> Current Price: </h3> <h3> {{ product.price }} </h3> </li>
+            <li class="span6"> <h3> Lowest Price: </h3> <h3> {{ product.price }} </h3> </li>
         </ul>
         
 		<!-- Start tabs with other module results here -->
@@ -85,6 +76,13 @@
 				<!-- ITERATE THROUGH MODULES AND PRINT CONTENT. change id -->
     			<div id="lA" class="tab-pane active">
 					<ul>
+		  	            <li class="span10" style="margin-bottom: 10px;">
+							<!-- Submit vote to frontend for storage -->
+							<form class="btn-group">
+								<button class="btn btn-success"><i class="icon-thumbs-up"> </i> Up vote</button>
+								<button class="btn btn-danger"><i class="icon-thumbs-down"> </i> Down vote</button>
+							</form>
+						</li>
 						<!-- MAKE SURE TO LIST THE PRICE FIRST -->
 			            {% for key,value in product.module1.items %}
 		  	            <li class="span10"> <b> {{ key }}: </b> {{ value }} </li>
@@ -93,6 +91,13 @@
 				</div>
 				<div id="lB" class="tab-pane">
 					<ul>
+		  	            <li class="span10" style="margin-bottom: 10px;">
+							<!-- Submit vote to frontend for storage -->
+							<form class="btn-group">
+								<button class="btn btn-success"><i class="icon-thumbs-up"> </i> Up vote</button>
+								<button class="btn btn-danger"><i class="icon-thumbs-down"> </i> Down vote</button>
+							</form>
+						</li>
 						<li class="span10"> <b> Attribute: </b> value </li>
 					</ul>
 				</div>
