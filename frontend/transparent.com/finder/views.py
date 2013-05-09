@@ -59,28 +59,40 @@ def search(request):
         query = request.GET['q']
 
         #TODO: get modules
-        #modules = [module.backend_id for module in Module.objects.all()]
-        #if request.user is not None and request.user.is_active:
-            #modules = [module.backend_id for module in request.user.userprofile.modules]
-            #modules = []
+        modules = []
+        if request.user is not None and request.user.is_authenticated():
+            modules = [module.backend_id for module in request.user.userprofile.modules.all()]
 
         payload = {'select': ['name', 'image', 'price', 'gid'],
-                'where': {'name': '=' + query},
-                #TODO: specify modules
-                #'modules': modules,
+                'name': query,
                 'page': page,
                 'pagesize': PAGE_SIZE}
-        resp = urllib2.urlopen(BACKEND_URL + '/search', json.dumps(payload))
-        results = json.loads(resp.read())
+        if modules:
+            payload['modules'] = modules
+
+        results = []
+        #resp = urllib2.urlopen(BACKEND_URL + '/search', json.dumps(payload))
+        #results = json.loads(resp.read())
+        more = len(results) == PAGE_SIZE
         for i in range(len(results)):
             new = {}
             for j in range(len(payload['select'])):
                 new[payload['select'][j]] = results[i][j]
             results[i] = new
         products = []
+
+
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+
         for i in range(0, len(results), 3):
             products.append(results[i:i+3])
-        return render(request, "search.html", {'products': products, 'query': query})
+        return render(request, "search.html", {'products': products, 'query': query,
+            'page': page, 'more': more})
     else:
         return HttpResponseRedirect(referer)
 

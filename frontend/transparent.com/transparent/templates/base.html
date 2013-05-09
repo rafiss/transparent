@@ -13,7 +13,6 @@
 {% load staticfiles %}
 <link rel="stylesheet" type="text/css" href="{% static "css/bootstrap.css" %}">
 <link rel="stylesheet" type="text/css" href="{% static "css/base.css" %}">
-<link rel="stylesheet" type="text/css" href="{% static "css/bootstrap-responsive.css" %}">
 <link rel="stylesheet" type="text/css" href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,700'>
 
 </head>
@@ -68,7 +67,6 @@
     	{% endblock sidebarRight %}
 
     	{% if user.is_authenticated %}
-    	<!-- ONLY SHOW IF LOGGED IN. Personal account links to different pages -->
     	<div class="sidebarRight">
         	<div class="well">
             	<ul class="nav nav-list">
@@ -79,14 +77,8 @@
               	  {% endcomment %}
             	  </ul>
         	</div>
-			{% comment %}
-			<form class="btn btn-success btn-block" method="post" action="/submit/">
-            	{% csrf_token %}
-            	<input type="submit" class="btn" value="Submit New Module">
-            </form>
-			{% endcomment %}
 
-        	<form method="get" action="/submit/">
+        	<form method="get" action="{% url 'finder.views.submit' %}">
             	<button type="submit" class="btn btn-success btn-block">Submit New Module</button>
         	</form>
    		</div>
@@ -114,7 +106,10 @@
     <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>
     <script src="{% static "js/bootstrap.js" %}"></script>
     <script src="{% static "js/common.js" %}"></script>
+    <script src="{% static "js/holder.js" %}"></script>
     {% comment %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/bootstrap-responsive.css" %}">
+    
     <script src="{% static "js/bootstrap-transition.js" %}"></script>
     <script src="{% static "js/bootstrap-alert.js" %}"></script>
     <script src="{% static "js/bootstrap-modal.js" %}"></script>

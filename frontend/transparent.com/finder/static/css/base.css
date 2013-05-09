@@ -14,7 +14,7 @@
 }
 
 .container {
-	margin-top: 8%;
+	margin-top: 5%;
 	margin-bottom: 8%;
 	width: 63%;
 }
@@ -27,6 +27,7 @@
 	float: left;
 	width:60%;
 	margin-right: 2%;
+	margin-left: 2%;
 }
 
 .centered-content {
@@ -39,11 +40,13 @@
 .sidebarLeft {
 	float:left;
 	width: 16%;	
+	margin-top: 50px;
 
 }
 .sidebarRight {
 	float:left;
 	width: 20%;
+	margin-top: 50px;
 }
 
 .sidebar_header {
@@ -97,25 +100,20 @@ body {
     text-align:center;
 }
 
-@media(max-width:1600px) {
+@media screen and (min-width:1369px) and (max-width:1600px) {
 	.container {
 		width: 90%;
 	}
 }
 
-@media(max-width:1368px) {
+@media screen and (min-width:1025px) and (max-width:1368px) {
 	.container {
-		width: 95%;
-	}
-}
-@media(max-width:1280px) {
-	.container {
-		width: 95%;
+		width: 90%;
 	}
 
 	.content {
 		float: left;
-		width:60%;
+		width: 60%;
 	}
 
 	.sidebarLeft {
@@ -125,6 +123,42 @@ body {
 	}
 	.sidebarRight {
 		float:left;
-		width: 20%;	
+		width: 17%;	
+	}
+}
+
+@media screen and (min-width:769px) and (max-width:1024px) {
+	.container {
+		width: 95%;
+	}
+
+	.content {
+		float: left;
+		width: 60%;
+	}
+
+	.sidebarLeft {
+		float: left;
+		width: 16%;	
+
+	}
+	.sidebarRight {
+		float: left;
+		width: 16%;	
+	}
+	
+	.well {
+	    padding: 8px;
+	}
+}
+
+@media screen and (max-width:768px) {
+	.container {
+		width: 95%;
+	}
+	
+	.content {
+		float: left;
+		width: 100%;
 	}
 }

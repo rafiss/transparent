@@ -10,15 +10,14 @@
 <!-- Search bar -->
 <div class="content">
     <div class="btn-group btn-group-vertical">
-            <!-- INCLUDE LOGO SOURCE HERE instead of "..." -->
 
-            <a href="/"><img src="{% static "img/logo.png" %}" width="512" height="94" class="img"></a>
+            <a href="{% url 'finder.views.index' %}"><img src="{% static "img/logo.png" %}" width="512" height="94" class="img"></a>
             <br>
             <br>
             
         <!-- Search bar form -->
         <div class="input-append">
-        <form action="/search/">
+        <form action="{% url 'finder.views.search' %}">
             <input class="span5" id="appendedInputButton" placeholder="Type your query (e.g. CoolerMaster, Intel 3770K, ...)" name="q" type="text" autofocus>
             <!-- <button class="btn btn-info" type="submit">Search</button> -->
 			<input type="hidden" type="text" name="p" value="1">
