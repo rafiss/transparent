@@ -1,7 +1,6 @@
 package transparent.core;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -10,11 +9,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.Date;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,7 +24,9 @@ import org.simpleframework.transport.connect.Connection;
 import org.simpleframework.transport.connect.SocketConnection;
 
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.johm.JOhm;
+import transparent.core.PriceHistory.Record;
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
 
@@ -507,6 +505,72 @@ public class Core
 		task.setFuture(future);
 	}
 
+	public static void addPriceRecord(long module, long gid, long price)
+	{
+		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		if (history == null)
+			history = new PriceHistory(gid);
+		history.addRecord(module, new Date().getTime(), price);
+		JOhm.save(history);
+	}
+
+	public static List<Record> getPriceHistory(long module, long gid)
+	{
+		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		if (history == null)
+			return null;
+		return history.getHistory(module);
+	}
+
+	public static void addPriceTrack(long gid, Long[] modules, Long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			info = new PriceTrigger(gid);
+		if (modules == null)
+			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price));
+		else
+			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price), modules);
+		JOhm.save(info);
+	}
+
+	public static void removePriceTrack(long gid, Long[] modules, Long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			return;
+		if (modules == null)
+			info.removeTrack(new PriceTrack(0, price));
+		else
+			info.removeTrack(new PriceTrack(0, price), modules);
+		JOhm.save(info);
+	}
+
+	public static long nextJOhmId(Class<?> clazz) {
+		long id = Core.random();
+		while (JOhm.get(clazz, id) != null)
+			id = Core.random();
+		return id;
+	}
+
+	public static boolean checkPrice(Module module, long gid, long price) {
+		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		if (info == null)
+			return false;
+
+		return info.checkPrice(module, price);
+	}
+
+	public static String priceToString(Long price) {
+		return "$" + (price / 100) + "." + (price % 100);
+	}
+
+	public static Long parsePrice(String price) {
+		try {
+			return Long.parseLong(price.replaceAll("\\.", "").replaceAll("\\$", ""));
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
 	public static void main(String[] args)
 	{
 		AnsiConsole.systemInstall();
@@ -540,7 +604,9 @@ public class Core
         loadSeed();
 
         /* load the price history/tracking datastore */
-        JedisPool pool = new JedisPool("localhost");
+        JedisPoolConfig config = new JedisPoolConfig();
+        config.maxActive = THREAD_POOL_SIZE;
+        JedisPool pool = new JedisPool(config, "localhost");
         JOhm.setPool(pool);
 
         /* load the script engine */

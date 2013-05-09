@@ -9,13 +9,17 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Map.Entry;
+
+import net.minidev.json.JSONObject;
 
 public class ModuleThread implements Runnable, Interruptable
 {
@@ -44,6 +48,7 @@ public class ModuleThread implements Runnable, Interruptable
 
 	private static final String DEFAULT_USER_AGENT =
 			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
+	private static final String PRICE_ALERT_URL = ""; /* TODO: fill this in */
 
 	private final Module module;
 	private byte requestType;
@@ -122,6 +127,40 @@ public class ModuleThread implements Runnable, Interruptable
 
 		dest.flush();
 		stream.close();
+	}
+
+	private void alertPriceChange(long gid, String name, long newPrice)
+	{
+		try {
+			URLConnection connection;
+				connection = new URL(PRICE_ALERT_URL).openConnection();
+			if (!(connection instanceof HttpURLConnection)) {
+				module.logError("ModuleThread", "alertPriceChange",
+						"Unrecognized network protocol.");
+				return;
+			}
+	
+			HttpURLConnection http = (HttpURLConnection) connection;
+			http.setRequestProperty("User-Agent", userAgent);
+			http.setDoInput(true);
+			http.setDoOutput(true);
+			http.setUseCaches(false);
+			http.setRequestMethod("GET");
+			http.connect();
+	
+			JSONObject result = new JSONObject();
+			result.put("gid", BigInteger.valueOf(gid));
+			result.put("name", name);
+			result.put("price", Core.priceToString(newPrice));
+			result.put("module", BigInteger.valueOf(module.getId()));
+			http.getOutputStream().write(result.toJSONString().getBytes(UTF8));
+			http.getOutputStream().flush();
+			http.getOutputStream().close();
+		} catch (MalformedURLException e) {
+			module.logError("ModuleThread", "alertPriceChange", "", e);
+		} catch (IOException e) {
+			module.logError("ModuleThread", "alertPriceChange", "", e);
+		}
 	}
 
 	private void httpGetRequest(
@@ -229,6 +268,7 @@ public class ModuleThread implements Runnable, Interruptable
 				new ArrayList<Entry<String, Object>>(count + 1);
 		Object brand = null;
 		Object model = null;
+		Object price = null;
 		for (int i = 0; i < count; i++)
 		{
 			int length = in.readUnsignedShort();
@@ -255,6 +295,8 @@ public class ModuleThread implements Runnable, Interruptable
 				brand = value;
 			else if (key.equals("model"))
 				model = value;
+			else if (key.equals("price"))
+				price = value;
 			else if (!Core.getDatabase().isReservedKey(key))
 				keyValues.add(new SimpleEntry<String, Object>(key, value));
 		}
@@ -262,17 +304,35 @@ public class ModuleThread implements Runnable, Interruptable
 		if (brand == null || model == null)
 			return;
 		Long gid = null;
+		Long oldPrice = null;
 		Results results = Core.getDatabase().query(null,
-				new String[] { "gid" },
+				new String[] { "gid", "price" },
 				new String[] { "model", "brand" },
 				new Relation[] { Relation.EQUALS, Relation.EQUALS },
 				new Object[] { model, brand },
 				null, null, true, null, null);
-		if (results.next())
-			gid = results.getLong(1);
-		else if (gid == null) {
+		while (results.next()) {
+			if (gid == null)
+				gid = results.getLong(1);
+			oldPrice = Math.min(oldPrice, results.getLong(2));
+		}
+		if (gid == null) {
 			keyValues.add(new SimpleEntry<String, Object>(
 					"gid", Core.random()));
+		}
+
+		if (price != null) {
+			long parsed = -1;
+			if (price instanceof String)
+				parsed = Core.parsePrice((String) price);
+			else if (price instanceof Long)
+				parsed = (Long) price;
+			else
+				throw new IllegalStateException("Unexpected type for price.");
+			if (parsed < oldPrice && Core.checkPrice(module, gid, parsed)) {
+				alertPriceChange(gid, model + " " + brand, parsed);
+			}
+			Core.addPriceRecord(module.getId(), gid, parsed);
 		}
 
 		if (dummy) return;
@@ -363,8 +423,6 @@ public class ModuleThread implements Runnable, Interruptable
 				requestedProductIds.seekRelative(position);
 			}
 
-			/* TODO: if a particular product ID fails, try to skip it */
-			/* TODO: if active logging is on, the error stream should print to console */
 			while (alive)
 			{
 				/* indicate the product ID we are requesting */
@@ -451,14 +509,17 @@ public class ModuleThread implements Runnable, Interruptable
 					stop();
 				}
 			}
+			module.logInfo("ModuleThread", "run",
+					"Module exited. (state: '" + state + "')");
 		} catch (InterruptedStreamException e) {
 			/* we have been told to die, so do so gracefully */
 			module.logInfo("ModuleThread", "run",
-					"Thread interrupted during IO, cleaning up module...");
+					"Thread interrupted during IO, cleaning up module... (state: '" + state + "')");
 		} catch (IOException e) {
 			/* we cannot communicate with the module, so just kill it */
 			module.logError("ModuleThread", "run",
-					"Cannot communicate with module; IOException: " + e.getMessage());
+					"Cannot communicate with module; (state: '"
+							+ state + "') IOException: " + e.getMessage());
 		}
 
 		/* destroy the process and all related threads */

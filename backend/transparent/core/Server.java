@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -220,7 +221,7 @@ public class Server implements Container
 			if (image != null)
 				rows.put("image", image);
 			if (price != null)
-				rows.put("price", price);
+				rows.put("price", Core.priceToString(price));
 
 			body.println(rows.toJSONString());
 		}
@@ -363,7 +364,7 @@ public class Server implements Container
 				}
 			}
 
-			Map<String, JSONArray> returned = query(name, select,
+			Map<Long, JSONArray> returned = query(name, select,
 					whereClause, whereRelation, whereArgs,
 					sort, ascending, page, limit);
 			if (returned != null) {
@@ -374,19 +375,119 @@ public class Server implements Container
 				body.println(error("Internal error occurred during query."));
 		}
 
+		private void parseSubscribe(PrintStream body) throws ParseException, IOException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid'."));
+				body.close();
+				return;
+			}
+
+			Long price = null;
+			Object priceObject = map.get("price");
+			if (priceObject != null) {
+				if (priceObject instanceof String)
+					price = Core.parsePrice((String) priceObject);
+				else if (priceObject instanceof Number)
+					price = ((Number) priceObject).longValue();
+				else {
+					body.println(error("Unable to parse 'price'."));
+					body.close();
+					return;
+				}
+			}
+
+			Long[] modules = null;
+			Object modulesObject = map.get("modules");
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			Core.addPriceTrack(gid, modules, price);
+			JSONObject result = new JSONObject();
+			result.put("success", "true");
+			body.println(result);
+		}
+
+		private void parseUnsubscribe(PrintStream body) throws ParseException, IOException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid'."));
+				body.close();
+				return;
+			}
+
+			Long price = null;
+			Object priceObject = map.get("price");
+			if (priceObject != null) {
+				if (priceObject instanceof String)
+					price = Core.parsePrice((String) priceObject);
+				else if (priceObject instanceof Number)
+					price = ((Number) priceObject).longValue();
+				else {
+					body.println(error("Unable to parse 'price'."));
+					body.close();
+					return;
+				}
+			}
+
+			Long[] modules = null;
+			Object modulesObject = map.get("modules");
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			Core.addPriceTrack(gid, modules, price);
+			JSONObject result = new JSONObject();
+			result.put("success", "true");
+			body.println(result);
+		}
+
 		@Override
 		public void run() {
 			PrintStream body = null;
 			try {
 				body = response.getPrintStream();
 				response.setValue("Content-Type", "text/plain");
-				String url = request.getPath().toString();
-				if (url.equals("/search"))
+				String url = request.getPath().getPath();
+				if (url.equals("/search") || url.equals("/search/"))
 					parseSearch(body);
-				else if (url.equals("/product"))
+				else if (url.equals("/product") || url.equals("/product/"))
 					parseProductQuery(body);
-				else if (url.equals("/modules"))
+				else if (url.equals("/modules") || url.equals("/modules/"))
 					parseModules(body);
+				else if (url.equals("/subscribe") || url.equals("/subscribe/"))
+					parseSubscribe(body);
+				else if (url.equals("/unsubscribe") || url.equals("/unsubscribe/"))
+					parseUnsubscribe(body);
 				else
 					body.println(error("Page not found."));
 				body.close();
@@ -439,23 +540,27 @@ public class Server implements Container
 		}
 	}
 
-	private static Map<String, JSONArray> query(String name, String[] select,
+	private static Map<Long, JSONArray> query(String name, String[] select,
 			String[] whereClause, Relation[] whereRelation, Object[] whereArgs,
 			String sort, boolean ascending, Integer page, Integer pageSize)
 	{
 		/* construct the select array */
 		int gidIndex = -1;
+		int priceIndex = -1;
 		int selectCount = select.length;
-		for (int i = 0; i < select.length; i++)
+		for (int i = 0; i < select.length; i++) {
 			if (select[i].equals("gid"))
 				gidIndex = i;
+			else if (select[i].equals("price"))
+				priceIndex = i;
+		}
 		if (gidIndex == -1) {
 			select = Arrays.copyOf(select, select.length + 1);
 			select[select.length - 1] = "gid";
 			gidIndex = select.length - 1;
 		}
 
-		HashMap<String, JSONArray> json = new HashMap<String, JSONArray>();
+		HashMap<Long, JSONArray> json = new HashMap<Long, JSONArray>();
 
 		Results dbresults = Core.getDatabase().query(
 				name, new String[] { "gid" },
@@ -481,16 +586,49 @@ public class Server implements Container
 				whereClause, whereRelation, whereArgs,
 				null, sort, ascending, null, null);
 
+		HashMap<Long, Entry<Long, Long>> priceRanges =
+				new HashMap<Long, Entry<Long, Long>>();
 		while (dbresults.next()) {
 			JSONArray row = new JSONArray();
 			row.ensureCapacity(select.length);
 			for (int i = 0; i < selectCount; i++)
 				row.add(dbresults.get(i + 1));
-			String gid = Core.toUnsignedString(dbresults.getLong(gidIndex + 1));
+			Long gid = dbresults.getLong(gidIndex + 1);
+
+			if (priceIndex != -1) {
+				Long price = dbresults.getLong(priceIndex + 1);
+				Entry<Long, Long> range = priceRanges.get(gid);
+				if (range == null)
+					range = new SimpleEntry<Long, Long>(price, price);
+				else {
+					if (price < range.getKey())
+						range = new SimpleEntry<Long, Long>(price, range.getValue());
+					if (price > range.getValue())
+						range = new SimpleEntry<Long, Long>(range.getKey(), price);
+				}
+			}
+
 			if (json.containsKey(gid))
 				mergeRows(json.get(gid), row);
 			else
 				json.put(gid, row);
+		}
+
+		if (priceIndex != -1) {
+			for (Entry<Long, JSONArray> entry : json.entrySet())
+			{
+				Long gid = entry.getKey();
+				JSONArray row = entry.getValue();
+				Entry<Long, Long> range = priceRanges.get(gid);
+				Long lowPrice = range.getKey();
+				Long highPrice = range.getValue();
+				if (lowPrice != highPrice) {
+					row.set(priceIndex, Core.priceToString(range.getKey())
+							+ " - " + Core.priceToString(range.getValue()));
+				} else {
+					row.set(priceIndex, Core.priceToString(range.getKey()));
+				}
+			}
 		}
 
 		return json;
