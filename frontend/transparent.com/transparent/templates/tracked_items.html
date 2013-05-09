@@ -11,43 +11,43 @@
         <div class="row-fluid">
         	<div class="span12">
                 <!-- Introduction -->
-                <h3>My_Tracker</h3>
-                <table width="90%" border="0">
+                <h3>Tracker</h3>
+                <table width="90%" class="table table-hover table-bordered">
+                    <thead>
 					<tr style="background-color:#E0E0E0;">
-                    <td>
-                    	<b>Product Name</b>
-					</td>
-                    <td>
-                        <b>Current Price</b>
-					</td>
-                    <td>
-						<b>Desired Price</b>
-					</td>
+                        <th>
+                        	<b>Product Name</b>
+					    </th>
+                        <th>
+                            <b>Current Price</b>
+					    </th>
+                        <th>
+						    <b>Desired Price</b>
+					    </th>
                     </tr>
+                    </thead>
+                	<!-- Iterate through products being tracked -->
+                    {% for product in products %}
                     <tr>
-					<td style="width:20%;">
-                    	<!-- Iterate through products being tracked -->
-						<a href="{% url 'finder.views.product' 1 %}">product1</a><br> 
-						<a href="{% url 'finder.views.product' 2 %}">product2</a><br>
-						<a href="{% url 'finder.views.product' 3 %}">product3</a></td>
-					<td style="width:20%;">
-                    	<!-- Iterate through product prices -->
-						$20.00<br> 
-						$100.00<br>
-						$63.00</td>
-					<td style="width:20%;">
-                    	<!-- Iterate through product thresholds -->
-						$18.00<br> 
-						$90.00<br>
-						$57.00</td>
-					{% comment %}
-                	<td style="width:20%;">
-                    	<!-- NOT IMPLEMENTING AT THIS TIME: Iterate through product price trends (changes in price since last view of tracked items page or 24 hours, whichever is longer) -->
-						+12%<br> 
-						-10%<br>
-						+1%</td>
-					{% endcomment %}
-					</tr>
+					    <td style="width:20%;">
+						    <a href="{% url 'finder.views.product' product.gid %}">product</a><br> 
+					    </td>
+					    <td style="width:20%;">
+						    ${{ product.price }} 
+					    </td>
+					    <td style="width:20%;">
+						    ${{ product.threshold }}
+					    </td>
+					    {% comment %}
+                    	<td style="width:20%;">
+                        	<!-- NOT IMPLEMENTING AT THIS TIME:
+                        	Iterate through product price trends (changes in price since last view of tracked items page or 24 hours, whichever is longer) -->
+						    +12%<br> 
+						    -10%<br>
+						    +1%</td>
+					    {% endcomment %}
+				    </tr>
+					{% endfor %}
 				</table>
             </div>
         </div>  <!-- End of row. Max of 3 items per row. --> 

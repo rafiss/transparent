@@ -11,23 +11,25 @@ urlpatterns = patterns('',
     # url(r'^$', 'transparent.views.home', name='home'),
     # url(r'^transparent/', include('transparent.foo.urls')),
     (r'^$', views.index),
-    (r'^hello/$', views.hello),
     (r'^search/$', views.search),
     (r'^product/([^/]+)/$', views.product),
     (r'^about/$', views.about),
     (r'^how_it_works/$', views.how_it_works),
     (r'^moduleAPI/$', views.moduleAPI),
+
 	(r'^settings/$', views.settings),
-#	(r'^selected_modules/$', views.selected_modules),
 	(r'^tracked_items/$', views.tracked_items),
 	(r'^submit/$', views.submit),
     (r'^toggle/$', views.toggle_module),
 
     # for registration
-    (r'^profile/$',  views.profile),
-    (r'^login/$',  views.login),
+    (r'^login/$', views.login),
     (r'^logout/$', views.logout),
     (r'^register/$', views.register),
+
+    # price tracking
+    (r'^track/$', views.track),
+    (r'^track_notify/$', views.track_notify),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),

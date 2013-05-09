@@ -3,23 +3,16 @@
 from django import forms
 from django.contrib import auth
 from django.contrib.auth.forms import UserCreationForm
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound, HttpResponseForbidden
 from django.shortcuts import render
-from finder.models import Module, UserProfile
-from transparent.settings import BACKEND_URL
+from finder.models import Module, UserProfile, Track, Product
+from transparent.settings import BACKEND_URL, BACKEND_IP
 import json, urllib2
 
 PAGE_SIZE = 15
 
-def hello(request):
-    return HttpResponse("Hello world")
-
 def index(request):
     return render(request, "index.html", {})
-
-def profile(request):
-    modules = request.user.userprofile.modules
-    return render(request, "profile.html", {'modules' : modules})
 
 def register(request):
     if request.method == 'POST':
@@ -58,7 +51,6 @@ def search(request):
     if 'q' in request.GET and request.GET['q']:
         query = request.GET['q']
 
-        #TODO: get modules
         modules = []
         if request.user is not None and request.user.is_authenticated():
             modules = [module.backend_id for module in request.user.userprofile.modules.all()]
@@ -82,7 +74,7 @@ def search(request):
         products = []
 
 
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
+        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': 1234})
         results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
         results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
         results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
@@ -146,7 +138,34 @@ def moduleAPI(request):
     return render(request, "moduleAPI.html", {})
 
 def tracked_items(request):
-    return render(request, "tracked_items.html", {})
+    tracks = []
+    if request.user and request.user.is_authenticated():
+        tracks = Track.objects.filter(userprofile=request.user.userprofile)
+    products = [{'gid': track.product.gid,
+        'price': "{0:.2f}".format(round(float(track.product.price) / 100, 2)),
+        'threshold': "{0:.2f}".format(round(float(track.threshold) / 100, 2))}
+        for track in tracks]
+    return render(request, "tracked_items.html", {'products': products})
+
+def track(request):
+    if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
+        return HttpResponseForbidden()
+    gid = request.POST.get('gid', None)
+    price = request.POST.get('price', None)
+    threshold = request.POST.get('threshold', None)
+    if not (gid and price and threshold):
+        return HttpResponseNotFound()
+    product, created = Product.objects.get_or_create(gid=int(gid))
+    product.price = 100 * int(price)
+    product.save()
+    track = Track(userprofile=request.user.userprofile, product=product, threshold=100*int(threshold))
+    track.save()
+
+def track_notify(request):
+    if request.META['REMOTE_ADDR'] != BACKEND_IP:
+        return HttpResponseNotFound()
+    payload = json.loads(request.body)
+    # TODO: Notify user. For now, user must go to tracked_items page.
 
 def submit(request):
     if request.method == 'GET':

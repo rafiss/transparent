@@ -15,13 +15,25 @@ class Module(models.Model):
     def __unicode__(self):
         return u'id:{0} name:{1}'.format(self.backend_id, self.name)
 
+class Product(models.Model):
+    gid = models.BigIntegerField()
+    price = models.IntegerField()
+
+    def __unicode__(self):
+        return u'product {0}'.format(self.gid)
+
 class UserProfile(models.Model):
     user = models.OneToOneField(User)
     modules = models.ManyToManyField(Module)
-    tracked_items = models.CommaSeparatedIntegerField(max_length=32000)
+    products = models.ManyToManyField(Product, through='Track')
 
     def __unicode__(self):
         return u'{0} profile'.format(self.user.username)
+
+class Track(models.Model):
+    userprofile = models.ForeignKey(UserProfile)
+    product = models.ForeignKey(Product)
+    threshold = models.IntegerField()
 
 def create_profile(sender, instance, created, **kwargs):
     if created:
