@@ -250,9 +250,20 @@ public class AmazonParser
 				/* parse the price of the last product */
 				String price;
 				Elements priceElement = elements.last().select(".price");
-				if (priceElement.size() == 0)
-					price = elements.last().select(".newp").text();
-				else price = priceElement.text();
+				if (priceElement.size() == 0) {
+					Elements newpElement = elements.last().select(".newp");
+					Elements redElement = newpElement.select(".red");
+					if (redElement.size() == 0)
+						price = newpElement.text();
+					else
+						price = redElement.text();
+				} else {
+					Elements redElement = priceElement.select(".red");
+					if (redElement.size() == 0)
+						price = priceElement.text();
+					else
+						price = redElement.text();
+				}
 				
 				lowPrice = price.trim().replaceAll("\\$", "");
 				page = 0;

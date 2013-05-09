@@ -514,17 +514,21 @@ public class ModuleThread implements Runnable, Interruptable
 					stop();
 				}
 			}
+			String productIdString = ", module_product_id: " + requestedProductId.getModuleProductId();
 			module.logInfo("ModuleThread", "run",
-					"Module exited. (state: '" + state + "')");
+					"Module exited. (state: '" + state + "'" + productIdString + ")");
 		} catch (InterruptedStreamException e) {
 			/* we have been told to die, so do so gracefully */
+			String productIdString = ", module_product_id: " + requestedProductId.getModuleProductId();
 			module.logInfo("ModuleThread", "run",
-					"Thread interrupted during IO, cleaning up module... (state: '" + state + "')");
+					"Thread interrupted during IO, cleaning up module... (state: '"
+							+ state + "'" + productIdString + ")");
 		} catch (IOException e) {
 			/* we cannot communicate with the module, so just kill it */
+			String productIdString = ", module_product_id: " + requestedProductId.getModuleProductId();
 			module.logError("ModuleThread", "run",
 					"Cannot communicate with module; (state: '"
-							+ state + "') IOException: " + e.getMessage());
+							+ state + "'" + productIdString + ") IOException: " + e.getMessage());
 		}
 
 		/* destroy the process and all related threads */

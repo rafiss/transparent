@@ -520,7 +520,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
         builder.append(ENTITY_TABLE);
 
 		if (query != null) {
-			builder.append(" LEFT JOIN (SELECT ");
+			builder.append(" JOIN (SELECT ");
 			builder.append(ENTITY_ID_COL.getName());
 			builder.append(" FROM ");
 			builder.append(NAME_INDEX_TABLE);

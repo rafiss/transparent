@@ -482,7 +482,7 @@ public class NeweggParser
 		}
 	}
 
-	private static void parseProductInfo(String productId)
+	private static boolean parseProductInfo(String productId)
 	{
 		byte[] data;
 		String url = PRODUCT_URL + productId + PRODUCT_URL_SUFFIX;
@@ -492,7 +492,7 @@ public class NeweggParser
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error requesting URL '" + url + "'.");
-			return;
+			return false;
 		}
 
 		Object parsed;
@@ -501,7 +501,7 @@ public class NeweggParser
 		} catch (ParseException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error parsing JSON.");
-			return;
+			return false;
 		}
 
 		/* parse product specifications */
@@ -516,7 +516,7 @@ public class NeweggParser
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error requesting URL '" + url + "'.");
-			return;
+			return false;
 		}
 
 		try {
@@ -524,12 +524,12 @@ public class NeweggParser
 		} catch (ParseException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error parsing JSON.");
-			return;
+			return false;
 		}
 		if (!(parsed instanceof JSONObject)) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Expected a JSON map at root.");
-			return;
+			return false;
 		}
 
 		JSONObject map = (JSONObject) parsed;
@@ -548,7 +548,7 @@ public class NeweggParser
 			if (!(image instanceof JSONObject)) {
 				System.err.println("NeweggParser.parseProductInfo ERROR:"
 						+ " Expected a map value for key 'Image'.");
-				return;
+				return false;
 			}
 
 			JSONObject imageMap = (JSONObject) image;
@@ -562,8 +562,10 @@ public class NeweggParser
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error responding with product information.");
-			return;
+			return false;
 		}
+
+		return true;
 	}
 
 	public static void main(String[] args)
@@ -586,7 +588,8 @@ public class NeweggParser
 				while (length > 0) {
 					byte[] data = new byte[length];
 					in.readFully(data);
-					parseProductInfo(new String(data, UTF8));
+					if (!parseProductInfo(new String(data, UTF8)))
+						break;
 					length = in.readUnsignedShort();
 				}
 				break;
