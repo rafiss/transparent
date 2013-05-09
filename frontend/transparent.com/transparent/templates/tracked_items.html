@@ -30,7 +30,7 @@
                     {% for product in products %}
                     <tr>
 					    <td style="width:20%;">
-						    <a href="{% url 'finder.views.product' product.gid %}">product</a><br> 
+                            <a href="{% url 'finder.views.product' product.gid %}">{{ product.name }}</a><br> 
 					    </td>
 					    <td style="width:20%;">
 						    ${{ product.price }} 

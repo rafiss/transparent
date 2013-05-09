@@ -16,51 +16,46 @@
 	<div class="row-fluid">
 		<div class="span12">
 	        <!-- Begin submission form -->
-	        <h3>Submit_Module</h3>
+	        <h3>Submit Module</h3>
 	        <!-- use for loop to interate through all sources and related modules -->
 	        <p>Please submit all code and documentation necessary for us to operate this module.</p>
 	        
 	        
 	        <!-- Submit code and optional documentation(?) -->
 	        <form class="navbar-form">
-	        <input class="span4" type="text" name="module_name" placeholder="Module Name">
-	        </form>
-			<form class="navbar-form">
-	        <input class="span4" type="text" name="source_name" placeholder="Source Name">
-	        </form>
-			<form class="navbar-form">
-	        <input class="span4" type="text" name="source_url" placeholder="Source url">
-	        </form>
-			<br>
-	        
-	        <form class="navbar-form">
-	        	Upload Source Code Files<br>
-				<input class="span4" type="file" name="source" title="Source Code Files">
-				{% comment %}
-	        	<button type="submit" class="btn">Browse</button>
-				{% endcomment %}
-			</form>
-	        
-			{% comment %}
-			<form class="navbar-form">
-	        	Documentation Files<br>
-				<input class="span4" type="file" name="doc" placeholder="doc">
-	        	<button type="submit" class="btn">Browse</button>
-	        </form>
-			{% endcomment %}
-	        
-	        <div class="mini-container" style="background-color: white;border: 3px ridge #aaaaaa;padding: 3px;">
-	        	<ul>
-					<br>
-	            	<b>Uploaded code</b><br>
-			        <!-- Iterate through and print source code file names -->
-	                main.java<br>
-	                branch1.java<br>
-	            </ul>
-	        </div>
-	        
-	        <form class="navbar-form">
-	        <input type="submit" class="btn">
+	            <input class="span4" type="text" name="module_name" placeholder="Module Name">
+			    <br>
+	            <input class="span4" type="text" name="source_name" placeholder="Source Name">
+			    <br>
+	            <input class="span4" type="text" name="source_url" placeholder="Source URL">
+			    <br>
+	            <br>
+            	Upload Source File<br>
+			    <input class="span4" type="file" name="source" title="Source File">
+			    <br>			    
+			    {% comment %}
+            	<button type="submit" class="btn">Browse</button>
+			    {% endcomment %}
+            
+			    {% comment %}
+            	Documentation Files<br>
+			    <input class="span4" type="file" name="doc" placeholder="doc">
+            	<button type="submit" class="btn">Browse</button>
+			    {% endcomment %}
+	            
+	            {% comment %}
+	            <div class="mini-container" style="background-color: white;border: 3px ridge #aaaaaa;padding: 3px;">
+	            	<ul>
+					    <br>
+	                	<b>Uploaded code</b><br>
+			            <!-- Iterate through and print source code file names -->
+	                    main.java<br>
+	                    branch1.java<br>
+	                </ul>
+	            </div>
+	            {% endcomment %}
+	            
+	            <input type="submit" class="btn" value="Submit">
 	        </form>
 	    </div>
 	</div>  <!-- End of row. Max of 3 items per row. -->

@@ -18,6 +18,7 @@ class Module(models.Model):
 class Product(models.Model):
     gid = models.BigIntegerField()
     price = models.IntegerField()
+    name = models.TextField()
 
     def __unicode__(self):
         return u'product {0}'.format(self.gid)

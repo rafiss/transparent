@@ -63,8 +63,8 @@ def search(request):
             payload['modules'] = modules
 
         results = []
-        #resp = urllib2.urlopen(BACKEND_URL + '/search', json.dumps(payload))
-        #results = json.loads(resp.read())
+        resp = urllib2.urlopen(BACKEND_URL + '/search', json.dumps(payload))
+        results = json.loads(resp.read())
         more = len(results) == PAGE_SIZE
         for i in range(len(results)):
             new = {}
@@ -72,14 +72,6 @@ def search(request):
                 new[payload['select'][j]] = results[i][j]
             results[i] = new
         products = []
-
-
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': 1234})
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
-        results.append({'name': 'Haswell', 'image': '#', 'price': '$104.00', 'gid': '1234'})
 
         for i in range(0, len(results), 3):
             products.append(results[i:i+3])
@@ -89,17 +81,15 @@ def search(request):
         return HttpResponseRedirect(referer)
 
 def product(request, gid):
-    #TODO: specify modules
-    #modules = [module.backend_id for module in Module.objects.all()]
-    #if request.user is not None and request.user.is_active:
-        #modules = [module.backend_id for module in request.user.userprofile.modules]
-    #payload = {'gid': gid, 'modules': modules}
+    modules = Module.objects.all()
+    if request.user is not None and request.user.is_authenticated():
+        modules = request.user.userprofile.modules.all()
     payload = {'gid': gid}
-    #resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
-    #product = json.loads(resp.read())
-    product = {}
-	#return HttpResponse(json.dumps(product))
-    return render(request, "product.html", {'product': product})
+    if modules:
+        payload['modules'] = [module.backend_id for module in modules]
+    resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
+    product = json.loads(resp.read())
+    return render(request, "product.html", {'gid': gid, 'product': product, 'modules': modules})
 
 def about(request):
     return render(request, "about.html", {})
@@ -143,23 +133,27 @@ def tracked_items(request):
         tracks = Track.objects.filter(userprofile=request.user.userprofile)
     products = [{'gid': track.product.gid,
         'price': "{0:.2f}".format(round(float(track.product.price) / 100, 2)),
-        'threshold': "{0:.2f}".format(round(float(track.threshold) / 100, 2))}
+        'threshold': "{0:.2f}".format(round(float(track.threshold) / 100, 2)),
+        'name': track.product.name}
         for track in tracks]
     return render(request, "tracked_items.html", {'products': products})
 
 def track(request):
     if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
-        return HttpResponseForbidden()
+        return HttpResponseForbidden("error 403")
     gid = request.POST.get('gid', None)
     price = request.POST.get('price', None)
     threshold = request.POST.get('threshold', None)
+    name = request.POST.get('name', None)
     if not (gid and price and threshold):
-        return HttpResponseNotFound()
-    product, created = Product.objects.get_or_create(gid=int(gid))
-    product.price = 100 * int(price)
+        return HttpResponseNotFound("{0} {1} {2}".format(gid, price, threshold))
+    product, created = Product.objects.get_or_create(gid=int(gid),
+            defaults={'price': int(100 * float(price[1:])),
+                'name': name})
     product.save()
-    track = Track(userprofile=request.user.userprofile, product=product, threshold=100*int(threshold))
+    track = Track(userprofile=request.user.userprofile, product=product, threshold=int(100*float(threshold)))
     track.save()
+    return HttpResponseRedirect('/product/{0}'.format(gid))
 
 def track_notify(request):
     if request.META['REMOTE_ADDR'] != BACKEND_IP:

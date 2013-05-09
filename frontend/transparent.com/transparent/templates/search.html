@@ -40,13 +40,11 @@
     	<li class="span4">
         	<div class="thumbnail well well-small">
         	    <a href="{% url 'finder.views.product' product.gid %}">
-        	        <img src="{{ product.image }}" alt="300x200" style="width: 300px; height: 200px;" data-src="{% static 'js/holder.js' }}/300x200" border="0" /></a>
+        	        <img src="{{ product.image }}" alt="300x200" style="width: 300px; height: auto;" border="0" /></a>
             	<div class="caption">
             	<h4>{{ product.name }}</h4>    
                 <ul style="list-style:none;">
 	                <li> Price: {{ product.price }} </li>
-                    <li> Attribute: value </li>
-	                <li> Attribute: value </li>
                 </ul>
                 </div>
             </div>
