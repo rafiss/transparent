@@ -21,7 +21,7 @@
                         <b>Current Price</b>
 					</td>
                     <td>
-						<b>Price Trend</b>
+						<b>Desired Price</b>
 					</td>
                     </tr>
                     <tr>
@@ -32,14 +32,21 @@
 						<a href="{% url 'finder.views.product' 3 %}">product3</a></td>
 					<td style="width:20%;">
                     	<!-- Iterate through product prices -->
-						$0.00<br> 
-						$0.00<br>
-						$0.00</td>
+						$20.00<br> 
+						$100.00<br>
+						$63.00</td>
+					<td style="width:20%;">
+                    	<!-- Iterate through product thresholds -->
+						$18.00<br> 
+						$90.00<br>
+						$57.00</td>
+					{% comment %}
                 	<td style="width:20%;">
-                    	<!-- Iterate through product price trends (changes in price since last view of tracked items page or 24 hours, whichever is longer) -->
+                    	<!-- NOT IMPLEMENTING AT THIS TIME: Iterate through product price trends (changes in price since last view of tracked items page or 24 hours, whichever is longer) -->
 						+12%<br> 
 						-10%<br>
 						+1%</td>
+					{% endcomment %}
 					</tr>
 				</table>
             </div>
