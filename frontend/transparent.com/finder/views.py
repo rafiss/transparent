@@ -102,9 +102,6 @@ def about(request):
 def how_it_works(request):
     return render(request, "how_it_works.html", {})
 
-def modules(request):
-    return render(request, "modules.html", {})
-
 def settings(request):
     modules = Module.objects.all()
     user_modules = []
@@ -144,3 +141,6 @@ def submit(request):
     else:
         return render(request, "submit.html", {})
 
+# redirect module link to the source code on github
+#def module(request)
+#	return HttpResponse('https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/amazon')
