@@ -291,13 +291,16 @@ public class ModuleThread implements Runnable, Interruptable
 				return;
 			}
 
-			if (key.equals("brand"))
+			if (key.equals("brand")) {
 				brand = value;
-			else if (key.equals("model"))
+				keyValues.add(new SimpleEntry<String, Object>(key, value));
+			} else if (key.equals("model")) {
 				model = value;
-			else if (key.equals("price"))
+				keyValues.add(new SimpleEntry<String, Object>(key, value));
+			} else if (key.equals("price")) {
 				price = value;
-			else if (!Core.getDatabase().isReservedKey(key))
+				keyValues.add(new SimpleEntry<String, Object>(key, value));
+			} else if (!Core.getDatabase().isReservedKey(key))
 				keyValues.add(new SimpleEntry<String, Object>(key, value));
 		}
 
@@ -311,15 +314,17 @@ public class ModuleThread implements Runnable, Interruptable
 				new Relation[] { Relation.EQUALS, Relation.EQUALS },
 				new Object[] { model, brand },
 				null, null, true, null, null);
-		while (results.next()) {
+		while (results != null && results.next()) {
 			if (gid == null)
 				gid = results.getLong(1);
-			oldPrice = Math.min(oldPrice, results.getLong(2));
+			if (oldPrice == null)
+				oldPrice = results.getLong(2);
+			else
+				oldPrice = Math.min(oldPrice, results.getLong(2));
 		}
-		if (gid == null) {
-			keyValues.add(new SimpleEntry<String, Object>(
-					"gid", Core.random()));
-		}
+		if (gid == null)
+			gid = Core.random();
+		keyValues.add(new SimpleEntry<String, Object>("gid", gid));
 
 		if (price != null) {
 			long parsed = -1;
@@ -329,7 +334,7 @@ public class ModuleThread implements Runnable, Interruptable
 				parsed = (Long) price;
 			else
 				throw new IllegalStateException("Unexpected type for price.");
-			if (parsed < oldPrice && Core.checkPrice(module, gid, parsed)) {
+			if ((oldPrice == null || parsed < oldPrice) && Core.checkPrice(module, gid, parsed)) {
 				alertPriceChange(gid, model + " " + brand, parsed);
 			}
 			Core.addPriceRecord(module.getId(), gid, parsed);

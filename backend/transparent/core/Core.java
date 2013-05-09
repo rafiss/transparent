@@ -26,7 +26,6 @@ import org.simpleframework.transport.connect.SocketConnection;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.johm.JOhm;
-import transparent.core.PriceHistory.Record;
 import transparent.core.database.Database;
 import transparent.core.database.MariaDBDriver;
 
@@ -514,7 +513,7 @@ public class Core
 		JOhm.save(history);
 	}
 
-	public static List<Record> getPriceHistory(long module, long gid)
+	public static List<PriceRecord> getPriceHistory(long module, long gid)
 	{
 		PriceHistory history = JOhm.get(PriceHistory.class, gid);
 		if (history == null)
@@ -608,6 +607,7 @@ public class Core
         config.maxActive = THREAD_POOL_SIZE;
         JedisPool pool = new JedisPool(config, "localhost");
         JOhm.setPool(pool);
+		JOhm.save(new PriceRecords());
 
         /* load the script engine */
         boolean consoleReady = Console.initConsole();

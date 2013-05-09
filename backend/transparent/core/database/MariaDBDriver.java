@@ -19,6 +19,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -40,6 +41,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 	private static final Column GID_COL = new Column("gid", Type.NUMBER, true);
 	private static final Column NAME_COL = new Column("name", Type.STRING, true);
 	private static final String DYNAMIC_COLS = "dynamic_cols";
+	private static final String DATABASE_NAME = "scratch2";
 
 	private static final Map<String, Column> RESERVED_COLUMNS;
 	static {
@@ -85,7 +87,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
     @Override
     public boolean addProductIds(Module module, String... moduleProductIds) {
         CallableStatement statement = null;
-        String query = "{ CALL scratch.AddProductId(?, ?) }";
+        String query = "{ CALL " + DATABASE_NAME +  ".AddProductId(?, ?) }";
 
         try {
             statement = connection.prepareCall(query);
@@ -138,12 +140,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
     }
 
-    @Override
-    @SafeVarargs
-    public final boolean addProductInfo(Module module,
-                                        ProductID productId,
-                                        Entry<String, Object>... keyValues) {
-        PreparedStatement statement = null;
+	private final boolean addProductInfoHelper(Module module, ProductID productId, Entry<String, Object>... keyValues) {
+		PreparedStatement statement = null;
         try {
 			Column[] setClause = new Column[keyValues.length];
 			Object[] setArgs = new Object[keyValues.length];
@@ -185,6 +183,53 @@ public class MariaDBDriver implements transparent.core.database.Database {
         }
 
         return true;
+	}
+
+    @Override
+    @SafeVarargs
+    public final boolean addProductInfo(Module module,
+                                        ProductID productId,
+                                        Entry<String, Object>... keyValues)
+{
+		Column[] setClause = new Column[keyValues.length];
+		Object[] setArgs = new Object[keyValues.length];
+        for (int i = 0; i < keyValues.length; i++)
+		{
+			Entry<String, Object> pair = keyValues[i];
+			setClause[i] = COLUMNS.get(pair.getKey());
+			if (setClause[i] == null) {
+				if (pair.getValue() instanceof String) {
+					setClause[i] = new Column(pair.getKey(), Type.STRING, false);
+					COLUMNS.put(setClause[i].getName(), setClause[i]);
+				} else if (pair.getValue() instanceof Number) {
+					setClause[i] = new Column(pair.getKey(), Type.NUMBER, false);
+					COLUMNS.put(setClause[i].getName(), setClause[i]);
+				} else
+					throw new IllegalArgumentException("Unrecognized value type at index "  + i + ".");
+			}
+			setArgs[i] = pair.getValue();
+		}
+
+		int dynamicCount = 0;
+		int startIndex = 0;
+		boolean broken = false;
+		ArrayList<Column> setArray = new ArrayList<Column>();
+		for (int i = 0; i < setClause.length; i++) {
+			if (!setClause[i].isStatic())
+				dynamicCount++;
+			if (dynamicCount == 3) {
+				broken = true;
+				Entry<String, Object>[] newKeyValues = Arrays.copyOfRange(keyValues, startIndex, i + 1);
+				addProductInfoHelper(module, productId, newKeyValues);
+				startIndex = i + 1;
+			}
+		}
+		if (broken) {
+			Entry<String, Object>[] newKeyValues = Arrays.copyOfRange(keyValues, startIndex, setClause.length);
+			if (newKeyValues.length > 0)
+				return addProductInfoHelper(module, productId, newKeyValues);
+		}
+		return true;
     }
 
     @Override
@@ -276,17 +321,24 @@ public class MariaDBDriver implements transparent.core.database.Database {
 				selectColumns = new Column[select.length];
 				for (int i = 0; i < select.length; i++) {
 					selectColumns[i] = COLUMNS.get(select[i]);
-					if (selectColumns[i] == null)
-						throw new IllegalArgumentException("Unrecognized column name.");
+					if (selectColumns[i] == null) {
+						Console.printError("MariaDBDriver", "query", "Unrecognized column name '" + select[i] + "'.");
+						return null;
+					}
 				}
 			}
 
-			Column[] whereColumns = new Column[whereClause.length];
-            for (int i = 0; i < whereClause.length; i++)
-			{
-				whereColumns[i] = COLUMNS.get(whereClause[i]);
-				if (whereColumns[i] == null)
-					throw new IllegalArgumentException("Unrecognized column name.");
+			Column[] whereColumns = null;
+			if (whereClause != null) {
+				whereColumns = new Column[whereClause.length];
+		        for (int i = 0; i < whereClause.length; i++)
+				{
+					whereColumns[i] = COLUMNS.get(whereClause[i]);
+					if (whereColumns[i] == null) {
+						Console.printError("MariaDBDriver", "query", "Unrecognized column name '" + whereClause[i] + "'.");
+						return null;
+					}
+				}
 			}
 
 			statement = buildSelectStatement(query,
@@ -297,9 +349,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
 											 COLUMNS.get(groupBy),
 											 COLUMNS.get(orderBy), orderAsc,
 											 startRow, rowCount);
-            return new MariaDBResults(null, statement.executeQuery(), whereColumns);
+            return new MariaDBResults(null, statement.executeQuery(), selectColumns);
 
-        } catch (Exception e) {
+        } catch (SQLException e) {
             Console.printError("MariaDBDriver", "queryWithAttributes", "", e);
             return null;
         } finally {
@@ -375,10 +427,10 @@ public class MariaDBDriver implements transparent.core.database.Database {
 									  Relation[] whereRelation,
 									  Object[] whereArgs)
 	{
-        builder.append(" WHERE ");
-
 		if (whereClause != null && whereClause.length > 0 && whereArgs != null)
 		{
+	        builder.append(" WHERE ");
+
 			if (whereClause.length != whereArgs.length || whereClause.length != whereRelation.length) {
 				throw new IllegalArgumentException("Clauses and arguments must have same length.");
 		    }
@@ -522,7 +574,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 			if (parameters.get(i) instanceof String) {
 				statement.setString(index++, (String) parameters.get(i));	
 			} else {
-				statement.setLong(index++, (long) parameters.get(i));
+				statement.setLong(index++, ((Number) parameters.get(i)).longValue());
 			}
 		}
 
@@ -563,7 +615,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 		dynamicBuilder.append(") ");
 		if (dynamicParameters.size() == 0)
 			builder.deleteCharAt(builder.length() - 1);
-		else {	
+		else {
 			builder.append(dynamicBuilder);
 			parameters.addAll(dynamicParameters);
 		}
@@ -572,12 +624,11 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         PreparedStatement statement = connection.prepareStatement(builder.toString());
 
-		int index = 1;
 		for (int i = 0; i < parameters.size(); i++) {
 			if (parameters.get(i) instanceof String) {
-				statement.setString(index++, (String) parameters.get(i));	
+				statement.setString(i + 1, (String) parameters.get(i));
 			} else if (parameters.get(i) instanceof Number) {
-				statement.setLong(index++, ((Number) parameters.get(i)).longValue());
+				statement.setLong(i + 1, ((Number) parameters.get(i)).longValue());
 			}
 		}
 
@@ -610,16 +661,23 @@ public class MariaDBDriver implements transparent.core.database.Database {
         while (productIDIterator.hasNext()) {
             ProductID productID = productIDIterator.next();
 
-            AbstractMap.SimpleEntry<String, Object> entry =
+            AbstractMap.SimpleEntry<String, Object> firstEntry =
             		new AbstractMap.SimpleEntry("foo", System.nanoTime());
-            database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("baz", "grep");
-            database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("something", "else");
-            database.addProductInfo(testModule, productID, entry);
-            entry = new AbstractMap.SimpleEntry("name", "item " + System.nanoTime());
-            database.addProductInfo(testModule, productID, entry);
-
+            AbstractMap.SimpleEntry<String, Object> secondEntry =
+					new AbstractMap.SimpleEntry("baz", "grep");
+            AbstractMap.SimpleEntry<String, Object> thirdEntry =
+					new AbstractMap.SimpleEntry("something", "else");
+            AbstractMap.SimpleEntry<String, Object> fourthEntry =
+					new AbstractMap.SimpleEntry("name", "item " + System.nanoTime());
+            AbstractMap.SimpleEntry<String, Object> fifthEntry =
+					new AbstractMap.SimpleEntry("something2", "item " + System.nanoTime());
+            AbstractMap.SimpleEntry<String, Object> sixthEntry =
+					new AbstractMap.SimpleEntry("something3", "item " + System.nanoTime());
+            AbstractMap.SimpleEntry<String, Object> seventhEntry =
+					new AbstractMap.SimpleEntry("something4", "item " + System.nanoTime());
+            AbstractMap.SimpleEntry<String, Object> eighthEntry =
+					new AbstractMap.SimpleEntry("something5", "item " + System.nanoTime());
+            database.addProductInfo(testModule, productID, firstEntry, secondEntry, thirdEntry, fourthEntry, fifthEntry, sixthEntry, seventhEntry, eighthEntry);
         }
         System.err.println(numInserts + " updates took "
         		+ ((System.nanoTime() - start) / 4e6) + "ms");
@@ -630,8 +688,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
                                 null, "foo", false, null, 50);
 
         while (search.next()) {
-            System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t" + search
-                    .getString(3) + "\t" + search.getString(4) + "\t" + search.getString(5));
+            System.out.println(search.getLong(1) + "\t" + search.getString(2) + "\t" + search.getString(3)
+					+ "\t" + search.getString(4) + "\t" + search.getString(5) + "\t" + search.getString(6));
         }
 
         System.err.println("First query complete.");
@@ -763,12 +821,12 @@ public class MariaDBDriver implements transparent.core.database.Database {
 	        	default:
 	        		throw new IllegalStateException("Unrecognized column type.");
 	        	}
-	        } catch (SQLException e) {
+	        } catch (Exception e) {
 	            if (owner == null)
 	                Console.printError("MariaDBResults", "get", "", e);
 	            else
 	                owner.logError("MariaDBResults", "get", "", e);
-	            return 0;
+	            return null;
 	        }
 	    }
 
