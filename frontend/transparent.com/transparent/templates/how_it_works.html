@@ -28,7 +28,7 @@
                 </div>
                 <br>
                 <div class="text-left">
-                    <p>The <a href="{% url 'finder.views.product' 1 %}">product page</a> for each item lists the current lowest price and the various attributes of the product. It also contains a price history graph to inform the user about the item's price trends. The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
+                    <p>The <a href="{% url 'finder.views.product' 1 %}">product page</a> for each item lists the current lowest price and the various attributes of the product. {% comment %} It also contains a price history graph to inform the user about the item's price trends. {% endcomment %} The history of the module and retailer through which the cheapest priced item was found is also viewable from the graph.</p>
                 </div>
                 <br>
                 <br>
@@ -37,8 +37,9 @@
                 </div>
                 <br>
                 <div class="text-left">
-            		<p>One type of module available to the user is all modules that are stored on the application's backend server. Each such module is accompanied by documentation on the <a href="{% url 'finder.views.modules' %}">module description page</a>. The implementation of these modules can also be viewed from the same page.</p>
+            		<p>One type of module available to the user is all modules that are stored on the application's backend server. The requisit source and path files of each such module is available in our github <a href=#>data base</a>. <a href='https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/newegg'>Here</a> is an example for Newegg.</p>
                 </div>
+				{% comment %}
                 <br>
                 <br>
                 <div class="text-header">
@@ -48,6 +49,7 @@
                 <div class="text-left">
             		<p>If the user would rather not reveal the implementation of their parser, they have the option of running their module on their own computer and simply delivering the parsed data to transparent for storage and search.</p>
                 </div>
+				{% endcomment %}
             </div>
         </div>
         

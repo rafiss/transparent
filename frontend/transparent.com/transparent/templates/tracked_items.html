@@ -1,15 +1,50 @@
-{% extends "leftbase.html" %}
+{% extends "base.html" %}
 
 {% block title %}
 <title>Transparent: Tracked Items</title>
 {% endblock %}
 
 {% block content %}
+<div class="centered-content">
 
-<div class="content">
-    <div class="btn-group btn-group-vertical">
-        <h2 class="">This page is under construction</h2>
-    </div>	
-</div>
+    	<!-- TEXT START -->
+        <div class="row-fluid">
+        	<div class="span12">
+                <!-- Introduction -->
+                <h3>My_Tracker</h3>
+                <table width="90%" border="0">
+					<tr style="background-color:#E0E0E0;">
+                    <td>
+                    	<b>Product Name</b>
+					</td>
+                    <td>
+                        <b>Current Price</b>
+					</td>
+                    <td>
+						<b>Price Trend</b>
+					</td>
+                    </tr>
+                    <tr>
+					<td style="width:20%;">
+                    	<!-- Iterate through products being tracked -->
+						<a href="{% url 'finder.views.product' 1 %}">product1</a><br> 
+						<a href="{% url 'finder.views.product' 2 %}">product2</a><br>
+						<a href="{% url 'finder.views.product' 3 %}">product3</a></td>
+					<td style="width:20%;">
+                    	<!-- Iterate through product prices -->
+						$0.00<br> 
+						$0.00<br>
+						$0.00</td>
+                	<td style="width:20%;">
+                    	<!-- Iterate through product price trends (maybe change in price since last login?) -->
+						+12%<br> 
+						-10%<br>
+						+1%</td>
+					</tr>
+				</table>
+            </div>
+        </div>  <!-- End of row. Max of 3 items per row. --> 
+    
+</div> <!-- End of Contents-->
 
 {% endblock %}
