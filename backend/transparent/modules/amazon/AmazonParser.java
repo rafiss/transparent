@@ -265,7 +265,12 @@ public class AmazonParser
 						price = redElement.text();
 				}
 				
-				lowPrice = price.trim().replaceAll("\\$", "");
+				String newLowPrice = price.trim().replaceAll("\\$", "");
+				if (newLowPrice.equals(lowPrice)) {
+					int newprice = Integer.parseInt(newLowPrice.replaceAll("\\.", "")) + 1;
+					lowPrice = (newprice / 100) + "." + (newprice % 100);
+				} else
+					lowPrice = newLowPrice;
 				page = 0;
 			}
 			productIds.clear();
@@ -310,7 +315,7 @@ public class AmazonParser
 
 		String key = tokens[0].trim();
 		String value = tokens[1].trim().replaceAll(
-				"(View shipping rates and policies)", "").trim();
+				"\\(View shipping rates and policies\\)", "").trim();
 		if (key.equals("Shipping Weight"))
 			key = "shipping weight";
 		else if (key.equals("Item Weight"))

@@ -641,7 +641,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         Database database = new MariaDBDriver();
 
-        Module testModule = new Module(1, null, "moduleName", "sourceName", null, false, false);
+        Module testModule = new Module(1, null, "moduleName", "sourceName", "url", "sourceUrl", null, false, false);
 
         int numInserts = 1000;
         String[] products = new String[numInserts];

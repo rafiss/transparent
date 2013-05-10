@@ -12,6 +12,7 @@ import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -180,10 +181,6 @@ public class Server implements Container
 						new Object[] { gid },
 						null, null, true, null, null);
 			} else {
-for (Long module : modules) {
-Console.printError("TEST","TEST","module: " + module);
-}
-Console.printError("TEST","TEST","gid:" + gid);
 				results = Core.getDatabase().query(
 						null, null,
 						new String[] { "gid", "module_id" },
@@ -206,12 +203,17 @@ Console.printError("TEST","TEST","gid:" + gid);
 					model = (String) json.get("model");
 				if (image == null)
 					image = (String) json.get("image");
-				if (price == null)
-					price = ((Number) json.get("price")).longValue();
+				Object priceObject = json.get("price");
+				if (priceObject != null) {
+					long priceValue = ((Number) priceObject).longValue();
+					json.put("price", Core.priceToString(priceValue));
+					if (price == null || priceValue < price)
+						price = priceValue;
+				}
 
 				JSONObject row = new JSONObject();
 				row.putAll(json);
-				row.put("module", module_id);
+				row.put("module", new BigInteger(Core.toUnsignedString(module_id)));
 				row.put("module_product_id", module_product_id);
 				row.put("name", module_product_name);
 				rows.put(Core.toUnsignedString(module_id), row);
@@ -497,7 +499,7 @@ Console.printError("TEST","TEST","gid:" + gid);
 					body.println(error("Page not found."));
 				body.close();
 			} catch (Exception e) {
-e.printStackTrace();
+				Console.printError("Server.QueryProcessor", "run", "", e);
 				if (body != null) {
 					StringWriter message = new StringWriter();
 					message.write(
@@ -523,6 +525,8 @@ e.printStackTrace();
 		JSONObject map = new JSONObject();
 		map.put("name", module.getModuleName());
 		map.put("source", module.getSourceName());
+		map.put("url", module.getModuleUrl());
+		map.put("sourceurl", module.getSourceUrl());
 		return map;
 	}
 
@@ -551,19 +555,30 @@ e.printStackTrace();
 			String sort, boolean ascending, Integer page, Integer pageSize)
 	{
 		/* construct the select array */
-		int gidIndex = -1;
-		int priceIndex = -1;
 		int selectCount = select.length;
-		for (int i = 0; i < select.length; i++) {
-			if (select[i].equals("gid"))
-				gidIndex = i;
-			else if (select[i].equals("price"))
-				priceIndex = i;
+		LinkedHashMap<String, Integer> selectIndices = new LinkedHashMap<String, Integer>();
+		for (int i = 0; i < select.length; i++)
+			selectIndices.put(select[i], i);
+
+		Integer gidIndex = selectIndices.get("gid");
+		Integer priceIndex = selectIndices.get("price");
+		Integer moduleIndex = selectIndices.get("module");
+		Integer nameIndex = selectIndices.get("name");
+		Integer brandIndex = selectIndices.get("brand");
+		Integer modelIndex = selectIndices.get("model");
+		if (gidIndex == null) {
+			gidIndex = selectIndices.size();
+			selectIndices.put("gid", selectIndices.size());
 		}
-		if (gidIndex == -1) {
-			select = Arrays.copyOf(select, select.length + 1);
-			select[select.length - 1] = "gid";
-			gidIndex = select.length - 1;
+		if (nameIndex != null) {
+			if (brandIndex == null) {
+				brandIndex = selectIndices.size();
+				selectIndices.put("brand", selectIndices.size());
+			}
+			if (modelIndex == null) {
+				modelIndex = selectIndices.size();
+				selectIndices.put("model", selectIndices.size());
+			}
 		}
 
 		HashMap<Long, JSONArray> json = new HashMap<Long, JSONArray>();
@@ -576,26 +591,16 @@ e.printStackTrace();
 		ArrayList<Long> gid_ids = new ArrayList<Long>();
 		while (dbresults.next())
 			gid_ids.add(dbresults.getLong(1));
-
-		if (whereClause != null) {
-			whereClause = Arrays.copyOf(whereClause, whereClause.length + 1);
-			whereRelation = Arrays.copyOf(whereRelation, whereClause.length);
-			whereArgs = Arrays.copyOf(whereArgs, whereClause.length);
-		} else {
-			whereClause = new String[1];
-			whereRelation = new Relation[1];
-			whereArgs = new Object[1];
-		}
-		whereClause[whereClause.length - 1] = "gid";
-		whereRelation[whereClause.length - 1] = Relation.EQUALS;
 		Long[] gidArg = new Long[gid_ids.size()];
-		for (int i = 0; i < gid_ids.size(); i++)
-			gidArg[i] = gid_ids.get(i);
-		whereArgs[whereClause.length - 1] = gidArg;
+		gidArg = gid_ids.toArray(gidArg);
 
+		String[] newSelect = new String[selectIndices.size()];
+		newSelect = selectIndices.keySet().toArray(newSelect);
 		dbresults = Core.getDatabase().query(
-				null, select,
-				whereClause, whereRelation, whereArgs,
+				null, newSelect,
+				new String[] { "gid" },
+				new Relation[] { Relation.EQUALS },
+				new Object[] { gidArg },
 				null, sort, ascending, null, null);
 
 		HashMap<Long, Entry<Long, Long>> priceRanges =
@@ -606,9 +611,11 @@ e.printStackTrace();
 			for (int i = 0; i < selectCount; i++)
 				row.add(dbresults.get(i + 1));
 			Long gid = dbresults.getLong(gidIndex + 1);
+			row.set(gidIndex, new BigInteger(Core.toUnsignedString(gid)));
 
-			if (priceIndex != -1) {
+			if (priceIndex != null) {
 				Long price = dbresults.getLong(priceIndex + 1);
+				row.set(priceIndex, Core.priceToString(price));
 				Entry<Long, Long> range = priceRanges.get(gid);
 				if (range == null)
 					range = new SimpleEntry<Long, Long>(price, price);
@@ -621,13 +628,25 @@ e.printStackTrace();
 				priceRanges.put(gid, range);
 			}
 
+			if (moduleIndex != null) {
+				Long module = dbresults.getLong(moduleIndex + 1);
+				row.set(moduleIndex, new BigInteger(Core.toUnsignedString(module)));
+			}
+
+			if (nameIndex != null) {
+				String brand = dbresults.getString(brandIndex + 1);
+				String model = dbresults.getString(modelIndex + 1);
+				if (brand != null && model != null)
+					row.set(nameIndex, brand + " " + model);
+			}
+
 			if (json.containsKey(gid))
 				mergeRows(json.get(gid), row);
 			else
 				json.put(gid, row);
 		}
 
-		if (priceIndex != -1) {
+		if (priceIndex != null) {
 			for (Entry<Long, JSONArray> entry : json.entrySet())
 			{
 				Long gid = entry.getKey();

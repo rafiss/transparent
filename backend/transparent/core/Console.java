@@ -593,6 +593,8 @@ public class Console
     			println(BOLD + "Module id: " + module.getIdString() + UNBOLD);
     			println(GRAY + "  name: " + DEFAULT + module.getModuleName());
     			println(GRAY + "  source: " + DEFAULT + module.getSourceName());
+    			println(GRAY + "  url: " + DEFAULT + module.getModuleUrl());
+    			println(GRAY + "  sourceurl: " + DEFAULT + module.getSourceUrl());
     			println(GRAY + "  is remote: " + DEFAULT + module.isRemote());
     			println(GRAY + "  blocked downloading: " + DEFAULT + module.blockedDownload());
     			println(GRAY + "  active logging: " + DEFAULT + module.isLoggingActivity());
@@ -612,12 +614,13 @@ public class Console
 		}
 
 		private void usage() {
-			Console.println("usage: modules add [name] [source]"
-					+ " [path] [is remote] [use blocked downloading]");
+			Console.println("usage: modules add [name] [source] [path] [url]"
+					+ " [sourceurl] [is remote] [use blocked downloading]");
 		}
 
 		private void addModule(String name, String source,
-				String path, boolean remote, boolean blocked)
+				String path, String moduleUrl, String sourceUrl,
+				boolean remote, boolean blocked)
 		{
 			long id = Core.random();
 			Console.lockConsole();
@@ -626,6 +629,8 @@ public class Console
 				Console.println(GRAY + "  name: " + DEFAULT + name);
 				Console.println(GRAY + "  source: " + DEFAULT + source);
 				Console.println(GRAY + "  path: " + DEFAULT + path);
+				Console.println(GRAY + "  url: " + DEFAULT + moduleUrl);
+				Console.println(GRAY + "  sourceurl: " + DEFAULT + sourceUrl);
 				Console.println(GRAY + "  is remote: " + DEFAULT + remote);
 				Console.println(GRAY + "  use blocked downloading: " + DEFAULT + blocked);
 			}
@@ -642,7 +647,7 @@ public class Console
 					}
 				}
 				if (response) {
-					Module module = Module.load(id, name, source, path, remote, blocked);
+					Module module = Module.load(id, name, source, path, moduleUrl, sourceUrl, remote, blocked);
 					if (module != null && Core.addModule(module))
 						Console.println("Module '" + name + "' added. "
 								+ "Use 'modules save' to push changes to database.");
@@ -665,7 +670,7 @@ public class Console
 					usage();
 					Console.unlockConsole();
 					return;
-				} else if (args.size() > 7) {
+				} else if (args.size() > 9) {
 					Console.lockConsole();
 					commandError("modules add", "Too many arguments.");
 					usage();
@@ -676,14 +681,16 @@ public class Console
 				String name = args.get(2).getToken();
 				String source = args.get(3).getToken();
 				String path = args.get(4).getToken();
+				String moduleUrl = args.get(5).getToken();
+				String sourceUrl = args.get(6).getToken();
 
 				Boolean remote = false;
-				if (args.size() > 5)
-					remote = parseBoolean(args.get(5).getToken());
+				if (args.size() > 7)
+					remote = parseBoolean(args.get(7).getToken());
 
 				Boolean blocked = true;
-				if (args.size() > 6)
-					blocked = parseBoolean(args.get(6).getToken());
+				if (args.size() > 8)
+					blocked = parseBoolean(args.get(8).getToken());
 
 				if (remote == null || blocked == null) {
 					Console.println("[is remote] and [use blocked downloading]"
@@ -691,13 +698,15 @@ public class Console
 					return;
 				}
 
-				addModule(name, source, path, remote, blocked);
+				addModule(name, source, path, moduleUrl, sourceUrl, remote, blocked);
 			} else {
 				try {
 					in.setUseHistory(false);
 					String name = in.readLine("Enter module name: ");
 					String source = in.readLine("Enter module source: ");
 					String path = in.readLine("Enter path: ");
+					String moduleUrl = in.readLine("Enter module URL: ");
+					String sourceUrl = in.readLine("Enter source URL: ");
 
 					Boolean remote = parseBoolean(
 							in.readLine("Is the module remote? "));
@@ -715,7 +724,7 @@ public class Console
 								in.readLine("Use blocked downloading? "));
 					}
 
-					addModule(name, source, path, remote, blocked);
+					addModule(name, source, path, moduleUrl, sourceUrl, remote, blocked);
 				} catch (IOException e) {
 					commandError("modules add", "", e);
 				}
@@ -730,7 +739,7 @@ public class Console
 		}
 
 		private void usage() {
-			println("usage: modules get [id] [name|source|path|remote|blocked|activelog]");
+			println("usage: modules get [id] [name|source|path|remote|blocked|activelog|url|sourceurl]");
 		}
 
 		@Override
@@ -764,6 +773,10 @@ public class Console
 				println(module.getSourceName());
 			else if (key.equals("path"))
 				println(module.getPath());
+			else if (key.equals("url"))
+				println(module.getModuleUrl());
+			else if (key.equals("sourceurl"))
+				println(module.getSourceUrl());
 			else if (key.equals("remote")) {
 				println(Boolean.toString(module.isRemote()));
 			} else if (key.equals("blocked")) {
@@ -782,7 +795,7 @@ public class Console
 
 		private void usage() {
 			println("usage: modules set [id] [name|source"
-					+ "|path|remote|blocked|activelog] [value]");
+					+ "|path|remote|blocked|activelog|url|sourceurl] [value]");
 		}
 
 		@Override
@@ -817,6 +830,10 @@ public class Console
 				module.setSourceName(value);
 			else if (key.equals("path"))
 				module.setPath(value);
+			else if (key.equals("url"))
+				module.setModuleUrl(value);
+			else if (key.equals("sourceurl"))
+				module.setSourceUrl(value);
 			else if (key.equals("remote")) {
 				Boolean parsed = parseBoolean(value);
 				if (parsed != null)
@@ -1025,15 +1042,16 @@ public class Console
 
 		private void usage() {
 			Console.println("usage: tasks add [parse type] [module id]"
-					+ " [start time] [reschedules] [dummy]");
+					+ " [start time] [reschedules] [dummy] [state]");
 			Console.println("  [parse type] can either be 'info', 'list', or 'image'.");
 			Console.println("  [start time] must be an integer indicating milliseconds from now.");
 			Console.println("  [dummy] indicates whether information is written to the database.");
-			Console.println("  By default, reschedules is false and dummy is true.");
+			Console.println("  [state] is the state data passed to the module.");
+			Console.println("  By default, reschedules is false, dummy is true, and state is empty.");
 		}
 
-		private void addTask(TaskType type, Module module,
-				long time, boolean reschedules, boolean dummy)
+		private void addTask(TaskType type, Module module, long time,
+				boolean reschedules, boolean dummy, String state)
 		{
 			Console.lockConsole();
 			if (!force) {
@@ -1043,6 +1061,8 @@ public class Console
 				Console.println(GRAY + "  time: " + DEFAULT + new Date(time).toString());
 				Console.println(GRAY + "  reschedules: " + DEFAULT + reschedules);
 				Console.println(GRAY + "  is dummy: " + DEFAULT + dummy);
+				if (state != null)
+					Console.println(GRAY + "  state: " + DEFAULT + state);
 			}
 
 			try {
@@ -1057,7 +1077,7 @@ public class Console
 					}
 				}
 				if (response) {
-					Task task = new Task(type, module, time, reschedules, dummy);
+					Task task = new Task(type, module, time, reschedules, dummy, state);
 					if (task != null) {
 						Core.queueTask(task);
 						Console.println("Task queued. "
@@ -1135,8 +1155,12 @@ public class Console
 					return;
 				}
 
+				String state = null;
+				if (args.size() > 7)
+					state = args.get(7).getToken();
+
 				addTask(type, module, System.currentTimeMillis()
-						+ time, reschedules, dummy);
+						+ time, reschedules, dummy, state);
 			} else {
 				try {
 					in.setUseHistory(false);
@@ -1154,7 +1178,7 @@ public class Console
 						usage();
 						unlockConsole();
 						return;
-					}					
+					}
 
 					long id;
 					try {
@@ -1195,8 +1219,12 @@ public class Console
 								"Disable writing to the database? "));
 					}
 
+					String state = in.readLine("Enter initial module state (or leave empty): ");
+					if (state.length() == 0)
+						state = null;
+
 					addTask(type, module, System.currentTimeMillis()
-							+ time, reschedules, dummy);
+							+ time, reschedules, dummy, state);
 				} catch (IOException e) {
 					commandError("modules add", "", e);
 				}

@@ -38,7 +38,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 	private boolean stopped = false;
 
 	public Task(TaskType type, Module module,
-			long time, boolean reschedules, boolean dummy)
+			long time, boolean reschedules, boolean dummy, String state)
 	{
 		this.type = type;
 		this.module = module;
@@ -46,7 +46,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 		this.reschedules = reschedules;
 		this.dummy = dummy;
 		this.id = ID_COUNTER.getAndIncrement();
-		this.state = "";
+		this.state = ((state == null) ? "" : state);
 		tasks.put(id, this);
 	}
 
@@ -144,7 +144,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 		boolean reschedules = !tokens[3].equals("0");
 		boolean dummy = !tokens[4].equals("0");
 
-		Task task = new Task(type, Core.getModule(id), time, reschedules, dummy);
+		Task task = new Task(type, Core.getModule(id), time, reschedules, dummy, null);
 		if (tokens.length > 5)
 			task.state = unescape(tokens[5]);
 		return task;
@@ -235,7 +235,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 				Core.stopTask(this, false);
 				if (reschedules && !stopped) {
 					Core.queueTask(new Task(TaskType.PRODUCT_INFO_PARSE,
-							module, System.currentTimeMillis(), true, dummy));
+							module, System.currentTimeMillis(), true, dummy, null));
 					if (!Core.saveQueue())
 						Console.printError("Task", "call", "Unable to save tasks.");
 				}
@@ -249,7 +249,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 				Core.stopTask(this, false);
 				if (reschedules && !stopped) {
 					Core.queueTask(new Task(TaskType.PRODUCT_LIST_PARSE,
-							module, System.currentTimeMillis(), true, dummy));
+							module, System.currentTimeMillis(), true, dummy, null));
 					if (!Core.saveQueue())
 						Console.printError("Task", "call", "Unable to save tasks.");
 				}
@@ -259,7 +259,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 				Core.stopTask(this, false);
 				if (reschedules) {
 					Core.queueTask(new Task(TaskType.IMAGE_FETCH,
-							module, System.currentTimeMillis(), true, dummy));
+							module, System.currentTimeMillis(), true, dummy, null));
 					if (!Core.saveQueue())
 						Console.printError("Task", "call", "Unable to save tasks.");
 				}

@@ -21,6 +21,12 @@ public class Module
 	/* unique name of module */
 	private String moduleName;
 
+	/* module-specific URL (for example, to a repository) */
+	private String moduleUrl;
+
+	/* the URL of the online merchant that this module parses */
+	private String sourceUrl;
+
 	/* specifies whether the module is remote */
 	private boolean remote;
 
@@ -53,12 +59,15 @@ public class Module
 
 	public Module(long id, String moduleName,
 			String sourceName, String path,
+			String url, String sourceUrl,
 			OutputStream log, boolean isRemote,
 			boolean blockedDownload)
 	{
 		this.path = path;
 		this.sourceName = sourceName;
 		this.moduleName = moduleName;
+		this.moduleUrl = url;
+		this.sourceUrl = sourceUrl;
 		this.remote = isRemote;
 		this.useBlockedDownload = blockedDownload;
 		this.id = id;
@@ -90,6 +99,14 @@ public class Module
 		return moduleName;
 	}
 
+	public String getSourceUrl() {
+		return sourceUrl;
+	}
+
+	public String getModuleUrl() {
+		return moduleUrl;
+	}
+
 	public boolean isRemote() {
 		return remote;
 	}
@@ -114,6 +131,16 @@ public class Module
 
 	public void setModuleName(String moduleName) {
 		this.moduleName = moduleName;
+		this.persistentIndex = -1;
+	}
+
+	public void setSourceUrl(String url) {
+		this.sourceUrl = url;
+		this.persistentIndex = -1;
+	}
+
+	public void setModuleUrl(String url) {
+		this.moduleUrl = url;
 		this.persistentIndex = -1;
 	}
 
@@ -278,6 +305,7 @@ public class Module
 
 	public static Module load(long id,
 			String name, String source, String path,
+			String url, String sourceUrl,
 			boolean isRemote, boolean blockedDownload)
 	{
 		PrintStream log;
@@ -309,13 +337,13 @@ public class Module
 			log = new PrintStream(NULL_STREAM);
 		}
 
-		return new Module(id, name, source, path, log, isRemote, blockedDownload);
+		return new Module(id, name, source, path, url, sourceUrl, log, isRemote, blockedDownload);
 	}
 
 	public static Module load(Database database, int index)
 	{
 		long id = -1;
-		String path, source;
+		String path, source, url, sourceUrl;
 		boolean blocked = true;
 		boolean remote = true;
 		String name = "<unknown>";
@@ -325,6 +353,8 @@ public class Module
 			path = database.getMetadata("module." + index + ".path");
 			name = database.getMetadata("module." + index + ".name");
 			source = database.getMetadata("module." + index + ".source");
+			url = database.getMetadata("module." + index + ".url");
+			sourceUrl = database.getMetadata("module." + index + ".source_url");
 			String blockedString = database.getMetadata("module." + index + ".blocked");
 			String remoteString = database.getMetadata("module." + index + ".remote");
 			
@@ -337,7 +367,7 @@ public class Module
 			return null;
 		}
 
-		Module module = load(id, name, source, path, remote, blocked);
+		Module module = load(id, name, source, path, url, sourceUrl, remote, blocked);
 		module.persistentIndex = index;
 		module.index = index;
 		return module;
@@ -353,6 +383,10 @@ public class Module
 				 "module." + index + ".name", moduleName)
 		 && database.setMetadata(
 				 "module." + index + ".source", sourceName)
+		 && database.setMetadata(
+				 "module." + index + ".url", moduleUrl)
+		 && database.setMetadata(
+				 "module." + index + ".source_url", sourceUrl)
 		 && database.setMetadata(
 				"module." + index + ".remote",
 				remote ? "1" : "0")
