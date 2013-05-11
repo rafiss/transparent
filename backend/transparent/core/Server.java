@@ -586,13 +586,15 @@ public class Server implements Container
 		Results dbresults = Core.getDatabase().query(
 				name, new String[] { "gid" },
 				whereClause, whereRelation, whereArgs,
-				"gid", sort, ascending, page, pageSize);
+				"gid", sort, ascending, (page - 1) * pageSize, pageSize);
 
 		ArrayList<Long> gid_ids = new ArrayList<Long>();
 		while (dbresults.next())
 			gid_ids.add(dbresults.getLong(1));
 		Long[] gidArg = new Long[gid_ids.size()];
 		gidArg = gid_ids.toArray(gidArg);
+		if (gid_ids.size() == 0)
+			return json;
 
 		String[] newSelect = new String[selectIndices.size()];
 		newSelect = selectIndices.keySet().toArray(newSelect);

@@ -572,7 +572,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 		int index = 1;
 		for (int i = 0; i < parameters.size(); i++) {
 			if (parameters.get(i) instanceof String) {
-				statement.setString(index++, (String) parameters.get(i));	
+				statement.setString(index++, (String) parameters.get(i));
 			} else {
 				statement.setLong(index++, ((Number) parameters.get(i)).longValue());
 			}
