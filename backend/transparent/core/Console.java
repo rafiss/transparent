@@ -45,7 +45,8 @@ public class Console
 			new ExitCommand(),
 			new TriggersCommand(),
 			new MigrateCommand(),
-			new TestServerCommand());
+			new TestServerCommand(),
+			new ImageQueueCommand());
 
 	private static ReentrantLock consoleLock = new ReentrantLock();
 	private static int nestedLock = 0;
@@ -1524,6 +1525,22 @@ public class Console
 				PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
 				printInfo(info);
 			}
+			unlockConsole();
+		}
+	}
+
+	private static class ImageQueueCommand extends Command
+	{
+		public ImageQueueCommand() {
+			super("imagequeue");
+		}
+
+		@Override
+		public void run(List<Token> args, int index)
+		{
+			lockConsole();
+			println(GRAY + " queue start: " + DEFAULT + Core.getImageQueueStart());
+			println(GRAY + " queue end: " + DEFAULT + Core.getImageQueueEnd());
 			unlockConsole();
 		}
 	}

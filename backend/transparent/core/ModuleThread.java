@@ -435,7 +435,7 @@ public class ModuleThread implements Runnable, Interruptable
 				} else if (key.equals("price")) {
 					price = value;
 					keyValues.add(new SimpleEntry<String, Object>(key, value));
-				} else if (!Core.getDatabase().isReservedKey(key))
+				} else if (!Core.getDatabase().isReservedKey(key) && !key.equals("image"))
 					keyValues.add(new SimpleEntry<String, Object>(key, value));
 			}
 			break;
@@ -467,12 +467,14 @@ public class ModuleThread implements Runnable, Interruptable
 			return;
 		}
 
+		/* look for other products with the same (brand, model) and generate a GID */
 		if (brand == null || model == null)
 			return;
 		Long gid = null;
 		Long oldPrice = null;
+		String image = null;
 		Results results = Core.getDatabase().query(null,
-				new String[] { "gid", "price" },
+				new String[] { "gid", "price", "image" },
 				new String[] { "model", "brand" },
 				new Relation[] { Relation.EQUALS, Relation.EQUALS },
 				new Object[] { model, brand },
@@ -484,11 +486,19 @@ public class ModuleThread implements Runnable, Interruptable
 				oldPrice = results.getLong(2);
 			else
 				oldPrice = Math.min(oldPrice, results.getLong(2));
+			if (image == null)
+				image = results.getString(3);
 		}
 		if (gid == null)
 			gid = Core.random();
 		keyValues.add(new SimpleEntry<String, Object>("gid", gid));
 
+		/* check to see if the image exists, and if not, add the product to the image queue */
+		image = Core.getImage(gid, image);
+		if (image != null)
+			keyValues.add(new SimpleEntry<String, Object>("image", image));
+
+		/* parse the price of the product, and check to see if it fires any notification triggers */
 		if (price != null) {
 			long parsed = -1;
 			if (price instanceof String)

@@ -31,7 +31,7 @@ def nodeText(node):
 	return ''.join([x for x in node.itertext()])
 
 def encodePrice(s):
-	return int(s.strip().replace('$','').replace('.',''))
+	return int(''.join(c for c in s if c.isdigit()))
 
 def httpGetRequest(url):
 	json.dump({'type':'get', 'url':url}, sys.stdout)
@@ -70,7 +70,9 @@ def parseProductInfo(request):
 	response = {}
 	productid = request['id']
 	parsed = parser.parse(httpGetRequest(PRODUCT_INFO_URL + productid))
-	response['price'] = encodePrice(nodeText((price_selector(parsed))[0]))
+	selected_price = price_selector(parsed)
+	if selected_price is not None and len(selected_price) > 0:
+		response['price'] = encodePrice(nodeText(selected_price[0]))
 	selected_name = name_selector(parsed)
 	if selected_name is None or len(selected_name) == 0:
 		selected_name = backup_name_selector(parsed)

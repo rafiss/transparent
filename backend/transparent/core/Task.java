@@ -219,6 +219,10 @@ public class Task implements Comparable<Task>, Callable<Object>
 			this.stopped = true;
 	}
 
+	public boolean stopped() {
+		return this.stopped;
+	}
+
 	@Override
 	public Object call() throws Exception
 	{
@@ -255,7 +259,7 @@ public class Task implements Comparable<Task>, Callable<Object>
 				}
 				return null;
 			case IMAGE_FETCH:
-				Console.printError("Task", "call", "Image fetching not implemented.");
+				Core.fetchImages(this, module);
 				Core.stopTask(this, false);
 				if (reschedules) {
 					Core.queueTask(new Task(TaskType.IMAGE_FETCH,

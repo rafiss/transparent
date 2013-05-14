@@ -7,9 +7,8 @@ import redis.clients.johm.CollectionList;
 import redis.clients.johm.CollectionMap;
 import redis.clients.johm.Id;
 import redis.clients.johm.Indexed;
-import redis.clients.johm.Model;
-
 import redis.clients.johm.JOhm;
+import redis.clients.johm.Model;
 
 @Model
 public class PriceHistory {

@@ -1,7 +1,9 @@
 package transparent.core;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
@@ -9,6 +11,10 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -24,10 +30,13 @@ import org.simpleframework.http.core.ContainerServer;
 import org.simpleframework.transport.connect.Connection;
 import org.simpleframework.transport.connect.SocketConnection;
 
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.johm.JOhm;
 import transparent.core.database.Database;
+import transparent.core.database.Database.Relation;
+import transparent.core.database.Database.Results;
 import transparent.core.database.MariaDBDriver;
 
 public class Core
@@ -45,6 +54,11 @@ public class Core
 	private static final String HELP_FLAG = "--help";
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final int HTTP_SERVER_PORT = 16317;
+	private static final int MAX_IMAGE_SIZE = 1 << 24;
+	private static final BigInteger HUNDRED_QUADRILLION = new BigInteger("100000000000000000");
+	private static final BigInteger ONE = new BigInteger("1");
+	private static final String IMAGE_PATH = "/var/www/localhost/htdocs/";
+	private static final String IMAGE_WEB_PATH = "http://theflowers.us.to/";
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
 
 	private static final String SPHINX_PROCESS = "searchd";
@@ -59,6 +73,8 @@ public class Core
 	private static ScheduledExecutorService dispatcher =
 			Executors.newScheduledThreadPool(THREAD_POOL_SIZE);
 	private static ReentrantLock tasksLock = new ReentrantLock();
+	private static ReentrantLock imageQueueLock = new ReentrantLock();
+	private static JedisPool pool;
 	
 	private static long seed = 0;
 
@@ -472,7 +488,6 @@ public class Core
 		int index = task.getIndex();
 		if (index < 0 || index >= tasks.size() || tasks.get(index) != task)
 			return;
-		tasks.remove(index);
 		task.setRunning(false);
 
 		/* move the last module into the removed module's place */
@@ -612,6 +627,199 @@ public class Core
 		}
 	}
 
+	private static boolean isLocalImage(String path)
+	{
+		File local = new File(IMAGE_PATH + path.substring(IMAGE_WEB_PATH.length()));
+		return path.startsWith(IMAGE_WEB_PATH) && local.exists();
+	}
+
+	private static void setImage(long gid, String image)
+	{
+		Results results = database.query(null,
+								 new String[] { "entity_id", "module_product_id", "module_id" },
+								 new String[] { "gid" },
+								 new Relation[] { Relation.EQUALS },
+								 new Object[] { gid },
+								 null, null, false, null, null);
+		while (results.next()) {
+			Module module = modules.get(results.getLong(3));
+			ProductID id = new ProductID(results.getLong(1), results.getString(2));
+			database.addProductInfo(module, id, new SimpleEntry<String, Object>("image", image));
+		}
+	}
+
+	private static void enqueue(long gid, Jedis jedis)
+	{
+		imageQueueLock.lock();
+		try {
+			BigInteger end = new BigInteger(jedis.get("images.end"));
+			jedis.set("images." + end, toUnsignedString(gid));
+			jedis.set("images.end", end.add(ONE).toString());
+		} finally {
+			imageQueueLock.unlock();
+		}
+	}
+
+	private static void enqueue(long gid)
+	{
+		Jedis jedis = pool.getResource();
+		enqueue(gid, jedis);
+		pool.returnResource(jedis);
+	}
+
+	/**
+	 * Gets the fetched image address for the given source image. If the source
+	 * image address is on the image cache, this method will return the same
+	 * address. If no image is found, the given product ID will be enqueued for
+	 * later image fetching.
+	 */
+	public static String getImage(long gid, String image)
+	{
+		if (image == null || !isLocalImage(image)) {
+			/* check to see if image exists */
+			Jedis jedis = pool.getResource();
+			String stored = jedis.get("imagestore." + image);
+			if (stored != null) {
+				pool.returnResource(jedis);
+				return stored;
+			} else {
+				/* queue this product for later image fetching */
+				enqueue(gid);
+				pool.returnResource(jedis);
+				return null;
+			}
+		} else {
+			return image;
+		}
+	}
+
+	public static BigInteger getImageQueueStart()
+	{
+		Jedis jedis = pool.getResource();
+		BigInteger start = new BigInteger(jedis.get("images.start"));
+		pool.returnResource(jedis);
+		return start;
+	}
+
+	public static BigInteger getImageQueueEnd()
+	{
+		Jedis jedis = pool.getResource();
+		BigInteger end = new BigInteger(jedis.get("images.end"));
+		pool.returnResource(jedis);
+		return end;
+	}
+
+	public static void fetchImages(Task task, Module authority)
+	{
+		while (!task.stopped()) {
+			/* get the start and end of the queue */
+			long gid;
+			Jedis jedis = pool.getResource();
+			imageQueueLock.lock();
+			try {
+				Thread.sleep(400);
+			} catch (InterruptedException e) {
+				return;
+			}
+			try {
+				BigInteger start = new BigInteger(jedis.get("images.start"));
+				BigInteger end = new BigInteger(jedis.get("images.end"));
+				if (start.equals(end))
+					break;
+				gid = new BigInteger(jedis.get("images." + start)).longValue();
+			} finally {
+				imageQueueLock.unlock();
+				pool.returnResource(jedis);
+			}
+
+			Results results = database.query(null,
+											 new String[] { "image" },
+											 new String[] { "module_id", "gid" },
+											 new Relation[] { Relation.EQUALS, Relation.EQUALS },
+											 new Object[] { authority.getId(), gid },
+											 null, null, false, null, null);
+			if (results == null)
+				return; /* database became unavailable, likely because we are exiting */
+			String image = null;
+			while (results.next()) {
+				image = results.getString(1);
+			}
+
+			if (image == null) {
+				/* the authority does not have an image, so re-add this product to the queue */
+				jedis = pool.getResource();
+				imageQueueLock.lock();
+				try {
+					BigInteger start = new BigInteger(jedis.get("images.start"));
+					BigInteger end = new BigInteger(jedis.get("images.end"));
+					jedis.del("images." + start);
+					jedis.set("images.start", start.add(ONE).toString());
+					jedis.set("images." + end, toUnsignedString(gid));
+					jedis.set("images.end", end.add(ONE).toString());
+				} finally {
+					imageQueueLock.unlock();
+					pool.returnResource(jedis);
+				}
+			} else if (isLocalImage(image)) {
+				/* the image has already been fetched for this GID, so update all associated products */
+				setImage(gid, image);
+			} else {
+				/* download the image from the authority */
+				/* ensure that the directory where we wish put the image exists */
+				boolean error = false;
+				BigInteger bigGid = new BigInteger(toUnsignedString(gid));
+				File directory = new File(IMAGE_PATH + bigGid.divide(HUNDRED_QUADRILLION));
+				if (!directory.exists()) {
+					if (!directory.mkdir()) {
+						Console.printError("Core", "fetchImages", "Unable to create directory for cached image.");
+						error = true;
+					}
+				} else if (!directory.isDirectory()) {
+					Console.printError("Core", "fetchImages", "Image cache subdirectory is a file!");
+					error = true;
+				}
+
+				/* download the image into the correct directory */
+				String newPath = null;
+				if (!error) {
+					String extension = image.substring(image.lastIndexOf('.'));
+					String suffix = bigGid.divide(HUNDRED_QUADRILLION)
+							+ "/" + bigGid.mod(HUNDRED_QUADRILLION) + extension;
+					String filename = IMAGE_PATH + suffix;
+					newPath = IMAGE_WEB_PATH + suffix;
+					try {
+						ReadableByteChannel rbc = Channels.newChannel(new URL(image).openStream());
+						FileOutputStream fos = new FileOutputStream(filename);
+						fos.getChannel().transferFrom(rbc, 0, MAX_IMAGE_SIZE);
+						setImage(gid, newPath);
+					} catch (IOException e) {
+						Console.printError("Core", "fetchImages", "Error occurred while fetching image.", e);
+						error = true;
+					}
+				}
+
+				/* pop the item, and if there is an error, add the product back into the queue */
+				jedis = pool.getResource();
+				imageQueueLock.lock();
+				try {
+					BigInteger start = new BigInteger(jedis.get("images.start"));
+					BigInteger end = new BigInteger(jedis.get("images.end"));
+					jedis.del("images." + start);
+					jedis.set("images.start", start.add(ONE).toString());
+					if (error) {
+						jedis.set("images." + end, toUnsignedString(gid));
+						jedis.set("images.end", end.add(ONE).toString());
+					} else {
+						jedis.set("imagestore." + image, newPath);
+					}
+				} finally {
+					imageQueueLock.unlock();
+					pool.returnResource(jedis);
+				}
+			}
+		}
+	}
+
 	public static void main(String[] args)
 	{
 		AnsiConsole.systemInstall();
@@ -663,9 +871,18 @@ public class Core
         /* load the price history/tracking datastore */
         JedisPoolConfig config = new JedisPoolConfig();
         config.maxActive = THREAD_POOL_SIZE;
-        JedisPool pool = new JedisPool(config, "localhost");
+        pool = new JedisPool(config, "localhost");
         JOhm.setPool(pool);
 		JOhm.save(new PriceRecords());
+
+		/* setup the image fetching queue */
+		Jedis jedis = pool.getResource();
+		if (jedis.get("images.start") == null)
+			jedis.set("images.start", "0");
+		if (jedis.get("images.end") == null)
+			jedis.set("images.end", "0");
+		pool.returnResource(jedis);
+		jedis = pool.getResource();
 
         /* load the script engine */
         boolean consoleReady = Console.initConsole();

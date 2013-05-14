@@ -641,7 +641,7 @@ public class MariaDBDriver implements transparent.core.database.Database {
 
         Database database = new MariaDBDriver();
 
-        Module testModule = new Module(1, null, "moduleName", "sourceName", "url", "sourceUrl", null, false, false);
+        Module testModule = new Module(1, null, "moduleName", "sourceName", "url", "sourceUrl", null, null, false, false);
 
         int numInserts = 1000;
         String[] products = new String[numInserts];
@@ -882,7 +882,7 @@ class ResultSetIterator implements Database.ResultsIterator<ProductID> {
     public ProductID next() {
         try {
             if (resultSet.next()) {
-                return new ProductID(resultSet.getInt(1), resultSet.getString(2));
+                return new ProductID(resultSet.getLong(1), resultSet.getString(2));
             } else {
                 return null;
             }
