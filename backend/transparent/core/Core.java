@@ -33,7 +33,7 @@ import org.simpleframework.transport.connect.SocketConnection;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.johm.JOhm;
+import transparent.core.PriceHistory.PriceRecord;
 import transparent.core.database.Database;
 import transparent.core.database.Database.Relation;
 import transparent.core.database.Database.Results;
@@ -528,52 +528,63 @@ public class Core
 
 	public static void addPriceRecord(long module, long gid, long price)
 	{
-		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		Jedis jedis = pool.getResource();
+		PriceHistory history = PriceHistory.load(jedis.get("history." + toUnsignedString(gid)));
+
 		if (history == null)
-			history = new PriceHistory(gid);
+			history = new PriceHistory();
 		history.addRecord(module, new Date().getTime(), price);
-		JOhm.save(history);
+		jedis.set("history." + toUnsignedString(gid), history.save());
+		pool.returnResource(jedis);
 	}
 
 	public static List<PriceRecord> getPriceHistory(long module, long gid)
 	{
-		PriceHistory history = JOhm.get(PriceHistory.class, gid);
+		Jedis jedis = pool.getResource();
+		PriceHistory history = PriceHistory.load(jedis.get("history." + toUnsignedString(gid)));
+		pool.returnResource(jedis);
 		if (history == null)
 			return null;
 		return history.getHistory(module);
 	}
 
 	public static void addPriceTrack(long gid, Long[] modules, Long price) {
-		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		Jedis jedis = pool.getResource();
+		PriceTrigger info = PriceTrigger.load(jedis.get("trigger." + toUnsignedString(gid)));
 		if (info == null)
-			info = new PriceTrigger(gid);
+			info = new PriceTrigger();
 		if (modules == null)
-			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price));
+			info.addTrack(new PriceTrack(price));
 		else
-			info.addTrack(new PriceTrack(nextJOhmId(PriceTrack.class), price), modules);
-		JOhm.save(info);
+			info.addTrack(new PriceTrack(price), modules);
+		jedis.set("trigger." + toUnsignedString(gid), info.save());
+		pool.returnResource(jedis);
 	}
 
 	public static void removePriceTrack(long gid, Long[] modules, Long price) {
-		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		Jedis jedis = pool.getResource();
+		PriceTrigger info = PriceTrigger.load(jedis.get("trigger." + toUnsignedString(gid)));
 		if (info == null)
 			return;
 		if (modules == null)
-			info.removeTrack(new PriceTrack(0, price));
+			info.removeTrack(new PriceTrack(price, 0));
 		else
-			info.removeTrack(new PriceTrack(0, price), modules);
-		JOhm.save(info);
+			info.removeTrack(new PriceTrack(price, 0), modules);
+		jedis.set("trigger." + toUnsignedString(gid), info.save());
+		pool.returnResource(jedis);
 	}
 
-	public static long nextJOhmId(Class<?> clazz) {
-		long id = Core.random();
-		while (JOhm.get(clazz, id) != null)
-			id = Core.random();
-		return id;
+	public static PriceTrigger getPriceTrigger(long gid) {
+		Jedis jedis = pool.getResource();
+		PriceTrigger info = PriceTrigger.load(jedis.get("trigger." + toUnsignedString(gid)));
+		pool.returnResource(jedis);
+		return info;
 	}
 
 	public static boolean checkPrice(Module module, long gid, long price) {
-		PriceTrigger info = JOhm.get(PriceTrigger.class, gid);
+		Jedis jedis = pool.getResource();
+		PriceTrigger info = PriceTrigger.load(jedis.get("trigger." + toUnsignedString(gid)));
+		pool.returnResource(jedis);
 		if (info == null)
 			return false;
 
@@ -683,6 +694,12 @@ public class Core
 				pool.returnResource(jedis);
 				return stored;
 			} else {
+				stored = jedis.get("imagestore." + gid);
+				if (stored != null) {
+					pool.returnResource(jedis);
+					return stored;
+				}
+
 				/* queue this product for later image fetching */
 				enqueue(gid);
 				pool.returnResource(jedis);
@@ -763,6 +780,19 @@ public class Core
 			} else if (isLocalImage(image)) {
 				/* the image has already been fetched for this GID, so update all associated products */
 				setImage(gid, image);
+
+				/* remove this product from the queue */
+				jedis = pool.getResource();
+				imageQueueLock.lock();
+				try {
+					BigInteger start = new BigInteger(jedis.get("images.start"));
+					jedis.del("images." + start);
+					jedis.set("images.start", start.add(ONE).toString());
+					jedis.set("imagestore." + gid, image);
+				} finally {
+					imageQueueLock.unlock();
+					pool.returnResource(jedis);
+				}
 			} else {
 				/* download the image from the authority */
 				/* ensure that the directory where we wish put the image exists */
@@ -811,6 +841,7 @@ public class Core
 						jedis.set("images.end", end.add(ONE).toString());
 					} else {
 						jedis.set("imagestore." + image, newPath);
+						jedis.set("imagestore." + gid, newPath);
 					}
 				} finally {
 					imageQueueLock.unlock();
@@ -872,8 +903,6 @@ public class Core
         JedisPoolConfig config = new JedisPoolConfig();
         config.maxActive = THREAD_POOL_SIZE;
         pool = new JedisPool(config, "localhost");
-        JOhm.setPool(pool);
-		JOhm.save(new PriceRecords());
 
 		/* setup the image fetching queue */
 		Jedis jedis = pool.getResource();
@@ -928,7 +957,7 @@ public class Core
         	connection.connect(new InetSocketAddress(HTTP_SERVER_PORT));
         } catch (IOException e) {
         	Console.printError("Core", "main", "Cannot start HTTP server."
-        			+ " Queries will not be processed.");
+        			+ " Queries will not be processed.", e);
         }
 
 		/* start the main loop */

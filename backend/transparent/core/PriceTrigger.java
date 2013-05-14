@@ -1,57 +1,34 @@
 package transparent.core;
 
+import java.math.BigInteger;
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
-import redis.clients.johm.Attribute;
-import redis.clients.johm.CollectionMap;
-import redis.clients.johm.CollectionSortedSet;
-import redis.clients.johm.Id;
-import redis.clients.johm.Indexed;
-import redis.clients.johm.Model;
+import net.minidev.json.JSONArray;
+import net.minidev.json.JSONObject;
+import net.minidev.json.parser.JSONParser;
+import net.minidev.json.parser.ParseException;
 
-@Model
-public class PriceTrigger {
-	@Id
-	private Long gid;
+public class PriceTrigger
+{
+	private static final JSONParser parser =
+			new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
 
-	@Attribute
-	private Integer numTracks;
-
-	@Indexed
-	@CollectionMap(key = Long.class, value = PriceTrack.class)
+	private int numTracks;
 	private HashMap<Long, PriceTrack> moduleTracks;
-
-	@Indexed
-	@CollectionSortedSet(of = PriceTrack.class, by = "price")
 	private TreeSet<PriceTrack> thresholdTracks;
-
-	@Indexed
-	@CollectionMap(key = Long.class, value = PriceTrackSet.class)
-	private HashMap<Long, PriceTrackSet> moduleThresholdTracks;
+	private HashMap<Long, TreeSet<PriceTrack>> moduleThresholdTracks;
 
 	public PriceTrigger() {
-		this.gid = 0L;
 		this.numTracks = 0;
 		this.moduleTracks = new HashMap<Long, PriceTrack>();
 		this.thresholdTracks = new TreeSet<PriceTrack>();
-		this.moduleThresholdTracks = new HashMap<Long, PriceTrackSet>();
+		this.moduleThresholdTracks = new HashMap<Long, TreeSet<PriceTrack>>();
 	}
 
-	public PriceTrigger(long gid) {
-		this.gid = gid;
-		this.numTracks = 0;
-		this.moduleTracks = new HashMap<Long, PriceTrack>();
-		this.thresholdTracks = new TreeSet<PriceTrack>();
-		this.moduleThresholdTracks = new HashMap<Long, PriceTrackSet>();
-	}
-
-	public Long getGid() {
-		return gid;
-	}
-
-	public Integer getNumTracks() {
+	public int getNumTracks() {
 		return numTracks;
 	}
 
@@ -63,7 +40,7 @@ public class PriceTrigger {
 		return thresholdTracks;
 	}
 
-	public HashMap<Long, PriceTrackSet> getModuleThresholdTracks() {
+	public HashMap<Long, TreeSet<PriceTrack>> getModuleThresholdTracks() {
 		return moduleThresholdTracks;
 	}
 
@@ -72,7 +49,18 @@ public class PriceTrigger {
 	}
 
 	public synchronized void decrementTracks() {
-		numTracks--;
+		if (numTracks > 0)
+			numTracks--;
+	}
+
+	private static void addTrack(TreeSet<PriceTrack> thresholdTracks, PriceTrack track) {
+		PriceTrack returned = thresholdTracks.floor(track);
+		if (returned == null || !returned.getPrice().equals(track.getPrice())) {
+			thresholdTracks.add(track);
+			track.setNumTracks(1);
+		} else {
+			returned.incrementTracks();
+		}
 	}
 
 	public synchronized void addTrack(PriceTrack track) {
@@ -101,11 +89,20 @@ public class PriceTrigger {
 			}
 		} else {
 			for (Long moduleId : modules) {
-				PriceTrackSet set = moduleThresholdTracks.get(moduleId);
+				TreeSet<PriceTrack> set = moduleThresholdTracks.get(moduleId);
 				if (set == null)
-					set = new PriceTrackSet(Core.nextJOhmId(PriceTrackSet.class));
-				set.addTrack(track);
+					set = new TreeSet<PriceTrack>();
+				addTrack(set, track);
 			}
+		}
+	}
+
+	private static void removeTrack(TreeSet<PriceTrack> thresholdTracks, PriceTrack track) {
+		PriceTrack returned = thresholdTracks.floor(track);
+		if (returned != null && returned.getPrice().equals(track.getPrice())) {
+			returned.decrementTracks();
+			if (returned.getNumTracks() == 0)
+				thresholdTracks.remove(returned);
 		}
 	}
 
@@ -126,7 +123,7 @@ public class PriceTrigger {
 		if (track.getPrice() == null) {
 			for (Long module : modules) {
 				PriceTrack returned = moduleTracks.get(module);
-				if (returned != null && returned.getPrice().equals(track.getPrice())) {
+				if (returned != null && returned.getPrice() == (long) track.getPrice()) {
 					returned.decrementTracks();
 					if (returned.getNumTracks() == 0)
 						moduleTracks.remove(returned);
@@ -134,27 +131,34 @@ public class PriceTrigger {
 			}
 		} else {
 			for (Long module : modules) {
-				PriceTrackSet set = moduleThresholdTracks.get(module);
+				TreeSet<PriceTrack> set = moduleThresholdTracks.get(module);
 				if (set != null) {
-					set.removeTrack(track);
-					if (set.empty())
+					removeTrack(set, track);
+					if (set.isEmpty())
 						moduleThresholdTracks.remove(module);
 				}
 			}
 		}
 	}
 
+	private static boolean checkPrice(TreeSet<PriceTrack> thresholdTracks, long price) {
+		if (thresholdTracks == null)
+			return false;
+		return (thresholdTracks.ceiling(new PriceTrack(price, 0)) != null);
+	}
+
 	public synchronized boolean checkPrice(Module module, long price) {
 		if (numTracks > 0)
 			return true;
 
-		if (moduleTracks.get(module.getId()).checkPrice(module, price))
+		PriceTrack track = moduleTracks.get(module.getId());
+		if (track != null && track.checkPrice(module, price))
 			return true;
 
-		if (thresholdTracks.ceiling(new PriceTrack(0, price)) != null)
+		if (thresholdTracks.ceiling(new PriceTrack(price, 0)) != null)
 			return true;
 
-		return moduleThresholdTracks.get(module.getId()).checkPrice(price);
+		return checkPrice(moduleThresholdTracks.get(module.getId()), price);
 	}
 
 	public static void printInfo(Set<PriceTrack> thresholds, String prefix) {
@@ -165,84 +169,94 @@ public class PriceTrigger {
 						+ ", count: " + Console.DEFAULT + track.getNumTracks());
 		}
 	}
+
+	public String save()
+	{
+		JSONArray array = new JSONArray();
+		array.add(numTracks);
+
+		JSONObject object = new JSONObject();
+		for (Entry<Long, PriceTrack> entry : moduleTracks.entrySet()) {
+			String key = Core.toUnsignedString(entry.getKey());
+			String value = entry.getValue().save();
+			object.put(key, value);
+		}
+		array.add(object);
+
+		JSONArray inner = new JSONArray();
+		for (PriceTrack track : thresholdTracks)
+			inner.add(track.save());
+		array.add(inner);
+
+		object = new JSONObject();
+		for (Entry<Long, TreeSet<PriceTrack>> entry : moduleThresholdTracks.entrySet()) {
+			String key = Core.toUnsignedString(entry.getKey());
+			inner = new JSONArray();
+			for (PriceTrack track : entry.getValue())
+				inner.add(track.save());
+			object.put(key, inner);
+		}
+		array.add(object);
+
+		return array.toJSONString();
+	}
+
+	public static PriceTrigger load(String serialized)
+	{
+		if (serialized == null)
+			return null;
+
+		JSONArray array;
+		try {
+			array = (JSONArray) parser.parse(serialized);
+		} catch (ParseException e) {
+			return null;
+		}
+
+		PriceTrigger trigger = new PriceTrigger();
+		trigger.numTracks = (int) array.get(0);
+		JSONObject object = (JSONObject) array.get(1);
+		for (Entry<String, Object> entry : object.entrySet()) {
+			long key = new BigInteger(entry.getKey()).longValue();
+			PriceTrack value = PriceTrack.load((String) entry.getValue());
+			trigger.moduleTracks.put(key, value);
+		}
+
+		JSONArray inner = (JSONArray) array.get(2);
+		for (Object obj : inner)
+			trigger.thresholdTracks.add(PriceTrack.load((String) obj));
+
+		object = (JSONObject) array.get(3);
+		for (Entry<String, Object> entry : object.entrySet()) {
+			long key = new BigInteger(entry.getKey()).longValue();
+			TreeSet<PriceTrack> value = new TreeSet<PriceTrack>();
+			inner = (JSONArray) entry.getValue();
+			for (Object obj : inner)
+				value.add(PriceTrack.load((String) obj));
+			trigger.moduleThresholdTracks.put(key, value);
+		}
+
+		return trigger;
+	}
 }
 
-@Model
-class PriceTrackSet {
-	@Id
-	private Long id;
-
-	@Indexed
-	@CollectionSortedSet(of = PriceTrack.class, by = "price")
-	private TreeSet<PriceTrack> thresholdTracks;
-
-	public PriceTrackSet() {
-		this.id = 0L;
-		this.thresholdTracks = new TreeSet<PriceTrack>();
-	}
-
-	public PriceTrackSet(long id) {
-		this.id = id;
-		this.thresholdTracks = new TreeSet<PriceTrack>();
-	}
-
-	public TreeSet<PriceTrack> getThresholdTracks() {
-		return thresholdTracks;
-	}
-
-	public void addTrack(PriceTrack track) {
-		PriceTrack returned = thresholdTracks.floor(track);
-		if (returned == null || !returned.getPrice().equals(track.getPrice())) {
-			thresholdTracks.add(track);
-			track.setNumTracks(1);
-		} else {
-			returned.incrementTracks();
-		}
-	}
-
-	public void removeTrack(PriceTrack track) {
-		PriceTrack returned = thresholdTracks.floor(track);
-		if (returned != null && returned.getPrice().equals(track.getPrice())) {
-			returned.decrementTracks();
-			if (returned.getNumTracks() == 0)
-				thresholdTracks.remove(returned);
-		}
-	}
-
-	public boolean empty() {
-		return thresholdTracks.isEmpty();
-	}
-
-	public boolean checkPrice(long price) {
-		return (thresholdTracks.ceiling(new PriceTrack(0, price)) != null);
-	}
-}
-
-@Model
-class PriceTrack {
-	@Id
-	private Long id;
-
-	@Attribute
+class PriceTrack implements Comparable<PriceTrack>
+{
 	private Long price;
+	private int numTracks;
 
-	@Attribute
-	private Integer numTracks;
+	public PriceTrack(Long price) {
+		this.price = price;
+		this.numTracks = 0;
+	}
+
+	public PriceTrack(Long price, int numTracks) {
+		this.price = price;
+		this.numTracks = numTracks;
+	}
 
 	public Long getPrice() {
 		return price;
-	}
-
-	public PriceTrack() {
-		this.id = 0L;
-		this.price = 0L;
-		this.numTracks = 0;
-	}
-
-	public PriceTrack(long id, Long price) {
-		this.id = id;
-		this.price = price;
-		this.numTracks = 0;
 	}
 
 	public synchronized void incrementTracks() {
@@ -250,7 +264,8 @@ class PriceTrack {
 	}
 
 	public synchronized void decrementTracks() {
-		numTracks--;
+		if (numTracks > 0)
+			numTracks--;
 	}
 
 	public Integer getNumTracks() {
@@ -263,5 +278,32 @@ class PriceTrack {
 
 	public synchronized boolean checkPrice(Module module, long price) {
 		return (numTracks > 0);
+	}
+
+	public String save() {
+		return String.valueOf(price) + '.' + numTracks;
+	}
+
+	public static PriceTrack load(String serialized) {
+		String[] tokens = serialized.split("\\.");
+		long price = Long.parseLong(tokens[0]);
+		int numTracks = Integer.parseInt(tokens[1]);
+		return new PriceTrack(price, numTracks);
+	}
+
+	@Override
+	public int compareTo(PriceTrack other) {
+		if (price < other.price) return -1;
+		else if (price > other.price) return 1;
+		else return 0;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (other == this) return true;
+		else if (other == null) return false;
+		else if (!other.getClass().equals(this.getClass())) return false;
+
+		return ((PriceTrack) other).price == this.price;
 	}
 }
