@@ -24,6 +24,7 @@ frontend/transparent.com/transparent/static/
 log
 backend/history
 backend/index
+backend/redis
 
 # Packages
 *.egg

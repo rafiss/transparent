@@ -189,6 +189,7 @@ public class Server implements Container
 						null, null, true, null, null);
 			}
 			JSONObject rows = new JSONObject();
+			HashMap<Long, Long> prices = new HashMap<Long, Long>();
 			while (results.next()) {
 				long module_id = results.getLong(2);
 				String module_product_id = results.getString(3);
@@ -197,19 +198,25 @@ public class Server implements Container
 					name = module_product_name;
 
 				JSONObject json = (JSONObject) parser.parse(results.getString(6));
+				Object priceObject = json.get("price");
+				if (priceObject != null) {
+					/* check that we are picking the lowest price from repeated results */
+					Long oldPrice = prices.get(module_id);
+					long priceValue = ((Number) priceObject).longValue();
+					if (oldPrice != null && oldPrice <= priceValue)
+						continue;
+					prices.put(module_id, priceValue);
+
+					json.put("price", Core.priceToString(priceValue));
+					if (price == null || priceValue < price)
+						price = priceValue;
+				}
 				if (brand == null)
 					brand = (String) json.get("brand");
 				if (model == null)
 					model = (String) json.get("model");
 				if (image == null)
 					image = (String) json.get("image");
-				Object priceObject = json.get("price");
-				if (priceObject != null) {
-					long priceValue = ((Number) priceObject).longValue();
-					json.put("price", Core.priceToString(priceValue));
-					if (price == null || priceValue < price)
-						price = priceValue;
-				}
 
 				JSONObject row = new JSONObject();
 				row.putAll(json);
@@ -562,7 +569,7 @@ public class Server implements Container
 
 		Integer gidIndex = selectIndices.get("gid");
 		Integer priceIndex = selectIndices.get("price");
-		Integer moduleIndex = selectIndices.get("module");
+		Integer moduleIndex = selectIndices.get("module_id");
 		Integer nameIndex = selectIndices.get("name");
 		Integer brandIndex = selectIndices.get("brand");
 		Integer modelIndex = selectIndices.get("model");
@@ -579,6 +586,10 @@ public class Server implements Container
 				modelIndex = selectIndices.size();
 				selectIndices.put("model", selectIndices.size());
 			}
+		}
+		if (priceIndex != null && moduleIndex == null) {
+			moduleIndex = selectIndices.size();
+			selectIndices.put("module_id", selectIndices.size());
 		}
 
 		HashMap<Long, JSONArray> json = new HashMap<Long, JSONArray>();
@@ -605,6 +616,8 @@ public class Server implements Container
 				new Object[] { gidArg },
 				null, sort, ascending, null, null);
 
+		HashMap<Entry<Long, Long>, Long> prices =
+				new HashMap<Entry<Long, Long>, Long>();
 		HashMap<Long, Entry<Long, Long>> priceRanges =
 				new HashMap<Long, Entry<Long, Long>>();
 		while (dbresults.next()) {
@@ -615,8 +628,22 @@ public class Server implements Container
 			Long gid = dbresults.getLong(gidIndex + 1);
 			row.set(gidIndex, new BigInteger(Core.toUnsignedString(gid)));
 
+			Long module = null;
+			if (moduleIndex != null) {
+				module = dbresults.getLong(moduleIndex + 1);
+				if (moduleIndex < row.size())
+					row.set(moduleIndex, new BigInteger(Core.toUnsignedString(module)));
+			}
+
 			if (priceIndex != null) {
+				/* check that we are picking the lowest price from repeated results */
+				Entry<Long, Long> moduleGid = new SimpleEntry<Long, Long>(module, gid);
+				Long oldPrice = prices.get(moduleGid);
 				Long price = dbresults.getLong(priceIndex + 1);
+				if (oldPrice != null && oldPrice <= price)
+					continue;
+				prices.put(moduleGid, price);
+
 				row.set(priceIndex, Core.priceToString(price));
 				Entry<Long, Long> range = priceRanges.get(gid);
 				if (range == null)
@@ -628,11 +655,6 @@ public class Server implements Container
 						range = new SimpleEntry<Long, Long>(range.getKey(), price);
 				}
 				priceRanges.put(gid, range);
-			}
-
-			if (moduleIndex != null) {
-				Long module = dbresults.getLong(moduleIndex + 1);
-				row.set(moduleIndex, new BigInteger(Core.toUnsignedString(module)));
 			}
 
 			if (nameIndex != null) {
@@ -677,3 +699,4 @@ public class Server implements Container
 		Core.execute(new QueryProcessor(request, response));
 	}
 }
+

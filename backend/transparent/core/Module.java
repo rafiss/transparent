@@ -33,6 +33,9 @@ public class Module
 	/* specifies whether websites should be downloaded in blocks or all at once */
 	private boolean useBlockedDownload;
 
+	/* specifies the API for communication between the modules and core */
+	private Api api;
+
 	/* unique integer identifier for the module */
 	private final long id;
 
@@ -60,7 +63,8 @@ public class Module
 	public Module(long id, String moduleName,
 			String sourceName, String path,
 			String url, String sourceUrl,
-			OutputStream log, boolean isRemote,
+			OutputStream log, Api api,
+			boolean isRemote,
 			boolean blockedDownload)
 	{
 		this.path = path;
@@ -69,6 +73,7 @@ public class Module
 		this.moduleUrl = url;
 		this.sourceUrl = sourceUrl;
 		this.remote = isRemote;
+		this.api = api;
 		this.useBlockedDownload = blockedDownload;
 		this.id = id;
 		this.log = new ModuleLogStream(log);
@@ -111,6 +116,10 @@ public class Module
 		return remote;
 	}
 
+	public Api getApi() {
+		return api;
+	}
+
 	public boolean blockedDownload() {
 		return useBlockedDownload;
 	}
@@ -122,6 +131,12 @@ public class Module
 	public void setPath(String path) {
 		this.path = path;
 		this.persistentIndex = -1;
+	}
+
+	public void setApi(Api api) {
+		if (this.api != api)
+			this.persistentIndex = -1;
+		this.api = api;
 	}
 
 	public void setSourceName(String sourceName) {
@@ -305,7 +320,7 @@ public class Module
 
 	public static Module load(long id,
 			String name, String source, String path,
-			String url, String sourceUrl,
+			String url, String sourceUrl, Api api,
 			boolean isRemote, boolean blockedDownload)
 	{
 		PrintStream log;
@@ -337,7 +352,7 @@ public class Module
 			log = new PrintStream(NULL_STREAM);
 		}
 
-		return new Module(id, name, source, path, url, sourceUrl, log, isRemote, blockedDownload);
+		return new Module(id, name, source, path, url, sourceUrl, log, api, isRemote, blockedDownload);
 	}
 
 	public static Module load(Database database, int index)
@@ -347,6 +362,7 @@ public class Module
 		boolean blocked = true;
 		boolean remote = true;
 		String name = "<unknown>";
+		Api api = null;
 		try {
 			id = new BigInteger(database.getMetadata("module." + index + ".id")).longValue();
 
@@ -355,6 +371,7 @@ public class Module
 			source = database.getMetadata("module." + index + ".source");
 			url = database.getMetadata("module." + index + ".url");
 			sourceUrl = database.getMetadata("module." + index + ".source_url");
+			api = Api.load(database.getMetadata("module." + index + ".api"));
 			String blockedString = database.getMetadata("module." + index + ".blocked");
 			String remoteString = database.getMetadata("module." + index + ".remote");
 			
@@ -367,7 +384,7 @@ public class Module
 			return null;
 		}
 
-		Module module = load(id, name, source, path, url, sourceUrl, remote, blocked);
+		Module module = load(id, name, source, path, url, sourceUrl, api, remote, blocked);
 		module.persistentIndex = index;
 		module.index = index;
 		return module;
@@ -387,6 +404,8 @@ public class Module
 				 "module." + index + ".url", moduleUrl)
 		 && database.setMetadata(
 				 "module." + index + ".source_url", sourceUrl)
+		 && database.setMetadata(
+				 "module." + index + ".api", api.save())
 		 && database.setMetadata(
 				"module." + index + ".remote",
 				remote ? "1" : "0")
@@ -563,6 +582,30 @@ public class Module
 	    		Console.append(csq, start, end);
 	    	return this;
 	    }
+	}
+
+	public static enum Api {
+		BINARY,
+		JSON;
+
+		public static Api load(String src) {
+			if (src.toLowerCase().equals("binary"))
+				return BINARY;
+			else if (src.toLowerCase().equals("json"))
+				return JSON;
+			else return null;
+		}
+
+		public String save() {
+			switch (this) {
+			case BINARY:
+				return "binary";
+			case JSON:
+				return "json";
+			default:
+				return null;
+			}
+		}
 	}
 }
 

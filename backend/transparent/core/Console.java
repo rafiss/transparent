@@ -595,6 +595,7 @@ public class Console
     			println(GRAY + "  source: " + DEFAULT + module.getSourceName());
     			println(GRAY + "  url: " + DEFAULT + module.getModuleUrl());
     			println(GRAY + "  sourceurl: " + DEFAULT + module.getSourceUrl());
+    			println(GRAY + "  api: " + DEFAULT + module.getApi());
     			println(GRAY + "  is remote: " + DEFAULT + module.isRemote());
     			println(GRAY + "  blocked downloading: " + DEFAULT + module.blockedDownload());
     			println(GRAY + "  active logging: " + DEFAULT + module.isLoggingActivity());
@@ -615,12 +616,12 @@ public class Console
 
 		private void usage() {
 			Console.println("usage: modules add [name] [source] [path] [url]"
-					+ " [sourceurl] [is remote] [use blocked downloading]");
+					+ " [sourceurl] [api:binary|json] [is remote] [use blocked downloading]");
 		}
 
 		private void addModule(String name, String source,
 				String path, String moduleUrl, String sourceUrl,
-				boolean remote, boolean blocked)
+				Module.Api api, boolean remote, boolean blocked)
 		{
 			long id = Core.random();
 			Console.lockConsole();
@@ -631,6 +632,7 @@ public class Console
 				Console.println(GRAY + "  path: " + DEFAULT + path);
 				Console.println(GRAY + "  url: " + DEFAULT + moduleUrl);
 				Console.println(GRAY + "  sourceurl: " + DEFAULT + sourceUrl);
+				Console.println(GRAY + "  api: " + DEFAULT + api);
 				Console.println(GRAY + "  is remote: " + DEFAULT + remote);
 				Console.println(GRAY + "  use blocked downloading: " + DEFAULT + blocked);
 			}
@@ -647,7 +649,7 @@ public class Console
 					}
 				}
 				if (response) {
-					Module module = Module.load(id, name, source, path, moduleUrl, sourceUrl, remote, blocked);
+					Module module = Module.load(id, name, source, path, moduleUrl, sourceUrl, api, remote, blocked);
 					if (module != null && Core.addModule(module))
 						Console.println("Module '" + name + "' added. "
 								+ "Use 'modules save' to push changes to database.");
@@ -664,13 +666,13 @@ public class Console
 		{
 			if (args.size() > 2) {
 				/* parse the arguments */
-				if (args.size() < 5) {
+				if (args.size() < 8) {
 					Console.lockConsole();
 					commandError("modules add", "Too few arguments.");
 					usage();
 					Console.unlockConsole();
 					return;
-				} else if (args.size() > 9) {
+				} else if (args.size() > 10) {
 					Console.lockConsole();
 					commandError("modules add", "Too many arguments.");
 					usage();
@@ -684,13 +686,19 @@ public class Console
 				String moduleUrl = args.get(5).getToken();
 				String sourceUrl = args.get(6).getToken();
 
+				Module.Api api = Module.Api.load(args.get(7).getToken());
+				if (api == null) {
+					Console.commandError("modules add", "Unrecognized API field '" + args.get(7).getToken() + "'.");
+					return;
+				}
+
 				Boolean remote = false;
-				if (args.size() > 7)
-					remote = parseBoolean(args.get(7).getToken());
+				if (args.size() > 8)
+					remote = parseBoolean(args.get(8).getToken());
 
 				Boolean blocked = true;
-				if (args.size() > 8)
-					blocked = parseBoolean(args.get(8).getToken());
+				if (args.size() > 9)
+					blocked = parseBoolean(args.get(9).getToken());
 
 				if (remote == null || blocked == null) {
 					Console.println("[is remote] and [use blocked downloading]"
@@ -698,7 +706,7 @@ public class Console
 					return;
 				}
 
-				addModule(name, source, path, moduleUrl, sourceUrl, remote, blocked);
+				addModule(name, source, path, moduleUrl, sourceUrl, api, remote, blocked);
 			} else {
 				try {
 					in.setUseHistory(false);
@@ -707,6 +715,11 @@ public class Console
 					String path = in.readLine("Enter path: ");
 					String moduleUrl = in.readLine("Enter module URL: ");
 					String sourceUrl = in.readLine("Enter source URL: ");
+					Module.Api api = Module.Api.load(in.readLine("Enter API (binary|json): "));
+					if (api == null) {
+						Console.commandError("modules add", "Unrecognized API field.");
+						return;
+					}
 
 					Boolean remote = parseBoolean(
 							in.readLine("Is the module remote? "));
@@ -724,7 +737,7 @@ public class Console
 								in.readLine("Use blocked downloading? "));
 					}
 
-					addModule(name, source, path, moduleUrl, sourceUrl, remote, blocked);
+					addModule(name, source, path, moduleUrl, sourceUrl, api, remote, blocked);
 				} catch (IOException e) {
 					commandError("modules add", "", e);
 				}
@@ -739,7 +752,7 @@ public class Console
 		}
 
 		private void usage() {
-			println("usage: modules get [id] [name|source|path|remote|blocked|activelog|url|sourceurl]");
+			println("usage: modules get [id] [name|source|path|remote|api|blocked|activelog|url|sourceurl]");
 		}
 
 		@Override
@@ -777,6 +790,8 @@ public class Console
 				println(module.getModuleUrl());
 			else if (key.equals("sourceurl"))
 				println(module.getSourceUrl());
+			else if (key.equals("api"))
+				println(module.getApi().toString());
 			else if (key.equals("remote")) {
 				println(Boolean.toString(module.isRemote()));
 			} else if (key.equals("blocked")) {
@@ -795,7 +810,7 @@ public class Console
 
 		private void usage() {
 			println("usage: modules set [id] [name|source"
-					+ "|path|remote|blocked|activelog|url|sourceurl] [value]");
+					+ "|path|remote|blocked|api|activelog|url|sourceurl] [value]");
 		}
 
 		@Override
@@ -834,7 +849,9 @@ public class Console
 				module.setModuleUrl(value);
 			else if (key.equals("sourceurl"))
 				module.setSourceUrl(value);
-			else if (key.equals("remote")) {
+			else if (key.equals("api")) {
+				module.setApi(Module.Api.load(value));
+			} else if (key.equals("remote")) {
 				Boolean parsed = parseBoolean(value);
 				if (parsed != null)
 					module.setRemote(parsed);

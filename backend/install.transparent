@@ -1,5 +1,6 @@
-modules forceadd 'Amazon Parser' 'Amazon' 'java -cp transparent/modules/amazon/:transparent/modules/amazon/jsoup-1.7.2.jar AmazonParser' 'https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/amazon' 'http://www.newegg.com/' false true
-modules forceadd 'Newegg Parser' 'Newegg' 'java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar:transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser' 'https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/newegg' 'http://www.newegg.com/' false true
+modules forceadd 'Amazon Parser' 'Amazon' 'java -cp transparent/modules/amazon/:transparent/modules/amazon/jsoup-1.7.2.jar AmazonParser' 'https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/amazon' 'http://www.newegg.com/' binary false true
+modules forceadd 'Newegg Parser' 'Newegg' 'java -cp transparent/modules/newegg/:transparent/modules/newegg/json-smart-1.1.1.jar:transparent/modules/newegg/jsoup-1.7.2.jar NeweggParser' 'https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/newegg' 'http://www.newegg.com/' binary false true
+modules forceadd 'TigerDirect Parser' 'TigerDirect' 'python transparent/modules/tigerdirect/parser.py' 'https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/tigerdirect' 'http://www.tigerdirect.com/' json false false
 modules save
 tasks save
 exit

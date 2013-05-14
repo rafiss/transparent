@@ -3,6 +3,7 @@ package transparent.core;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -45,6 +46,12 @@ public class Core
 	private static final int THREAD_POOL_SIZE = 64;
 	private static final int HTTP_SERVER_PORT = 16317;
 	private static final String DEFAULT_SCRIPT = "rc.transparent";
+
+	private static final String SPHINX_PROCESS = "searchd";
+	private static final String SPHINX_COMMAND = SPHINX_PROCESS + " --config index/sphinx.conf";
+
+	private static final String REDIS_PROCESS = "redis-server";
+	private static final String REDIS_COMMAND = "/usr/sbin/redis-server redis/redis.conf";
 
 	private static final Sandbox sandbox = new NoSandbox();
 	private static Database database;
@@ -463,7 +470,7 @@ public class Core
 	private static void removeTask(ArrayList<Task> tasks, Task task)
 	{
 		int index = task.getIndex();
-		if (index < 0 || index >= tasks.size())
+		if (index < 0 || index >= tasks.size() || tasks.get(index) != task)
 			return;
 		tasks.remove(index);
 		task.setRunning(false);
@@ -559,7 +566,10 @@ public class Core
 	}
 
 	public static String priceToString(Long price) {
-		return "$" + (price / 100) + "." + (price % 100);
+		String cents = String.valueOf(price % 100);
+		if (cents.length() == 1)
+			cents = "0" + cents;
+		return "$" + (price / 100) + "." + cents;
 	}
 
 	public static Long parsePrice(String price) {
@@ -567,6 +577,38 @@ public class Core
 			return Long.parseLong(price.replaceAll("\\.", "").replaceAll("\\$", ""));
 		} catch (NumberFormatException e) {
 			return null;
+		}
+	}
+
+	private static boolean isRunning(String processName) {
+		try {
+			Process p = Runtime.getRuntime().exec("pidof " + processName);
+		    BufferedReader input =
+		            new BufferedReader(new InputStreamReader(p.getInputStream()));
+			String pid = input.readLine();
+		    input.close();
+			if (pid == null)
+				return false;
+			return true;
+		} catch (IOException e) {
+			Console.printError("Core", "pidof", "", e);
+			return false;
+		}
+	}
+
+	public static void runCommand(String programName, String command)
+	{
+		try {
+			Process process = Runtime.getRuntime().exec(command);
+			BufferedReader input =
+			            new BufferedReader(new InputStreamReader(process.getInputStream()));
+			String line = input.readLine();
+			while (line != null) {
+				Console.println("  " + Console.GRAY + line + Console.DEFAULT);
+				line = input.readLine();
+			}
+		} catch (IOException e) {
+			Console.printError("Core", "runCommand", "Error starting " + programName + ".", e);
 		}
 	}
 
@@ -598,6 +640,22 @@ public class Core
         	Console.printError("Core", "main", "Cannot "
         			+ "connect to database.", e);
         }
+
+		/* check to see if Sphinx is running, and if not, start it */
+		if (!isRunning(SPHINX_PROCESS)) {
+			Console.lockConsole();
+			Console.println("Sphinx not running, starting...");
+			runCommand("Sphinx", SPHINX_COMMAND);
+			Console.unlockConsole();
+		}
+
+		/* check to see if Redis is running, and if not, start it */
+		if (!isRunning(REDIS_PROCESS)) {
+			Console.lockConsole();
+			Console.println("Redis not running, starting...");
+			runCommand("Redis", REDIS_COMMAND);
+			Console.unlockConsole();
+		}
 
 		/* load random number generator seed */
         loadSeed();
@@ -659,7 +717,7 @@ public class Core
 		/* start the main loop */
         BackgroundWorker worker = new BackgroundWorker();
         ScheduledFuture<?> future =
-        		dispatcher.scheduleWithFixedDelay(worker, 10, 10, TimeUnit.SECONDS);
+        		dispatcher.scheduleWithFixedDelay(worker, 0, 10, TimeUnit.SECONDS);
 		if (consoleReady)
 			Console.runConsole();
 
@@ -670,8 +728,14 @@ public class Core
 			for (Task task : runningList) {
 				if (task != null) {
 					task.stop(true);
-					if (task.getFuture() != null)
+					if (task.getFuture() != null) {
 						task.getFuture().cancel(true);
+
+						/* wait for task to exit */
+						try {
+							task.getFuture().get();
+						} catch (Exception e) { }
+					}
 				}
 			}
 		} finally {
@@ -694,11 +758,26 @@ public class Core
 	
 	private static class BackgroundWorker implements Runnable
 	{
+		private static final int INDEXER_PERIOD = 100;
+		private static final String INDEXER_COMMAND =
+				"indexer -c index/sphinx.conf --all --rotate";
+
+		private int cycles = 0;
+
 		@Override
 		public void run()
 		{
-			/* TODO: run indexer */
-			saveQueue();
+			if (cycles % INDEXER_PERIOD == 0) {
+				Console.lockConsole();
+				Console.println("Regenerating search index...");
+				runCommand("indexer", INDEXER_COMMAND);
+				Console.unlockConsole();
+			}
+
+			if (cycles > 0)
+				saveQueue();
+
+			cycles++;
 		}	
 	}
 }

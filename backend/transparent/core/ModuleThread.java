@@ -4,11 +4,14 @@ import transparent.core.database.Database.Relation;
 import transparent.core.database.Database.Results;
 import transparent.core.database.Database.ResultsIterator;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
@@ -18,8 +21,13 @@ import java.nio.charset.Charset;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
+import net.minidev.json.parser.JSONParser;
+import net.minidev.json.parser.ParseException;
 
 public class ModuleThread implements Runnable, Interruptable
 {
@@ -35,6 +43,7 @@ public class ModuleThread implements Runnable, Interruptable
 	private static final int DOWNLOAD_ABORTED = 1;
 
 	private static final int BUFFER_SIZE = 4096; /* in bytes */
+	private static final int CHAR_BUFFER_SIZE = 256; /* in bytes */
 	private static final int MAX_DOWNLOAD_SIZE = 10485760; /* 10 MB */
 	private static final int MAX_USHORT = 65535;
 	private static final int MAX_BATCH_SIZE = 10000;
@@ -45,10 +54,17 @@ public class ModuleThread implements Runnable, Interruptable
 
 	private static final Charset ASCII = Charset.forName("US-ASCII");
 	private static final Charset UTF8 = Charset.forName("UTF-8");
+	private static final Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
 
 	private static final String DEFAULT_USER_AGENT =
 			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
 	private static final String PRICE_ALERT_URL = ""; /* TODO: fill this in */
+	private static final Pattern ENCODING_PATTERN =
+			Pattern.compile("text/html;\\s+charset=([^\\s]+)\\s*");
+	private static final String NEWLINE = System.getProperty("line.separator");
+
+	private static final JSONParser parser =
+			new JSONParser(JSONParser.DEFAULT_PERMISSIVE_MODE);
 
 	private final Module module;
 	private byte requestType;
@@ -73,7 +89,79 @@ public class ModuleThread implements Runnable, Interruptable
 		this.alive = false;
 	}
 
-	private void downloadPage(String contentType,
+	private void downloadPageChars(String contentType,
+			InputStream stream, OutputStream dest, boolean blocked)
+					throws IOException
+	{
+		/* determine the encoding of the web page */
+		Charset encoding = UTF8;
+		if (contentType != null) {
+			Matcher match = ENCODING_PATTERN.matcher(contentType);
+			if (match.matches())
+				encoding = Charset.forName(match.group(1));
+		}
+
+		int total = 0;
+		if (blocked) {
+			/* download the page in blocks, sending each to the module */
+			int start = 0;
+			CountingInputStream counter = new CountingInputStream(stream);
+			InputStreamReader reader = new InputStreamReader(counter, encoding);
+			StringBuilder builder = new StringBuilder(2 * BUFFER_SIZE);
+			char[] buf = new char[CHAR_BUFFER_SIZE];
+			while (true) {
+				int read = reader.read(buf, 0, buf.length);
+				if (read == -1) break;
+				else if (counter.bytesRead() > MAX_DOWNLOAD_SIZE)
+					break;
+
+				builder.append(buf, 0, read);
+				if (counter.bytesRead() - start >= BUFFER_SIZE) {
+					JSONObject map = new JSONObject();
+					map.put("response", builder.toString());
+					dest.write(map.toJSONString().getBytes(UTF8));
+					builder = new StringBuilder(2 * BUFFER_SIZE);
+				}
+			}
+
+			/* send the last message */
+			JSONObject map = new JSONObject();
+			map.put("response", builder.toString());
+			map.put("end", "true");
+			dest.write(map.toJSONString().getBytes(UTF8));
+			total = counter.bytesRead();
+		} else {
+			/* download the entire page, and send the whole thing */
+			ByteArrayOutputStream page = new ByteArrayOutputStream(4 * BUFFER_SIZE);
+			byte[] buf = new byte[BUFFER_SIZE];
+			int read = stream.read(buf);
+			total = read;
+			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
+				page.write(buf, 0, read);
+				read = stream.read(buf);
+				total += read;
+			}
+			JSONObject map = new JSONObject();
+			map.put("response", new String(page.toByteArray(), encoding));
+			dest.write(map.toJSONString().getBytes(UTF8));
+			dest.write(NEWLINE.getBytes(UTF8));
+		}
+
+		if (total < MAX_DOWNLOAD_SIZE)
+			module.logDownloadCompleted(total);
+		else {
+			module.logDownloadAborted();
+			JSONObject map = new JSONObject();
+			map.put("error", "Exceeded download size limit... aborted.");
+			dest.write(map.toJSONString().getBytes(UTF8));
+			dest.write(NEWLINE.getBytes(UTF8));
+		}
+
+		dest.flush();
+		stream.close();
+	}
+
+	private void downloadPageBytes(String contentType,
 			InputStream stream, DataOutputStream dest, boolean blocked)
 					throws IOException
 	{
@@ -105,12 +193,13 @@ public class ModuleThread implements Runnable, Interruptable
 			dest.writeShort(0);
 		} else {
 			/* download the entire page, and send the whole thing */
-			ByteArrayOutputStream page = new ByteArrayOutputStream(BUFFER_SIZE);
-			int read = stream.read();
+			ByteArrayOutputStream page = new ByteArrayOutputStream(4 * BUFFER_SIZE);
+			byte[] buf = new byte[BUFFER_SIZE];
+			int read = stream.read(buf);
 			total = read;
 			while (read != -1 && total < MAX_DOWNLOAD_SIZE) {
-				page.write(read);
-				read = stream.read();
+				page.write(buf);
+				read = stream.read(buf);
 				total += read;
 			}
 			dest.writeInt(page.size());
@@ -177,7 +266,16 @@ public class ModuleThread implements Runnable, Interruptable
 			module.logHttpGetRequest(url);
 			URLConnection http = new URL(url).openConnection();
 			http.setRequestProperty("User-Agent", userAgent);
-			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
+			switch (module.getApi()) {
+			case BINARY:
+				downloadPageBytes(http.getContentType(), http.getInputStream(), dest, blocked);
+				break;
+			case JSON:
+				downloadPageChars(http.getContentType(), http.getInputStream(), dest, blocked);
+				break;
+			default:
+				module.logError("ModuleThread", "httpGetRequest", "Unrecognized module API field.");
+			}
 		} catch (IOException e) {
 			module.logError("ModuleThread", "httpGetRequest",
 					"Could not download from URL '" + url + "'.");
@@ -215,7 +313,16 @@ public class ModuleThread implements Runnable, Interruptable
 			http.getOutputStream().flush();
 			http.getOutputStream().close();
 
-			downloadPage(http.getContentType(), http.getInputStream(), dest, blocked);
+			switch (module.getApi()) {
+			case BINARY:
+				downloadPageBytes(http.getContentType(), http.getInputStream(), dest, blocked);
+				break;
+			case JSON:
+				downloadPageChars(http.getContentType(), http.getInputStream(), dest, blocked);
+				break;
+			default:
+				module.logError("ModuleThread", "httpPostRequest", "Unrecognized module API field.");
+			}
 		} catch (Exception e) {
 			module.logError("ModuleThread", "httpPostRequest",
 					"Could not download from URL '" + url
@@ -225,26 +332,52 @@ public class ModuleThread implements Runnable, Interruptable
 	}
 
 	private void getProductListResponse(
-			Module module, DataInputStream in) throws IOException
+			Module module, DataInputStream in, JSONObject json) throws IOException
 	{
-		int length = in.readUnsignedShort();
-		byte[] data = new byte[length];
-		in.readFully(data);
-		state = new String(data, UTF8);
-
-		int count = in.readUnsignedShort();
-		if (count < 0 || count > MAX_BATCH_SIZE) {
-			module.logError("ModuleThread", "getProductListResponse",
-					"Invalid product ID count.");
-			return;
-		}
-
-		String[] productIds = new String[count];
-		for (int i = 0; i < count; i++) {
-			length = in.readUnsignedShort();
-			data = new byte[length];
+		String[] productIds;
+		switch (module.getApi()) {
+		case BINARY:
+			int length = in.readUnsignedShort();
+			byte[] data = new byte[length];
 			in.readFully(data);
-			productIds[i] = new String(data, UTF8);
+			state = new String(data, UTF8);
+
+			int count = in.readUnsignedShort();
+			if (count < 0 || count > MAX_BATCH_SIZE) {
+				module.logError("ModuleThread", "getProductListResponse",
+						"Invalid product ID count.");
+				return;
+			}
+
+			productIds = new String[count];
+			for (int i = 0; i < count; i++) {
+				length = in.readUnsignedShort();
+				data = new byte[length];
+				in.readFully(data);
+				productIds[i] = new String(data, UTF8);
+			}
+			break;
+		case JSON:
+			Object parsed = json.get("ids");
+			if (!(parsed instanceof JSONArray)) {
+				module.logError("ModuleThread", "getProductListResponse",
+						"Expected JSON array of product IDs.");
+				return;
+			}
+
+			JSONArray array = (JSONArray) parsed;
+			productIds = new String[array.size()];
+			for (int i = 0; i < array.size(); i++)
+				productIds[i] = array.get(i).toString();
+
+			Object newState = json.get("state");
+			if (newState != null && newState instanceof String)
+				state = (String) newState;
+			break;
+		default:
+			module.logError("ModuleThread", "getProductListResponse",
+					"Unrecognized module API field.");
+			return;
 		}
 
 		if (dummy) return;
@@ -255,53 +388,83 @@ public class ModuleThread implements Runnable, Interruptable
 	}
 
 	private void getProductInfoResponse(Module module,
-			ProductID productId, DataInputStream in) throws IOException
+			ProductID productId, DataInputStream in, JSONObject json) throws IOException
 	{
-		int count = in.readUnsignedShort();
-		if (count < 0 || count > MAX_COLUMN_COUNT) {
-			module.logError("ModuleThread", "getProductInfoResponse",
-					"Too many key-value pairs.");
-			return;
-		}
-
-		ArrayList<Entry<String, Object>> keyValues =
-				new ArrayList<Entry<String, Object>>(count + 1);
 		Object brand = null;
 		Object model = null;
 		Object price = null;
-		for (int i = 0; i < count; i++)
-		{
-			int length = in.readUnsignedShort();
-			byte[] data = new byte[length];
-			in.readFully(data);
-			String key = new String(data, UTF8);
-
-			Object value;
-			int type = in.readUnsignedByte();
-			if (type == TYPE_LONG) {
-				value = in.readLong();
-			} else if (type == TYPE_STRING) {
-				length = in.readUnsignedShort();
-				data = new byte[length];
-				in.readFully(data);
-				value = new String(data, UTF8);
-			} else {
+		ArrayList<Entry<String, Object>> keyValues;
+		switch (module.getApi()) {
+		case BINARY:
+			int count = in.readUnsignedShort();
+			if (count < 0 || count > MAX_COLUMN_COUNT) {
 				module.logError("ModuleThread", "getProductInfoResponse",
-						"Unrecognized value type flag.");
+						"Too many key-value pairs.");
 				return;
 			}
 
-			if (key.equals("brand")) {
-				brand = value;
-				keyValues.add(new SimpleEntry<String, Object>(key, value));
-			} else if (key.equals("model")) {
-				model = value;
-				keyValues.add(new SimpleEntry<String, Object>(key, value));
-			} else if (key.equals("price")) {
-				price = value;
-				keyValues.add(new SimpleEntry<String, Object>(key, value));
-			} else if (!Core.getDatabase().isReservedKey(key))
-				keyValues.add(new SimpleEntry<String, Object>(key, value));
+			keyValues = new ArrayList<Entry<String, Object>>(count + 1);
+			for (int i = 0; i < count; i++)
+			{
+				int length = in.readUnsignedShort();
+				byte[] data = new byte[length];
+				in.readFully(data);
+				String key = new String(data, UTF8);
+
+				Object value;
+				int type = in.readUnsignedByte();
+				if (type == TYPE_LONG) {
+					value = in.readLong();
+				} else if (type == TYPE_STRING) {
+					length = in.readUnsignedShort();
+					data = new byte[length];
+					in.readFully(data);
+					value = new String(data, UTF8);
+				} else {
+					module.logError("ModuleThread", "getProductInfoResponse",
+							"Unrecognized value type flag.");
+					return;
+				}
+
+				if (key.equals("brand")) {
+					brand = value;
+					keyValues.add(new SimpleEntry<String, Object>(key, value));
+				} else if (key.equals("model")) {
+					model = value;
+					keyValues.add(new SimpleEntry<String, Object>(key, value));
+				} else if (key.equals("price")) {
+					price = value;
+					keyValues.add(new SimpleEntry<String, Object>(key, value));
+				} else if (!Core.getDatabase().isReservedKey(key))
+					keyValues.add(new SimpleEntry<String, Object>(key, value));
+			}
+			break;
+		case JSON:
+			Object parsed = json.get("response");
+			if (!(parsed instanceof JSONObject)) {
+				module.logError("ModuleThread", "getProductInfoResponse",
+						"Expected JSON map of key-value pairs.");
+				return;
+			}
+
+			JSONObject map = (JSONObject) parsed;
+			brand = map.get("brand");
+			model = map.get("model");
+			price = map.get("price");
+
+			keyValues = new ArrayList<Entry<String, Object>>(map.size());
+			if (brand != null) keyValues.add(new SimpleEntry<String, Object>("brand", brand));
+			if (model != null) keyValues.add(new SimpleEntry<String, Object>("model", model));
+			if (price != null) keyValues.add(new SimpleEntry<String, Object>("price", price));
+			for (Entry<String, Object> entry : map.entrySet()) {
+				if (!Core.getDatabase().isReservedKey(entry.getKey()))
+					keyValues.add(entry);
+			}
+			break;
+		default:
+			module.logError("ModuleThread", "getProductInfoResponse",
+					"Unrecognized module API field.");
+			return;
 		}
 
 		if (brand == null || model == null)
@@ -404,8 +567,9 @@ public class ModuleThread implements Runnable, Interruptable
 
 		process = Core.getSandbox().run(module);
 		DataOutputStream out = new DataOutputStream(process.getOutputStream());
-		DataInputStream in = new DataInputStream(new InterruptableInputStream(
-				process.getInputStream(), this, INPUT_SLEEP_DURATION));
+		InputStream underlyingStream = new InterruptableInputStream(
+				process.getInputStream(), this, INPUT_SLEEP_DURATION);
+		DataInputStream in = new DataInputStream(underlyingStream);
 
 		/* TODO: limit the amount of data we read */
 		InterruptableInputStream error = new InterruptableInputStream(
@@ -419,11 +583,28 @@ public class ModuleThread implements Runnable, Interruptable
 		ProductID requestedProductId = null;
 		long prevRequest = System.nanoTime() - REQUEST_PERIOD;
 		try {
-			out.writeByte(requestType);
-			if (requestType == Core.PRODUCT_LIST_REQUEST) {
-				out.writeShort(state.length());
-				out.write(state.getBytes(UTF8));
-			} else if (state.length() > 0) {
+			JSONObject map = null;
+			switch (module.getApi()) {
+			case BINARY:
+				out.writeByte(requestType);
+				if (requestType == Core.PRODUCT_LIST_REQUEST) {
+					out.writeShort(state.length());
+					out.write(state.getBytes(UTF8));
+				}
+				break;
+			case JSON:
+				map = new JSONObject();
+				if (requestType == Core.PRODUCT_LIST_REQUEST) {
+					map.put("type", "list");
+					map.put("state", state);
+					out.write(map.toJSONString().getBytes(UTF8));
+					out.write(NEWLINE.getBytes(UTF8));
+				} else {
+					map.put("type", "info");
+				}
+			}
+
+			if (requestType == Core.PRODUCT_INFO_REQUEST && state.length() > 0) {
 				position = Integer.parseInt(state);
 				requestedProductIds.seekRelative(position);
 			}
@@ -435,10 +616,21 @@ public class ModuleThread implements Runnable, Interruptable
 					if (requestedProductIds.hasNext()) {
 						requestedProductId = requestedProductIds.next();
 						String moduleProductId = requestedProductId.getModuleProductId();
-						out.writeShort(moduleProductId.length());
-						out.write(moduleProductId.getBytes(UTF8));
+						if (module.getApi() == Module.Api.BINARY) {
+							out.writeShort(moduleProductId.length());
+							out.write(moduleProductId.getBytes(UTF8));
+						} else if (module.getApi() == Module.Api.JSON) {
+							map.put("id", moduleProductId);
+							out.write(map.toJSONString().getBytes(UTF8));
+							out.write(NEWLINE.getBytes(UTF8));
+						}
 					} else {
-						out.writeShort(0);
+						if (module.getApi() == Module.Api.BINARY)
+							out.writeShort(0);
+						else if (module.getApi() == Module.Api.JSON) {
+							out.write(new JSONObject().toJSONString().getBytes(UTF8));
+							out.write(NEWLINE.getBytes(UTF8));
+						}
 						break;
 					}
 					responded = false;
@@ -446,72 +638,120 @@ public class ModuleThread implements Runnable, Interruptable
 				out.flush();
 
 				/* read input from the module */
-				switch (in.readUnsignedByte()) {
-				case MODULE_SET_USER_AGENT:
-					if (module.isRemote()) {
-						module.logError("ModuleThread", "run",
-								"Remote modules cannot make HTTP requests.");
+				if (module.getApi() == Module.Api.JSON) {
+					Object parsed = null;
+					try {
+						parsed = parser.parse(in);
+					} catch (ParseException e) {
+						module.logError("ModuleThread", "run", "Error during JSON parsing.", e);
 						stop();
-					} else {
-						int length = in.readUnsignedShort();
-						byte[] data = new byte[length];
-						in.readFully(data);
-						this.userAgent = new String(data, UTF8);
+						break;
+					}
+					if (!(parsed instanceof JSONObject)) {
+						module.logError("ModuleThread", "run", "Expected JSON map.");
+						stop();
+						break;
+					}
+
+					JSONObject response = (JSONObject) parsed;
+					String type = response.get("type").toString().trim().toLowerCase();
+					if (type.equals("get") || type.equals("post")) {
+						if (module.isRemote()) {
+							module.logError("ModuleThread", "run",
+									"Remote modules cannot make HTTP requests.");
+							stop();
+							break;
+						}
+
+						String url = response.get("url").toString();
+						Object userAgent = response.get("user_agent");
+						if (userAgent != null)
+							this.userAgent = userAgent.toString();
 						module.logUserAgentChange(this.userAgent);
+						if (type.equals("post")) {
+							String post = response.get("post").toString();
+							httpPostRequest(url, post.getBytes(UTF8), out, module.blockedDownload(), prevRequest);
+						} else {
+							httpGetRequest(url, out, module.blockedDownload(), prevRequest);
+						}
+					} else if (type.equals("response")) {
+						if (requestType == Core.PRODUCT_LIST_REQUEST)
+							getProductListResponse(module, in, response);
+						else if (requestType == Core.PRODUCT_INFO_REQUEST) {
+							getProductInfoResponse(module, requestedProductId, in, response);
+							state = String.valueOf(position);
+							position++;
+						}
+						responded = true;
 					}
-					break;
+				} else {
+					switch (in.readUnsignedByte()) {
+					case MODULE_SET_USER_AGENT:
+						if (module.isRemote()) {
+							module.logError("ModuleThread", "run",
+									"Remote modules cannot make HTTP requests.");
+							stop();
+						} else {
+							int length = in.readUnsignedShort();
+							byte[] data = new byte[length];
+							in.readFully(data);
+							this.userAgent = new String(data, UTF8);
+							module.logUserAgentChange(this.userAgent);
+						}
+						break;
 
-				case MODULE_HTTP_GET_REQUEST:
-					if (module.isRemote()) {
-						module.logError("ModuleThread", "run",
-								"Remote modules cannot make HTTP requests.");
-						stop();
-					} else {
-						int length = in.readUnsignedShort();
-						byte[] data = new byte[length];
-						in.readFully(data);
-						String url = new String(data, ASCII);
-						httpGetRequest(url, out, module.blockedDownload(), prevRequest);
-						prevRequest = System.nanoTime();
-					}
-					break;
+					case MODULE_HTTP_GET_REQUEST:
+						if (module.isRemote()) {
+							module.logError("ModuleThread", "run",
+									"Remote modules cannot make HTTP requests.");
+							stop();
+						} else {
+							int length = in.readUnsignedShort();
+							byte[] data = new byte[length];
+							in.readFully(data);
+							String url = new String(data, ASCII);
+							httpGetRequest(url, out, module.blockedDownload(), prevRequest);
+							prevRequest = System.nanoTime();
+						}
+						break;
 
-				case MODULE_HTTP_POST_REQUEST:
-					if (module.isRemote()) {
-						module.logError("ModuleThread", "run",
-								"Remote modules cannot make HTTP requests.");
-						stop();
-					} else {
-						int length = in.readUnsignedShort();
-						byte[] data = new byte[length];
-						in.readFully(data);
-						String url = new String(data, ASCII);
+					case MODULE_HTTP_POST_REQUEST:
+						if (module.isRemote()) {
+							module.logError("ModuleThread", "run",
+									"Remote modules cannot make HTTP requests.");
+							stop();
+						} else {
+							int length = in.readUnsignedShort();
+							byte[] data = new byte[length];
+							in.readFully(data);
+							String url = new String(data, ASCII);
 
-						/* read the POST data */
-						length = in.readInt();
-						data = new byte[length];
-						in.readFully(data);
+							/* read the POST data */
+							length = in.readInt();
+							data = new byte[length];
+							in.readFully(data);
 						
-						httpPostRequest(url, data, out, module.blockedDownload(), prevRequest);
-						prevRequest = System.nanoTime();
-					}
-					break;
+							httpPostRequest(url, data, out, module.blockedDownload(), prevRequest);
+							prevRequest = System.nanoTime();
+						}
+						break;
 
-				case MODULE_RESPONSE:
-					if (requestType == Core.PRODUCT_LIST_REQUEST)
-						getProductListResponse(module, in);
-					else if (requestType == Core.PRODUCT_INFO_REQUEST) {
-						getProductInfoResponse(module, requestedProductId, in);
-						state = String.valueOf(position);
-						position++;
-					}
-					responded = true;
-					break;
+					case MODULE_RESPONSE:
+						if (requestType == Core.PRODUCT_LIST_REQUEST)
+							getProductListResponse(module, in, null);
+						else if (requestType == Core.PRODUCT_INFO_REQUEST) {
+							getProductInfoResponse(module, requestedProductId, in, null);
+							state = String.valueOf(position);
+							position++;
+						}
+						responded = true;
+						break;
 
-				default:
-					module.logError("ModuleThread", "run",
-							"Unknown module response type.");
-					stop();
+					default:
+						module.logError("ModuleThread", "run",
+								"Unknown module response type.");
+						stop();
+					}
 				}
 			}
 			String productIdString = "";
@@ -541,3 +781,24 @@ public class ModuleThread implements Runnable, Interruptable
 		cleanup(process, pipe, piper);
 	}
 }
+
+class CountingInputStream extends InputStream
+{
+	private InputStream stream;
+	private int count = 0;
+
+	public CountingInputStream(InputStream stream) {
+		this.stream = stream;
+	}
+
+	@Override
+	public int read() throws IOException {
+		count++;
+		return stream.read();
+	}
+
+	public int bytesRead() {
+		return count;
+	}
+}
+
