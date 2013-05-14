@@ -27,6 +27,8 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User)
     modules = models.ManyToManyField(Module)
     products = models.ManyToManyField(Product, through='Track')
+    up_modules = models.ManyToManyField(Module, related_name='up+')
+    down_modules = models.ManyToManyField(Module, related_name='down+')
 
     def __unicode__(self):
         return u'{0} profile'.format(self.user.username)
