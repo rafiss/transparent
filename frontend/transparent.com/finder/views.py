@@ -99,8 +99,15 @@ def product(request, gid):
         payload['modules'] = [module.backend_id for module in modules]
     resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
     product = json.loads(resp.read())
+
+    # Remove empty module results
+    included_modules = []
+    for module in modules:
+        if module.backend_id in product and product[module.backend_id]:
+            included_modules.append(module)
+
     return render(request, "product.html", {'gid': gid, 'product': product,
-        'modules': modules, 'tracking': tracking, 'threshold': threshold})
+        'modules': included_modules, 'tracking': tracking, 'threshold': threshold})
 
 def about(request):
     return render(request, "about.html", {})

@@ -110,8 +110,12 @@
                                 {% ifequal id module.backend_id %}
 								<li class="span7" style="margin-bottom: 10px;">
 								<table class="table table-hover table-bordered">
+                                    <tr><td><b> price </b></td><td> {{ data.price }} </td></tr>
+                                    <tr><td><b> url </b></td><td> <a href="{{ data.url }}">Retailer page</a></td></tr>
                                 {% for key, value in data.items %}
-                                    <tr><td><b> {{ key }} </b></td><td> {{ value }} </td></tr>
+                                    {% if key != "price" and key != "url" and key != "module" and key != "image" and key != "module_product_id" %}
+                                        <tr><td><b> {{ key }} </b></td><td> {{ value }} </td></tr>
+                                    {% endif %}
                                 {% endfor %}
 								</table>
 								</li>
