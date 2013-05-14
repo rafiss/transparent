@@ -11,8 +11,6 @@ SRCS = \
 	transparent/core/Server.java \
 	transparent/core/Console.java \
 	transparent/core/PriceTrigger.java \
-	transparent/core/PriceRecord.java \
-	transparent/core/PriceRecords.java \
 	transparent/core/PriceHistory.java \
 	transparent/core/Interruptable.java \
 	transparent/core/InterruptableInputStream.java \
@@ -28,7 +26,7 @@ SRCS = \
 #
 
 JC=javac
-JFLAGS=-cp lib/mariadb-java-client-1.1.1.jar:lib/jansi-1.9.jar:lib/jline-1.0.jar:lib/jcurses.jar:lib/simple-5.1.1.jar:lib/json-smart-1.1.1.jar:lib/commons-pool-1.6.jar:lib/jedis-2.1.0.jar:lib/johm.jar:.
+JFLAGS=-cp lib/mariadb-java-client-1.1.1.jar:lib/jansi-1.9.jar:lib/jline-1.0.jar:lib/jcurses.jar:lib/simple-5.1.1.jar:lib/json-smart-1.1.1.jar:lib/commons-pool-1.6.jar:lib/jedis-2.1.0.jar:.
 MODULES=newegg amazon
 
 #

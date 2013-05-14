@@ -168,6 +168,7 @@ public class AmazonParser
 			out.writeShort(data.length);
 			out.write(data);
 		}
+		out.flush();
 	}
 
 	private static void respond(Map<String, Object> keyValues) throws IOException
@@ -191,6 +192,7 @@ public class AmazonParser
 				out.writeLong(((Number) valueObject).longValue());
 			}
 		}
+		out.flush();
 	}
 	
 	private static void parseCategory(int category, int startPage, String lowPrice)
@@ -395,15 +397,19 @@ public class AmazonParser
 		String url = PRODUCT_URL + productId;
 
 		byte[] data;
+		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		try {
 			data = httpGetRequest(url);
+			if (data == null || data.length == 0) {
+				respond(keyValues);
+				return;
+			}
 		} catch (IOException e) {
 			System.err.println("AmazonParser.parseProductInfo ERROR:"
 					+ " Error requesting URL '" + url + "'.");
 			return;
 		}
 
-		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		Document document = Jsoup.parse(new String(data, UTF8));
 
 		/* parse the price and store the price and URL */

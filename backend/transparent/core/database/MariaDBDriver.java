@@ -43,6 +43,8 @@ public class MariaDBDriver implements transparent.core.database.Database {
 	private static final String DYNAMIC_COLS = "dynamic_cols";
 	private static final String DATABASE_NAME = "scratch2";
 
+	private static final int MAX_SEARCH_MATCHES = 2000;
+
 	private static final Map<String, Column> RESERVED_COLUMNS;
 	static {
 		Map<String, Column> reserved = new HashMap<String, Column>();
@@ -169,8 +171,22 @@ public class MariaDBDriver implements transparent.core.database.Database {
 			saveColumns();
             statement.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
-            module.logError("MariaDBDriver", "addProductInfo", "", e);
+			StringBuilder builder = new StringBuilder();
+			if (keyValues.length == 0)
+				builder.append("keyValues: {}");
+			else {
+				builder.append("keyValues: {");
+				builder.append(keyValues[0].getKey() + ":");
+				if (keyValues[0].getValue() instanceof String)
+					builder.append("'" + keyValues[0].getValue() + "'");
+				for (int i = 1; i < keyValues.length; i++) {
+					builder.append("," + keyValues[i].getKey() + ":");
+					if (keyValues[i].getValue() instanceof String)
+						builder.append("'" + keyValues[i].getValue() + "'");
+				}
+				builder.append("}");
+			}
+            module.logError("MariaDBDriver", "addProductInfo", builder.toString(), e);
             return false;
         } finally {
             if (statement != null) {
@@ -525,9 +541,9 @@ public class MariaDBDriver implements transparent.core.database.Database {
 			builder.append(" FROM ");
 			builder.append(NAME_INDEX_TABLE);
 			builder.append(" WHERE query=?) t1 USING (");
-			parameters.add(query + ";mode=any");
+			parameters.add(query + ";mode=any;limit=" + MAX_SEARCH_MATCHES);
 			builder.append(ENTITY_ID_COL.getName());
-			builder.append(")" );
+			builder.append(") ");
 		}
 
 		appendWhereStatement(builder, parameters, whereClause, whereRelation, whereArgs);

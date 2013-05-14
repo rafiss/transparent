@@ -233,6 +233,7 @@ public class NeweggParser
 			out.writeShort(data.length);
 			out.write(data);
 		}
+		out.flush();
 	}
 
 	private static void respond(Map<String, Object> keyValues) throws IOException
@@ -260,6 +261,7 @@ public class NeweggParser
 				out.writeLong(((Number) valueObject).longValue());
 			}
 		}
+		out.flush();
 	}
 
 	private static void findKeyValues(
@@ -486,9 +488,14 @@ public class NeweggParser
 	{
 		byte[] data;
 		String url = PRODUCT_URL + productId + PRODUCT_URL_SUFFIX;
-		
+
+		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		try {
 			data = httpGetRequest(url);
+			if (data == null || data.length == 0) {
+				respond(keyValues);
+				return true;
+			}
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error requesting URL '" + url + "'.");
@@ -505,7 +512,6 @@ public class NeweggParser
 		}
 
 		/* parse product specifications */
-		HashMap<String, Object> keyValues = new HashMap<String, Object>();
 		findKeyValues(keyValues, parsed);
 
 		/* parse general product info */
@@ -513,6 +519,10 @@ public class NeweggParser
 
 		try {
 			data = httpGetRequest(url);
+			if (data == null || data.length == 0) {
+				respond(keyValues);
+				return true;
+			}
 		} catch (IOException e) {
 			System.err.println("NeweggParser.parseProductInfo ERROR:"
 					+ " Error requesting URL '" + url + "'.");

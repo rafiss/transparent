@@ -31,7 +31,10 @@ def nodeText(node):
 	return ''.join([x for x in node.itertext()])
 
 def encodePrice(s):
-	return int(''.join(c for c in s if c.isdigit()))
+	price_string = ''.join(c for c in s if c.isdigit())
+	if len(price_string) == 0:
+		return None
+	return int(price_string)
 
 def httpGetRequest(url):
 	json.dump({'type':'get', 'url':url}, sys.stdout)
@@ -72,7 +75,9 @@ def parseProductInfo(request):
 	parsed = parser.parse(httpGetRequest(PRODUCT_INFO_URL + productid))
 	selected_price = price_selector(parsed)
 	if selected_price is not None and len(selected_price) > 0:
-		response['price'] = encodePrice(nodeText(selected_price[0]))
+		encoded_price = encodePrice(nodeText(selected_price[0]))
+		if encoded_price is not None:
+			response['price'] = encoded_price
 	selected_name = name_selector(parsed)
 	if selected_name is None or len(selected_name) == 0:
 		selected_name = backup_name_selector(parsed)
@@ -88,9 +93,9 @@ def parseProductInfo(request):
 				key = token[0].strip().lower()
 				value = token[1].strip().replace('<b>','').replace('</b>','') \
 						.replace('<strong>','').replace('</strong>','')
-				if key == 'Manufactured by':
+				if key == 'manufactured by':
 					response['brand'] = value
-				elif key == 'Mfg Part No':
+				elif key == 'mfg part no':
 					response['model'] = value
 
 	# parse specification key-value pairs

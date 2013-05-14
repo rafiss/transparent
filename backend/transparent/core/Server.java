@@ -1,5 +1,6 @@
 package transparent.core;
 
+import transparent.core.PriceHistory.PriceRecord;
 import transparent.core.database.Database.Relation;
 import transparent.core.database.Database.Results;
 
@@ -8,11 +9,14 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -53,6 +57,8 @@ public class Server implements Container
 				return ((BigInteger) json).longValue();
 			} else if (json instanceof Long) {
 				return (long) json;
+			} else if (json instanceof Integer) {
+				return Long.valueOf((int) json);
 			} else {
 				return null;
 			}
@@ -171,6 +177,8 @@ public class Server implements Container
 			String model = null;
 			String image = null;
 			String name = null;
+			String url = null;
+			Long module = null;
 			Long price = null;
 			Results results;
 			if (modules == null) {
@@ -206,6 +214,12 @@ public class Server implements Container
 					if (oldPrice != null && oldPrice <= priceValue)
 						continue;
 					prices.put(module_id, priceValue);
+					module = module_id;
+					Object urlObject = json.get("url");
+					if (urlObject != null && urlObject instanceof String)
+						url = (String) urlObject;
+					else
+						url = null;
 
 					json.put("price", Core.priceToString(priceValue));
 					if (price == null || priceValue < price)
@@ -231,6 +245,10 @@ public class Server implements Container
 			else if (name != null)
 				rows.put("name", name);
 
+			if (module != null)
+				rows.put("module", new BigInteger(Core.toUnsignedString(module)));
+			if (url != null)
+				rows.put("url", url);
 			if (image != null)
 				rows.put("image", image);
 			if (price != null)
@@ -347,11 +365,11 @@ public class Server implements Container
 				}
 			}
 
-			Integer page = null;
+			Integer page = 1;
 			Object pageObject = map.get("page");
 			if (pageObject != null) {
-				if (pageObject instanceof Integer) {
-					page = (int) pageObject;
+				if (pageObject instanceof Number) {
+					page = ((Number) pageObject).intValue();
 				} else if (pageObject instanceof String) {
 					page = Integer.parseInt((String) pageObject);
 				} else {
@@ -359,15 +377,13 @@ public class Server implements Container
 					body.close();
 					return;
 				}
-
-				page = Integer.parseInt((String) pageObject);
 			}
 
-			Integer limit = null;
+			Integer limit = 15;
 			Object limitObject = map.get("pagesize");
 			if (limitObject != null) {
-				if (limitObject instanceof Integer) {
-					limit = (int) limitObject;
+				if (limitObject instanceof Number) {
+					limit = ((Number) limitObject).intValue();
 				} else if (limitObject instanceof String) {
 					limit = Integer.parseInt((String) limitObject);
 				} else {
@@ -434,7 +450,7 @@ public class Server implements Container
 			Core.addPriceTrack(gid, modules, price);
 			JSONObject result = new JSONObject();
 			result.put("success", "true");
-			body.println(result);
+			body.println(result.toJSONString());
 		}
 
 		private void parseUnsubscribe(PrintStream body) throws ParseException, IOException
@@ -479,10 +495,58 @@ public class Server implements Container
 				}
 			}
 
-			Core.addPriceTrack(gid, modules, price);
+			Core.removePriceTrack(gid, modules, price);
 			JSONObject result = new JSONObject();
 			result.put("success", "true");
-			body.println(result);
+			body.println(result.toJSONString());
+		}
+
+		private void parseHistory(PrintStream body) throws ParseException, IOException
+		{
+			Object object = parser.parse(request.getContent());
+			if (!(object instanceof JSONObject)) {
+				body.println(error("Root structure must be a map."));
+				body.close();
+				return;
+			}
+
+			JSONObject map = (JSONObject) object;
+			Long gid = parseJsonLong(map.get("gid"));
+			if (gid == null) {
+				body.println(error("Unable to parse 'gid'."));
+				body.close();
+				return;
+			}
+
+			Long[] modules = null;
+			Object modulesObject = map.get("modules");
+			if (modulesObject != null) {
+				modules = parseModules(modulesObject);
+				if (modules == null) {
+					body.println(error("Unable to parse 'modules' key."));
+					body.close();
+					return;
+				}
+			}
+
+			JSONArray result = new JSONArray();
+			if (modules == null) {
+				for (Module module : Core.getModules()) {
+					JSONObject row = new JSONObject();
+					row.put("name", module.getSourceName()); /* TODO: do something smarter with overlapping source names */
+					row.put("data", serializeHistory(Core.getPriceHistory(module.getId(), gid)));
+					result.add(row);
+				}
+			} else {
+				for (Long moduleId : modules) {
+					JSONObject row = new JSONObject();
+					row.put("name", Core.getModule(moduleId).getSourceName());
+					row.put("data", serializeHistory(Core.getPriceHistory(moduleId, gid)));
+					result.add(row);
+				}
+			}
+
+			body.println(result.toJSONString());
 		}
 
 		@Override
@@ -502,6 +566,8 @@ public class Server implements Container
 					parseSubscribe(body);
 				else if (url.equals("/unsubscribe") || url.equals("/unsubscribe/"))
 					parseUnsubscribe(body);
+				else if (url.equals("/history") || url.equals("/history/"))
+					parseHistory(body);
 				else
 					body.println(error("Page not found."));
 				body.close();
@@ -524,6 +590,19 @@ public class Server implements Container
 		}
 	}
 
+	private static JSONObject serializeHistory(List<PriceRecord> history) {
+		JSONObject map = new JSONObject();
+		if (history == null)
+			return map;
+		SimpleDateFormat sd = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+		for (PriceRecord record : history) {
+			String key = sd.format(new Date(record.getTime()));
+			double value = record.getPrice() / 100.0;
+			map.put(key, value);
+		}
+		return map;
+	}
+
 	private static JSONObject moduleInfo(Module module)
 	{
 		if (module == null)
@@ -534,6 +613,7 @@ public class Server implements Container
 		map.put("source", module.getSourceName());
 		map.put("url", module.getModuleUrl());
 		map.put("sourceurl", module.getSourceUrl());
+		map.put("api", module.getApi().save());
 		return map;
 	}
 

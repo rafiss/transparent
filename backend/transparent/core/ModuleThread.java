@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -41,6 +42,7 @@ public class ModuleThread implements Runnable, Interruptable
 
 	private static final int DOWNLOAD_OK = 0;
 	private static final int DOWNLOAD_ABORTED = 1;
+	private static final int URL_NOT_FOUND = 2;
 
 	private static final int BUFFER_SIZE = 4096; /* in bytes */
 	private static final int CHAR_BUFFER_SIZE = 256; /* in bytes */
@@ -58,7 +60,7 @@ public class ModuleThread implements Runnable, Interruptable
 
 	private static final String DEFAULT_USER_AGENT =
 			"Mozilla/5.0 (X11; Linux x86_64; rv:20.0) Gecko/20100101 Firefox/20.0";
-	private static final String PRICE_ALERT_URL = ""; /* TODO: fill this in */
+	private static final String PRICE_ALERT_URL = "http://transparent.rafiss.com/track_notify";
 	private static final Pattern ENCODING_PATTERN =
 			Pattern.compile("text/html;\\s+charset=([^\\s]+)\\s*");
 	private static final String NEWLINE = System.getProperty("line.separator");
@@ -276,9 +278,16 @@ public class ModuleThread implements Runnable, Interruptable
 			default:
 				module.logError("ModuleThread", "httpGetRequest", "Unrecognized module API field.");
 			}
+		} catch (FileNotFoundException e) {
+			/* URL does not exist, so send empty bytes */
+			try {
+				dest.writeShort(0);
+				dest.writeShort(0);
+				dest.writeByte(URL_NOT_FOUND);
+			} catch (IOException e2) { }
 		} catch (IOException e) {
 			module.logError("ModuleThread", "httpGetRequest",
-					"Could not download from URL '" + url + "'.");
+					"Could not download from URL '" + url + "'.", e);
 		}
 	}
 
@@ -323,10 +332,16 @@ public class ModuleThread implements Runnable, Interruptable
 			default:
 				module.logError("ModuleThread", "httpPostRequest", "Unrecognized module API field.");
 			}
+		} catch (FileNotFoundException e) {
+			/* URL does not exist, so send empty bytes */
+			try {
+				dest.writeShort(0);
+				dest.writeShort(0);
+				dest.writeByte(URL_NOT_FOUND);
+			} catch (IOException e2) { }
 		} catch (Exception e) {
 			module.logError("ModuleThread", "httpPostRequest",
-					"Could not download from URL '" + url
-					+ "'. Exception: " + e.getMessage());
+					"Could not download from URL '" + url + "'.", e);
 			return;
 		}
 	}
@@ -503,8 +518,8 @@ public class ModuleThread implements Runnable, Interruptable
 			long parsed = -1;
 			if (price instanceof String)
 				parsed = Core.parsePrice((String) price);
-			else if (price instanceof Long)
-				parsed = (Long) price;
+			else if (price instanceof Number)
+				parsed = ((Number) price).longValue();
 			else
 				throw new IllegalStateException("Unexpected type for price.");
 			if ((oldPrice == null || parsed < oldPrice) && Core.checkPrice(module, gid, parsed)) {
