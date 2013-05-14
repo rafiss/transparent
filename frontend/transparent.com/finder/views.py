@@ -118,8 +118,27 @@ def product(request, gid):
                 module['downvoted'] = bool(request.user.userprofile.down_modules.filter(backend_id=module['backend_id']))
             included_modules.append(module)
 
+    #resp = urllib2.urlopen(BACKEND_URL + '/history', json.dumps(payload))
+    #chartData = json.loads(resp.read())
+    #chartUrl = BACKEND_URL + '/history'
+
     return render(request, "product.html", {'gid': gid, 'product': product,
         'modules': included_modules, 'tracking': tracking, 'threshold': threshold})
+
+def chart(request, gid):
+    modules = Module.objects.all()
+    if request.user is not None and request.user.is_authenticated():
+        if request.user.userprofile.modules.all():
+            modules = request.user.userprofile.modules.all()
+
+    payload = {'gid': gid}
+    if modules:
+        payload['modules'] = [module.backend_id for module in modules]
+
+    resp = urllib2.urlopen(BACKEND_URL + '/history', json.dumps(payload))
+    return HttpResponse(resp.read())
+    #chartData = json.loads(resp.read())
+
 
 def about(request):
     return render(request, "about.html")
@@ -301,7 +320,7 @@ def downvote(request):
 
     if downed:
         request.user.userprofile.down_modules.remove(module)
-        module.up_score = F('down_score') - 1
+        module.down_score = F('down_score') - 1
     else:
         request.user.userprofile.down_modules.add(module)
         module.down_score = F('down_score') + 1
@@ -313,7 +332,3 @@ def downvote(request):
     request.user.userprofile.save()
    
     return HttpResponse("ok")
-
-# redirect module link to the source code on github
-#def module(request)
-#	return HttpResponse('https://github.com/rafiss/transparent/tree/master/backend/transparent/modules/amazon')

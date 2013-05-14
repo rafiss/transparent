@@ -30,7 +30,8 @@ urlpatterns = patterns('',
     # price tracking
     (r'^track/$', views.track),
     (r'^stop_track/$', views.stop_track),
-    (r'^track_notify/$', views.track_notify),
+
+    (r'^chart/([^/]+)/$', views.chart),
 
     # module voting
     (r'^upvote/$', views.upvote),

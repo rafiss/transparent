@@ -76,6 +76,15 @@
             <li class="span6"> <h3> Lowest Price: {{ product.price }}</h3> </li>
         </ul>
 
+        <div class="well">
+            <h4>Price History</h4>
+            <div id="chart-1" style="height: 300px;"></div>
+        </div>
+		<script>
+			var chart = document.getElementById("chart-1");
+            new Chartkick.LineChart(chart, "{% url 'finder.views.chart' gid %}");
+		</script>
+
 		<!-- Start tabs with other module results here -->
 	    <div class="tabbable tabs-left well well-large">
 	    	<ul class="nav nav-tabs">
@@ -103,25 +112,25 @@
                                 <div class="btn-group">
                                     {% if user.is_authenticated %}
                                         {% if module.upvoted %}
-                                        <button class="btn btn-success" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
+                                        <button data-toggle="tooltip" data-placement="bottom"  title="Votes: {{ module.up_score }}" class="voter btn btn-success" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
                                         {% else %}
-                                        <button class="btn" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
+                                        <button data-toggle="tooltip" data-placement="bottom"  title="Votes: {{ module.up_score}}"class="voter btn" value="{{ module.backend_id }}" onclick="downvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
                                         {% endif %}
                                         {% if module.downvoted %}
-                                        <button class="btn btn-danger" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
+                                        <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn btn-danger" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
                                         {% else %}
-                                        <button class="btn" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
+                                        <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn" value="{{ module.backend_id }}" onclick="downvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
                                         {% endif %}
                                     {% else %}
-                                        <button class="btn" disabled><i class="icon-thumbs-up"></i> Upvote</button>
-                                        <button class="btn" disabled><i class="icon-thumbs-down"></i> Downvote</button>
+                                        <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.up_score }}" class="voter btn" disabled><i class="icon-thumbs-up"></i> Upvote</button>
+                                        <button data-toggle="tooltip" data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn" disabled><i class="icon-thumbs-down"></i> Downvote</button>
                                     {% endif %}
                                 </div>
                             </li>
                             <!-- MAKE SURE TO LIST THE PRICE FIRST -->
                             {% for id, data in product.items %}
                                 {% ifequal id module.backend_id %}
-								<li class="span7" style="margin-bottom: 10px;">
+								<li class="span10" style="margin-bottom: 10px;">
 								<table class="table table-hover table-bordered">
                                     <tr><td><b> price </b></td><td> {{ data.price }} </td></tr>
                                     <tr><td><b> url </b></td><td> <a href="{{ data.url }}">Retailer page</a></td></tr>
@@ -139,36 +148,12 @@
                 {% endfor %}
     		</div>
     	</div>
-
-		<!-- FILL IN PRICE HISTORY HERE USING THE APPROPRIATE DJANGO VARIABLES -->
-		<div id="chart-1" style="height: 300px;" class="well"></div>
-		<script>
-			var chart = document.getElementById("chart-1");
-			new Chartkick.PieChart(chart, {"Football": 45, "Soccer": 56, "Basketball": 98});
-			// or remote
-			new Chartkick.LineChart(chart, "/charts/stocks");
-		</script>
-
-		{% comment %}
-        <ul>
-            {% for key,value in product.module1.items %}
-  	            <li class="span6"> <h5> {{ key }}: </h5> {{ value }} </li>
-            {% endfor %}
-        </ul>
-		{% endcomment %}
-        
-		{% comment %}
-        <ul>
-            {% for key,value in product.module2.items %}
-  	            <li class="span6"> <h5> {{ key }}: </h5> {{ value }} </li>
-            {% endfor %}
-          	<li class="span6"> <h4> Source: </h4> <a href="#">Amazon</a> </li>
-		    <li class="span6"></li>
-            <li class="span6"> <h5> Attribute: </h5> value </li>
-        </ul>
-		{% endcomment %}
     </div>
 </div>
+
+<script> 
+    $('.voter').tooltip();
+</script>
 
 <!-- End of Product Diplays. -->
 

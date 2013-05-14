@@ -39,7 +39,6 @@ function toggleModule(checkBox) {
 }
 
 function upvote(btn) {
-    console.log(btn.value);
      $.ajax({
         type: "POST",
         url: "/upvote/",
@@ -50,11 +49,11 @@ function upvote(btn) {
     });
 }
 
-function downvote(bid) {
+function downvote(btn) {
      $.ajax({
         type: "POST",
         url: "/downvote/",
-        data: {"bid":bid},
+        data: {"bid":btn.value},
         success: function(data, stat, jqXHR) {
             location.reload();
         }
