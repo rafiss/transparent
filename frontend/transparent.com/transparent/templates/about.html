@@ -14,21 +14,47 @@
                 <div class="span12">
                     <!-- Introduction -->
                     <h3>Transparent.About</h3>
-                    <div class="text-header">
-                        Introduction
-                    </div>
                     <br>
                     <div class="text-left">
-                        <p>Have you ever used an online search engine to look for the cheapest products on the market? Have you ever found lower prices at retailers not included in those searches? Transparent is an open source effort to deliver the best deals on online retail stores to its users. It accomplishes this by opening up the development process to the community to expand the search to previously unreachable vendors.</p>
+                        <p>Have you ever used an online search engine to look for the cheapest products on the market? Have you ever found lower prices at retailers not included in those searches? Transparent is an open source effort to deliver the best deals on online retail stores to its users. It accomplishes this by opening up the development process to the community to expand the search to previously unreachable vendors. Transparent offers many features in including to the user.</p>
                     </div>
                     <br>
-                    <br>
-                    <div class="text-header">
-                        Features
-                    </div>
                     <br>
                     <div class="text-left">
-                        <p>The price tracking feature allows the user to view a product's price history and perform a simple prediction of the future product cost. Users can also contribute code to extend the current search database of the application.</p>
+						<div class="text-header">
+                        Search Functionality
+                    	</div><br>
+                        <p>Transparent provides a very intuitive and simple interface to search for products, using the conventional search bar on the home page. Transparent is powered by <a href="http://sphinxsearch.com/about/sphinx/">Sphinx</a> to deliver the most relevant search results to the user.</p>
+						<p><img src="{% static "img/Search_Bar.png" %}" width="90%" class="img" style="border: 1px solid #000000;padding:1px;"></p><br>
+
+						<div class="text-header">
+                        Settings
+                    	</div><br>
+                        <p>By signing up for a free account, you can customize the search results and tailor them specifically to your needs. This gives you the flexibility to choose whichever retailers or specific modules to use. The Settings tab also compactly shows all the modules along with their date of submission and the number of upvotes and downvotes the module received from other users. This provides additional information to help choose the most beneficial modules for a better searching experience.</p>
+						<p><img src="{% static "img/settings.png" %}" width="100%" class="img" style="border: 1px solid #000000;padding:1px;"></p><br>
+
+						<div class="text-header">
+                        Tracker
+                    	</div><br>
+                        <p>Another great feature that registered users can utilize is the Price Tracker. If you find a particular item that you want to purchase after it drops below a certain price, you can have this product tracked and displayed on the Tracked Items page. This provides a simple way to have all items of interest in one location, instead of having to search many websites to find the cheapest price over time.</p>
+						<p><img src="{% static "img/tracker.png" %}" width="100%" class="img" style="border: 1px solid #000000;padding:1px;"></p><br>
+
+						<div class="text-header">
+                        Submit Module
+                    	</div><br>
+                        <p>You can help to improve the search experience by writing and submitting modules to Transparent using the Submit Module form. By following the  <a href="{% url 'finder.views.moduleAPI' %}">Module API</a>, you can make a module for your preferred retailer and have that included in the search results when making a query. Submitted modules are currently reviewed by the Transparent team, and are manually plugged into the backend.</p>
+						<p><img src="{% static "img/submit_module.png" %}" width="80%" class="img" style="border: 1px solid #000000;padding:1px;"></p><br>
+
+						<div class="text-header">
+                        Upvote/Downvote
+                    	</div><br>
+                        <p>This features allows users to upvote their favorite modules while downvoting modules that display incorrect or faulty information on the product page. This will help the better modules rise up and get used more, while unpopular modules can be removed from search results in the Settings page.</p>
+						<p><img src="{% static "img/vote.png" %}" width="40%" class="img" style="border: 1px solid #000000;padding:1px;"></p><br>
+
+						<div class="text-header">
+                        Price History
+                    	</div><br>
+                        <p>Ever wonder what the price trends are for the products you are interested in? With the price history feature, you can get an idea of what the cheapest price for a product has been over time, helping you make an informed decision for waiting or purchasing right away. Market trends are extremely useful for purchasing products at the right time, and Transparent brings this feature directly to you to help save you both time and money.</p>
                     </div>
           </div>
     </div>  <!-- End of row. Max of 3 items per row. --> 
@@ -36,4 +62,7 @@
 </div> <!-- End of Contents-->
 
 {% endblock %}
+
+
+
 

@@ -58,9 +58,16 @@ p, a, h1, h2, h3, h4, input[type="submit"].btn, li, td, th {
 }
 
 .text-header {
+	font-size: 18px;
+	line-height: 22px;
+	font-weight: 400;
+	color: #000066;
+}
+
+.text-subheader {
 	font-size: 16px;
 	line-height: 20px;
-	font-weight: 400;
+	font-weight: 300;
 	color: #000066;
 }
 
