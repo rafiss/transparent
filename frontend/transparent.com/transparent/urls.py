@@ -29,6 +29,7 @@ urlpatterns = patterns('',
 
     # price tracking
     (r'^track/$', views.track),
+    (r'^stop_track/$', views.stop_track),
     (r'^track_notify/$', views.track_notify),
 
     # Uncomment the admin/doc line below to enable admin documentation:

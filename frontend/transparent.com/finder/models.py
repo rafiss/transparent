@@ -16,7 +16,7 @@ class Module(models.Model):
         return u'id:{0} name:{1}'.format(self.backend_id, self.name)
 
 class Product(models.Model):
-    gid = models.BigIntegerField()
+    gid = models.CharField(max_length=1024)
     price = models.IntegerField()
     name = models.TextField()
 

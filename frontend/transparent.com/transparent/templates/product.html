@@ -47,23 +47,33 @@
    			</form>
             </li>
             {% endcomment %}
-			<li class="span6">
-				<!-- REPLACE VALUE WITH 90% OF CURRENT PRICE FOR DEFAULT THRESHOLD -->
-				{% if user.is_authenticated %}
-				<div class="input-prepend" style="margin-top:10px;">
-					<!-- CHANGES THE THRESHOLD VALUE IN THE SETTINGS FIELDS FOR THE TRACKED ITEM -->
-                    <form method="post" action="{% url 'finder.views.track' %}">
-                        {% csrf_token %}
-	   					<button type="submit" class="btn">Alert me when price drops below</button>
-                        <input type="text" class="span3" placeholder="{{ product.price }}" name="threshold" data-mask="$9999.99">
-                        <input type="hidden" name="gid" value="{{ gid }}"">
-                        <input type="hidden" name="price" value="{{ product.price }}">
-                        <input type="hidden" name="name" value="{{ product.name }}">
-					</form>
-				</div>
-				{% endif %}
-			</li>
-            <li class="span6"> <h3> Lowest Price: </h3> <h3>{{ product.price }}</h3> </li>
+            {% if user.is_authenticated %}
+                <li class="span6">
+                    <!-- REPLACE VALUE WITH 90% OF CURRENT PRICE FOR DEFAULT THRESHOLD -->
+                    <div class="input-prepend" style="margin-top:10px;">
+                        <!-- CHANGES THE THRESHOLD VALUE IN THE SETTINGS FIELDS FOR THE TRACKED ITEM -->
+                        {% if tracking %}
+                        <form method="post" action="{% url 'finder.views.stop_track' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn">Stop Tracking</button>
+                            <input type="hidden" name="gid" value="{{ gid }}">
+                            <input type="hidden" name="threshold" value="{{ threshold }}">
+                        </form>
+                        <h3>Current threshold price: {{ threshold }}</h3>
+                        {% else %}
+                        <form method="post" action="{% url 'finder.views.track' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn">Alert me when price drops below</button>
+                            <input type="text" class="span3" placeholder="{{ product.price }}" name="threshold">
+                            <input type="hidden" name="gid" value="{{ gid }}">
+                            <input type="hidden" name="price" value="{{ product.price }}">
+                            <input type="hidden" name="name" value="{{ product.name }}">
+                        </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endif %}
+            <li class="span6"> <h3> Lowest Price: {{ product.price }}</h3> </li>
         </ul>
 
 		<!-- Start tabs with other module results here -->

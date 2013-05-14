@@ -82,14 +82,25 @@ def search(request):
 
 def product(request, gid):
     modules = Module.objects.all()
+    tracking = False
+    threshold = 0
     if request.user is not None and request.user.is_authenticated():
-        modules = request.user.userprofile.modules.all()
+        if request.user.userprofile.modules.all():
+            modules = request.user.userprofile.modules.all()
+        if Product.objects.filter(gid=str(gid)):
+            product = Product.objects.get(gid=str(gid))
+            if Track.objects.filter(userprofile=request.user.userprofile, product=product):
+                tracking = True
+                track = Track.objects.get(userprofile=request.user.userprofile, product=product)
+                threshold = track.threshold
+                threshold = "${0:.2f}".format(round(float(threshold) / 100, 2))
     payload = {'gid': gid}
     if modules:
         payload['modules'] = [module.backend_id for module in modules]
     resp = urllib2.urlopen(BACKEND_URL + '/product', json.dumps(payload))
     product = json.loads(resp.read())
-    return render(request, "product.html", {'gid': gid, 'product': product, 'modules': modules})
+    return render(request, "product.html", {'gid': gid, 'product': product,
+        'modules': modules, 'tracking': tracking, 'threshold': threshold})
 
 def about(request):
     return render(request, "about.html", {})
@@ -130,7 +141,7 @@ def moduleAPI(request):
 def tracked_items(request):
     tracks = []
     if request.user and request.user.is_authenticated():
-        tracks = Track.objects.filter(userprofile=request.user.userprofile)
+        tracks = request.user.userprofile.track_set.all()
     products = [{'gid': track.product.gid,
         'price': "{0:.2f}".format(round(float(track.product.price) / 100, 2)),
         'threshold': "{0:.2f}".format(round(float(track.threshold) / 100, 2)),
@@ -140,26 +151,66 @@ def tracked_items(request):
 
 def track(request):
     if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
-        return HttpResponseForbidden("error 403")
+        return HttpResponseRedirect('/404')
     gid = request.POST.get('gid', None)
     price = request.POST.get('price', None)
     threshold = request.POST.get('threshold', None)
     name = request.POST.get('name', None)
-    if not (gid and price and threshold):
-        return HttpResponseNotFound("{0} {1} {2}".format(gid, price, threshold))
-    product, created = Product.objects.get_or_create(gid=int(gid),
-            defaults={'price': int(100 * float(price[1:])),
-                'name': name})
+
+    parsed_threshold = threshold
+    gid = str(gid)
+    if price and price[0] == '$':
+        price = price[1:]
+    try:
+        price = int(100 * float(price))
+    except ValueError:
+        return HttpResponseRedirect('/404')
+    if threshold and threshold[0] == '$':
+        parsed_threshold = threshold[1:]
+    try:
+        parsed_threshold = int(100 * float(parsed_threshold))
+    except ValueError:
+        return HttpResponseRedirect('/404')
+
+    if not (gid and price and parsed_threshold and price > 0 and parsed_threshold > 0):
+        return HttpResponseRedirect('/404')
+    product, created = Product.objects.get_or_create(gid=gid,
+            defaults={'price': price, 'name': name})
     product.save()
-    track = Track(userprofile=request.user.userprofile, product=product, threshold=int(100*float(threshold)))
+    track = Track(userprofile=request.user.userprofile, product=product, threshold=parsed_threshold)
     track.save()
+
+    resp = urllib2.urlopen(BACKEND_URL + '/subscribe',
+            json.dumps({'gid': int(gid), 'price': threshold}))
+    json.loads(resp.read())
+
+    return HttpResponseRedirect('/product/{0}'.format(gid))
+
+def stop_track(request):
+    if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
+        return HttpResponseRedirect('/404')
+    gid = request.POST.get('gid', None)
+    threshold = request.POST.get('gid', None)
+
+    resp = urllib2.urlopen(BACKEND_URL + '/unsubscribe', 
+            json.dumps({'gid': int(gid), 'price': threshold}))
+    json.loads(resp.read())
+ 
+    product = Product.objects.get(gid=str(gid))
+    track = Track.objects.get(userprofile=request.user.userprofile, product=product)
+    track.delete()
+   
     return HttpResponseRedirect('/product/{0}'.format(gid))
 
 def track_notify(request):
     if request.META['REMOTE_ADDR'] != BACKEND_IP:
         return HttpResponseNotFound()
     payload = json.loads(request.body)
-    # TODO: Notify user. For now, user must go to tracked_items page.
+    product = Product.objects.get(gid=str(payload['gid']))
+    price = payload['price']
+    price = int(100 * float(price[1:]))
+    product = Product(price=price)
+    product.save()
 
 def submit(request):
     if request.method == 'GET':
