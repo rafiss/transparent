@@ -5,6 +5,7 @@ from django.contrib import auth
 from django.contrib.auth.forms import UserCreationForm
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound, HttpResponseForbidden
 from django.shortcuts import render
+from django.db.models import F
 from finder.models import Module, UserProfile, Track, Product
 from transparent.settings import BACKEND_URL, BACKEND_IP, MEDIA_ROOT
 from datetime import datetime
@@ -110,8 +111,11 @@ def product(request, gid):
 
     # Remove empty module results
     included_modules = []
-    for module in modules:
-        if module.backend_id in product and product[module.backend_id]:
+    for module in modules.values():
+        if module['backend_id'] in product and product[module['backend_id']]:
+            if request.user is not None and request.user.is_authenticated():
+                module['upvoted'] = bool(request.user.userprofile.up_modules.filter(backend_id=module['backend_id']))
+                module['downvoted'] = bool(request.user.userprofile.down_modules.filter(backend_id=module['backend_id']))
             included_modules.append(module)
 
     return render(request, "product.html", {'gid': gid, 'product': product,
@@ -255,6 +259,60 @@ def submit(request):
             return render(request, "submit.html", {'failed': True, 'form': newForm}) 
     
     return render(request, 'submit.html', {'form': newForm})
+
+def upvote(request):
+    if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
+        return HttpResponseRedirect('/404')
+    module_id = request.POST.get('bid', None)
+
+    if module_id == None:
+        return HttpResponseRedirect('/404')
+ 
+    module = Module.objects.get(backend_id=module_id)
+    upped = bool(request.user.userprofile.up_modules.filter(backend_id=module_id))
+    downed = bool(request.user.userprofile.down_modules.filter(backend_id=module_id))
+
+    if upped:
+        request.user.userprofile.up_modules.remove(module)
+        module.up_score = F('up_score') - 1
+    else:
+        request.user.userprofile.up_modules.add(module)
+        module.up_score = F('up_score') + 1
+        if downed:
+            request.user.userprofile.down_modules.remove(module)
+            module.down_score = F('down_score') - 1
+
+    module.save()
+    request.user.userprofile.save()
+   
+    return HttpResponse("ok")
+
+def downvote(request):
+    if not (request.user and request.user.is_authenticated() and request.method == 'POST'):
+        return HttpResponseRedirect('/404')
+    module_id = request.POST.get('bid', None)
+
+    if module_id == None:
+        return HttpResponseRedirect('/404')
+ 
+    module = Module.objects.get(backend_id=module_id)
+    upped = bool(request.user.userprofile.up_modules.filter(backend_id=module_id))
+    downed = bool(request.user.userprofile.down_modules.filter(backend_id=module_id))
+
+    if downed:
+        request.user.userprofile.down_modules.remove(module)
+        module.up_score = F('down_score') - 1
+    else:
+        request.user.userprofile.down_modules.add(module)
+        module.down_score = F('down_score') + 1
+        if upped:
+            request.user.userprofile.upped_modules.remove(module)
+            module.up_score = F('up_score') - 1
+
+    module.save()
+    request.user.userprofile.save()
+   
+    return HttpResponse("ok")
 
 # redirect module link to the source code on github
 #def module(request)

@@ -100,10 +100,23 @@
                         <ul>
                             <li class="span10" style="margin-bottom: 10px;">
                                 <!-- Submit vote to frontend for storage -->
-                                <form class="btn-group">
-                                    <button class="btn btn-success"><i class="icon-thumbs-up"> </i> Up vote</button>
-                                    <button class="btn btn-danger"><i class="icon-thumbs-down"> </i> Down vote</button>
-                                </form>
+                                <div class="btn-group">
+                                    {% if user.is_authenticated %}
+                                        {% if module.upvoted %}
+                                        <button class="btn btn-success" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
+                                        {% else %}
+                                        <button class="btn" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
+                                        {% endif %}
+                                        {% if module.downvoted %}
+                                        <button class="btn btn-danger" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
+                                        {% else %}
+                                        <button class="btn" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
+                                        {% endif %}
+                                    {% else %}
+                                        <button class="btn" disabled><i class="icon-thumbs-up"></i> Upvote</button>
+                                        <button class="btn" disabled><i class="icon-thumbs-down"></i> Downvote</button>
+                                    {% endif %}
+                                </div>
                             </li>
                             <!-- MAKE SURE TO LIST THE PRICE FIRST -->
                             {% for id, data in product.items %}

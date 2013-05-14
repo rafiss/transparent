@@ -20,6 +20,7 @@ function csrfSafeMethod(method) {
     // these HTTP methods do not require CSRF protection
     return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
 }
+
 $.ajaxSetup({
     crossDomain: false,
     beforeSend: function(xhr, settings) {
@@ -34,5 +35,28 @@ function toggleModule(checkBox) {
         type: "POST",
         url: "/toggle/",
         data: {"bid":checkBox.value, "enable": (checkBox.checked) ? 1 : 0}
+    });
+}
+
+function upvote(btn) {
+    console.log(btn.value);
+     $.ajax({
+        type: "POST",
+        url: "/upvote/",
+        data: {"bid":btn.value},
+        success: function(data, stat, jqXHR) {
+            location.reload();
+        }
+    });
+}
+
+function downvote(bid) {
+     $.ajax({
+        type: "POST",
+        url: "/downvote/",
+        data: {"bid":bid},
+        success: function(data, stat, jqXHR) {
+            location.reload();
+        }
     });
 }

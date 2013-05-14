@@ -32,6 +32,10 @@ urlpatterns = patterns('',
     (r'^stop_track/$', views.stop_track),
     (r'^track_notify/$', views.track_notify),
 
+    # module voting
+    (r'^upvote/$', views.upvote),
+    (r'^downvote/$', views.downvote),
+
     # Uncomment the admin/doc line below to enable admin documentation:
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
