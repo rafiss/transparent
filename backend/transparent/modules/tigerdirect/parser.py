@@ -25,7 +25,7 @@ td_selector = lxml.cssselect.CSSSelector('td')
 product_selector = lxml.cssselect.CSSSelector('li.prodRowWrap')
 id_selector = lxml.cssselect.CSSSelector('p.itemModel')
 
-err = sys.stderr
+err = open('log.txt', 'w')
 
 def nodeText(node):
 	return ''.join([x for x in node.itertext()])
@@ -81,7 +81,8 @@ def parseProductInfo(request):
 	selected_name = name_selector(parsed)
 	if selected_name is None or len(selected_name) == 0:
 		selected_name = backup_name_selector(parsed)
-	response['name'] = nodeText(selected_name[0]).strip()
+	if selected_name is not None and len(selected_name) > 0:
+		response['name'] = nodeText(selected_name[0]).strip()
 
 	# parse brand and model
 	warranty = warranty_selector(parsed)

@@ -468,11 +468,8 @@ public class ModuleThread implements Runnable, Interruptable
 			price = map.get("price");
 
 			keyValues = new ArrayList<Entry<String, Object>>(map.size());
-			if (brand != null) keyValues.add(new SimpleEntry<String, Object>("brand", brand));
-			if (model != null) keyValues.add(new SimpleEntry<String, Object>("model", model));
-			if (price != null) keyValues.add(new SimpleEntry<String, Object>("price", price));
 			for (Entry<String, Object> entry : map.entrySet()) {
-				if (!Core.getDatabase().isReservedKey(entry.getKey()))
+				if (!Core.getDatabase().isReservedKey(entry.getKey()) && !entry.getKey().equals("image"))
 					keyValues.add(entry);
 			}
 			break;
