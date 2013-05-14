@@ -8,9 +8,15 @@
 
 <div class="centered-content">
 
-    <div class="btn-group btn-group-vertical">
-        <h2 class="">This page is under construction</h2>
-    </div>	
+    {% if failed %}
+        <div class="btn-group btn-group-vertical alert alert-error">
+            <h2 class="">File upload failed.</h2>
+        </div>	
+    {% elif succeeded %}
+        <div class="btn-group btn-group-vertical alert alert-success">
+            <h2 class="">File upload succeeded!</h2>
+        </div>
+    {% endif %}
 
 	<!-- TEXT START -->
 	<div class="row-fluid">
@@ -22,7 +28,10 @@
 	        
 	        
 	        <!-- Submit code and optional documentation(?) -->
-	        <form class="navbar-form">
+            <form class="navbar-form" enctype="multipart/form-data" method="post" action="{% url 'finder.views.submit' %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                {% comment %}
 	            <input class="span4" type="text" name="module_name" placeholder="Module Name">
 			    <br>
 	            <input class="span4" type="text" name="source_name" placeholder="Source Name">
@@ -31,30 +40,9 @@
 			    <br>
 	            <br>
             	Upload Source File<br>
-			    <input class="span4" type="file" name="source" title="Source File">
-			    <br>			    
-			    {% comment %}
-            	<button type="submit" class="btn">Browse</button>
-			    {% endcomment %}
-            
-			    {% comment %}
-            	Documentation Files<br>
-			    <input class="span4" type="file" name="doc" placeholder="doc">
-            	<button type="submit" class="btn">Browse</button>
-			    {% endcomment %}
-	            
-	            {% comment %}
-	            <div class="mini-container" style="background-color: white;border: 3px ridge #aaaaaa;padding: 3px;">
-	            	<ul>
-					    <br>
-	                	<b>Uploaded code</b><br>
-			            <!-- Iterate through and print source code file names -->
-	                    main.java<br>
-	                    branch1.java<br>
-	                </ul>
-	            </div>
-	            {% endcomment %}
-	            
+			    <input class="span4" type="file" name="source_code" title="Source File">
+                <br>
+                {% endcomment %}
 	            <input type="submit" class="btn" value="Submit">
 	        </form>
 	    </div>

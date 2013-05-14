@@ -6,13 +6,21 @@ from django.contrib.auth.forms import UserCreationForm
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound, HttpResponseForbidden
 from django.shortcuts import render
 from finder.models import Module, UserProfile, Track, Product
-from transparent.settings import BACKEND_URL, BACKEND_IP
+from transparent.settings import BACKEND_URL, BACKEND_IP, MEDIA_ROOT
+from datetime import datetime
 import json, urllib2
+import os
+
+class UploadFileForm(forms.Form):
+    module_name = forms.CharField(max_length=50)
+    source_name = forms.CharField(max_length=50)
+    source_url = forms.CharField(max_length=50)
+    source_file = forms.FileField()
 
 PAGE_SIZE = 15
 
 def index(request):
-    return render(request, "index.html", {})
+    return render(request, "index.html")
 
 def register(request):
     if request.method == 'POST':
@@ -110,10 +118,10 @@ def product(request, gid):
         'modules': included_modules, 'tracking': tracking, 'threshold': threshold})
 
 def about(request):
-    return render(request, "about.html", {})
+    return render(request, "about.html")
 
 def how_it_works(request):
-    return render(request, "how_it_works.html", {})
+    return render(request, "how_it_works.html")
 
 def settings(request):
     modules = Module.objects.all()
@@ -220,10 +228,33 @@ def track_notify(request):
     product.save()
 
 def submit(request):
-    if request.method == 'GET':
-        return render(request, "submit.html", {})
-    else:
-        return render(request, "submit.html", {})
+    newForm = UploadFileForm()
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            module_name = request.POST.get('module_name', None)
+            source_name = request.POST.get('source_name', None)
+            source_url = request.POST.get('source_url', None)
+            source_code = request.FILES['source_file']
+ 
+            now = str(datetime.now())
+            directory = os.path.join(MEDIA_ROOT, 'modules', now)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            info_file = open(os.path.join(directory, 'info.txt'), 'w+')
+            source_file = open(os.path.join(directory, module_name), 'w+')
+            info_file.write('Module Name: ' + module_name + '\n')
+            info_file.write('Source Name: ' + source_name + '\n')
+            info_file.write('Source URL: ' + source_url + '\n')
+            for chunk in source_code.chunks():
+                source_file.write(chunk)
+            info_file.close()
+            source_file.close()
+            return render(request, "submit.html", {'succeeded': True, 'form': newForm})
+        else:
+            return render(request, "submit.html", {'failed': True, 'form': newForm}) 
+    
+    return render(request, 'submit.html', {'form': newForm})
 
 # redirect module link to the source code on github
 #def module(request)

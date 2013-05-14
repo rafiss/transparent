@@ -16,6 +16,7 @@ backend/bin/
 
 # Static site dir (should be populated by ./manage.py collectstatic)
 frontend/transparent.com/transparent/static/
+frontend/transparent.com/transparent/media/
 
 # C extensions
 *.so
