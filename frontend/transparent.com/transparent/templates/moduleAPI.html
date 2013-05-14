@@ -11,12 +11,28 @@
             <!-- TEXT START -->
             <div class="row-fluid">
                 <div class="span12">
+					<a name="binary"></a>
                     <!-- Introduction -->
-                    <h3>Transparent.Module API</h3>
-					<br>
-					<br>
+                    <h3>Transparent Module API</h3>
+					<br/>
+						<table width="90%" class="table table-hover table-bordered">
+						    <thead>
+							<tr>
+		                		<th style="padding-left:25px;">
+								    <h5>Jump to:</h5>
+							    </th>
+		                		<th style="padding-left:25px;">
+								    <h5><a href="#binary">Binary API</a></h5>
+							    </th>
+		                		<th style="padding-left:25px;">
+								    <h5><a href="#json">JSON API</a></h5>
+							    </th>
+							</tr>
+							</thead>
+						</table>
+					<br/>
                     <div class="text-header">
-                        Binary API
+                        <a name="binary">Binary API</a>
                     </div>
                     <br>
                     <div class="text-left">
@@ -66,7 +82,7 @@
 								<td>Response</td>
 								<td>0</td>
 								<td><p>If this is a <b>Product list request</b>, then the response should consist of the new State data, and the list of product IDs that were parsed by the module. In detail, the next 16-bits is the unsigned length of the State data in bytes. The State data then follows. The next 16-bits is the unsigned count of product IDs that will be returned by the module. Let this be <i>n</i>. The following repeats <i>n</i> times: Each product ID is a length-encoded UTF8 string, where the first 16-bits is the unsigned length of the product ID <i>in bytes</i>. This is followed by the UTF8-encoded product ID string. The Transparent Core then pushes this data into the database, also saving the State data for the module, and continues to listen to the module for further feedback.</p>
-									<p>If this is a <b>Product info request</b>, then the first unsigned 16-bits indicate the number of key-value pairs parsed by the module. The following is repeated until the specified number of key-value pairs are read: The key is specified as a length-encoded UTF8 string, where the first 16-bits is the unsigned length of the string <i>in bytes</i>, followed by the UTF8-encoded string. The value can either be a number or a string, as specified by the next 8-bit unsigned flag. If this flag is 0, the value is assumed to be numeric, in which case the next 64-bits are parsed and stored as a number. If this flag is 1, it is assumed to be a string, which is also a length-encoded UTF8 string. This implies that the first 16-bits indicate the unsigned length of the string <i>in bytes</i>, which is then followed by the UTF8-encoded string. The Transparent Core then interprets the data, maybe pushing the data to the database, and then continuing to listen to the module for further feedback.</p></td>
+									<p>If this is a <b>Product info request</b>, then the first unsigned 16-bits indicate the number of key-value pairs parsed by the module. The following is repeated until the specified number of key-value pairs are read: The key is specified as a length-encoded UTF8 string, where the first 16-bits is the unsigned length of the string <i>in bytes</i>, followed by the UTF8-encoded string. The value can either be a number or a string, as specified by the next 8-bit unsigned flag. If this flag is 0, the value is assumed to be numeric, in which case the next 64-bits are parsed and stored as a number. If this flag is 1, it is assumed to be a string, which is also a length-encoded UTF8 string. This implies that the first 16-bits indicate the unsigned length of the string <i>in bytes</i>, which is then followed by the UTF8-encoded string. The Transparent Core then interprets the data, maybe pushing the data to the database, and then sends another request packet with a new module-specific product identifier.</p></td>
 							</tr>
 							<tr>
 								<td>HTTP GET request</td>
@@ -87,7 +103,7 @@
 						<br/>
 						<p>For HTTP GET and POST requests, the Transparent Core first specifies the HTTP Content Type field as a length-encoded byte sequence. The first 16-bits indicate the unsigned length of the Content Type field, which is followed by the Content Type byte sequence. The Transparent Core provides two methods for downloading and sending the data to the module: <b>blocked</b> or <b>complete</b>. This is specified when the module is initially submitted.</p>
 						<ul>
-							<li><p>For <b>blocked</b> downloading, the page is passed to the module in chunks, each length-encoded such that the first 16-bits indicate the unsigned length of the chunk. The chunk byte sequence is then provided. The end of the download is indicated when the length provided is zero.</p></li>
+							<a name="json"></a><li><p>For <b>blocked</b> downloading, the page is passed to the module in chunks, each length-encoded such that the first 16-bits indicate the unsigned length of the chunk. The chunk byte sequence is then provided. The end of the download is indicated when the length provided is zero.</p></li>
 							<li><p>For <b>complete</b> downloading, the page is downloaded into a single byte sequence in the Core, and then passed as a single length-encoded chunk, where the length is 32-bits. This is <i>not</i> followed by a terminating 0-length as in the blocked downloading case.</p></li>
 						</ul>
                     </div>
@@ -98,7 +114,81 @@
                     </div>
                     <br>
                     <div class="text-left">
-                        <p>JSON API is currently under development. Coming soon!</p>
+                        <p>The JSON API provides a clean text-based interface with the Transparent Core. JSON messages are passed to and from the module encoded in UTF8 separated by newline characters. The first message sent from the Transparent Core to the module is the request packet. This packet is a JSON map with a key <b>"type"</b> mapped to one of either: <b>"list"</b> or <b>"info"</b>.</p>
+						<br/>
+						<table width="90%" class="table table-hover table-bordered">
+						    <thead>
+							<tr>
+		                		<th>
+								    <h5>JSON map key</h5>
+							    </th>
+		                		<th>
+								    <h5>Value</h5>
+							    </th>
+							</tr>
+							</thead>
+							<tr>
+								<td>"type"</td>
+								<td>"info" or "list"</td>
+							</tr>
+							<tr>
+								<td>"id"</td>
+								<td><b>(Product info request only)</b> The module-specific product identifier string of the requested product.</td>
+							</tr>
+							<tr>
+								<td>"state"</td>
+								<td><b>(Product list request only)</b> The (optional) persistent state string.</td>
+							</tr>
+						</table>
+						<br/>
+                        <p>If the request type is a <b>Product list request</b>, then the JSON map may also contain the key <b>"state"</b> which maps to a string, containing the persistent state data that the module can use across multiple runs. Note that this key may not exist, in which case, it is implied that the module starts from the beginning of its parse.</p>
+                        <p>If the request type is a <b>Product info request</b>, then the JSON map will contain the key <b>"id"</b> which maps to a string, containing the module-specific product identifier indicating which product's information is being requested by the Transparent Core.</p>
+						<br/>
+                        <p>Once the initial request packet is sent, the Transparent Core will wait and listen for response packets from the module. The feedback options are listed below:</p>
+						<br/>
+						<table width="90%" class="table table-hover table-bordered">
+						    <thead>
+							<tr>
+		                		<th>
+								    <h5>JSON map key</h5>
+							    </th>
+		                		<th>
+								    <h5>Value</h5>
+							    </th>
+							</tr>
+							</thead>
+							<tr>
+								<td>"type"</td>
+								<td>"get", "post", or "response"</td>
+							</tr>
+							<tr>
+								<td>"ids"</td>
+								<td><b>(Product list response only)</b> A JSON array of module-specific product identifier strings.</td>
+							</tr>
+							<tr>
+								<td>"state"</td>
+								<td><b>(Product list response only)</b> The (optional) persistent state string.</td>
+							</tr>
+							<tr>
+								<td>"response"</td>
+								<td><b>(Product info response only)</b> A JSON map containing the key-value pairs encoding the information about the requested product.</td>
+							</tr>
+							<tr>
+								<td>"url"</td>
+								<td><b>(HTTP GET/POST request)</b> The URL string to request from.</td>
+							</tr>
+							<tr>
+								<td>"user_agent"</td>
+								<td><b>(HTTP GET/POST request)</b> The (optional) user agent string to use.</td>
+							</tr>
+							<tr>
+								<td>"post"</td>
+								<td><b>(HTTP POST request only)</b> The POST data (encoded with UTF8).</td>
+							</tr>
+						</table>
+						<br/>
+                        <p>If the Transparent Core receives an HTTP request, it will return the data, depending on whether the module is setup to use <b>blocked</b> downloading or <b>complete</b> downloading. For blocked downloading, each block is sent to the module in a JSON map, with the key <b>"response"</b>. The last block contains the key-value pair <b>"key" : "true"</b>. For complete downloading, the entire page is sent in a JSON map with the key <b>"response"</b>.</p>
+                        <p>Once the module sends the appropriate response to the Transparent Core, then if the initial request was a Product list request, the Core will continue to wait and listen for further HTTP requests and responses. If the initial request was a Product info request, the Core will send another request packet identical to the first packet except for the new module-specific product identifier. The process then repeats.</p>
                     </div>
           </div>
     </div>  <!-- End of row. Max of 3 items per row. --> 
