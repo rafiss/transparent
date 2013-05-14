@@ -114,10 +114,10 @@
                                         {% if module.upvoted %}
                                         <button data-toggle="tooltip" data-placement="bottom"  title="Votes: {{ module.up_score }}" class="voter btn btn-success" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
                                         {% else %}
-                                        <button data-toggle="tooltip" data-placement="bottom"  title="Votes: {{ module.up_score}}"class="voter btn" value="{{ module.backend_id }}" onclick="downvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
+                                        <button data-toggle="tooltip" data-placement="bottom"  title="Votes: {{ module.up_score}}"class="voter btn" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-up"></i> Upvote</button>
                                         {% endif %}
                                         {% if module.downvoted %}
-                                        <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn btn-danger" value="{{ module.backend_id }}" onclick="upvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
+                                        <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn btn-danger" value="{{ module.backend_id }}" onclick="downvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
                                         {% else %}
                                         <button data-toggle="tooltip"  data-placement="bottom" title="Votes: {{ module.down_score }}" class="voter btn" value="{{ module.backend_id }}" onclick="downvote(this);"><i class="icon-thumbs-down"></i> Downvote</button>
                                         {% endif %}
